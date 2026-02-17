@@ -569,20 +569,23 @@ ${historyText}
 Player: ${playerInput}
 
 ---
-## RESPONSE FORMAT (IMPORTANT)
-- Put actions in [brackets], third person: [She wipes the counter]
-- Put dialogue in quotes: "Words here."
-- Actions SEPARATE from dialogue, not mixed
-- Example: [She glances up from the glass.] "You're asking about Harren?"
+## RESPONSE FORMAT
+- Action in [brackets]: [She sets down the glass.]
+- Dialogue in quotes: "Like this."
+- Example: [She glances up.] "Harren? What about him."
 
-## RESPONSE STYLE (IMPORTANT)
-- You KNOW the situation. Don't ask obvious questions like "what brings you here"
-- PUSH forward - drop hints about Harren, the mystery, your opinions
-- Have a personality. React with attitude. Be memorable.
-- If trust is low, be guarded but intriguing - hint at things you won't say yet
-- End with something that invites response (a challenge, a hint, a loaded statement)
-- 2-4 short sentences max
-- NO generic tavern talk. Every line should reveal character or advance intrigue.
+## RESPONSE STYLE - BE BRIEF
+- 1-2 sentences ONLY. Let conversation build slowly.
+- One thought per reply. Don't info-dump.
+- Short, punchy. This is texting, not a novel.
+- React to what they said. Don't monologue.
+- Leave hooks for them to ask more.
+
+BAD (too long):
+[She sets down the glass and sighs.] "Harren was a good man. He knew every board in this place. Been here thirty years. Strange that he'd fall like that. The guards ruled it an accident but I have my doubts."
+
+GOOD (brief):
+[She pauses.] "Harren knew those stairs." [A look.] "Men like that don't just fall."
 
 Respond as ${identity.name}:`;
 }
@@ -595,7 +598,7 @@ async function generateTalkResponse(
   playerName: string | null
 ): Promise<string> {
   const prompt = buildTalkPrompt(npc, input, playerName);
-  const response = await provider.generate(prompt, { temperature: 0.8, maxTokens: 200 });
+  const response = await provider.generate(prompt, { temperature: 0.8, maxTokens: 80 });
 
   // Track tokens
   tokenTracker.track(chatId, 'chat',
