@@ -2,7 +2,7 @@
  * LLM Provider Factory
  *
  * BYOM - Bring Your Own Model
- * Supports: Ollama, OpenAI-compatible, Anthropic, MiniMax
+ * Supports: Ollama, OpenAI-compatible, Anthropic, MiniMax, Kimi (Moonshot)
  */
 
 import type { LLMProvider, ModelConfig, GenerateOptions } from '../types/index.js';
@@ -17,6 +17,8 @@ export function createProvider(config: ModelConfig): LLMProvider {
     case 'openai':
     case 'lmstudio':
       return new OpenAICompatibleProvider(config);
+    case 'kimi':
+      return new KimiProvider(config);
     case 'anthropic':
       return new AnthropicProvider(config);
     case 'minimax':
@@ -54,7 +56,7 @@ class OllamaProvider implements LLMProvider {
       }),
     });
 
-    const data = await response.json();
+    const data = await response.json() as { response: string };
     return data.response;
   }
 
@@ -109,7 +111,65 @@ class OpenAICompatibleProvider implements LLMProvider {
       }),
     });
 
-    const data = await response.json();
+    const data = await response.json() as { choices: Array<{ message: { content: string } }> };
+    return data.choices[0].message.content;
+  }
+
+  async generateJSON<T>(prompt: string, options?: GenerateOptions): Promise<T> {
+    const response = await this.generate(
+      prompt + '\n\nRespond with valid JSON only.',
+      options
+    );
+
+    const jsonMatch = response.match(/\{[\s\S]*\}/);
+    if (!jsonMatch) {
+      throw new Error('No valid JSON in response');
+    }
+
+    return JSON.parse(jsonMatch[0]) as T;
+  }
+}
+
+/**
+ * Kimi Provider (Moonshot AI)
+ * OpenAI-compatible API
+ * International: https://api.moonshot.ai/v1
+ * China: https://api.moonshot.cn/v1
+ * Models: moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k
+ */
+class KimiProvider implements LLMProvider {
+  name = 'kimi';
+  private endpoint: string;
+  private model: string;
+  private apiKey: string;
+
+  constructor(config: ModelConfig) {
+    this.endpoint = config.endpoint ?? 'https://api.moonshot.ai/v1';
+    this.model = config.modelName ?? 'moonshot-v1-32k';
+    this.apiKey = config.apiKey!;
+  }
+
+  async generate(prompt: string, options?: GenerateOptions): Promise<string> {
+    const response = await fetch(`${this.endpoint}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages: [{ role: 'user', content: prompt }],
+        temperature: options?.temperature ?? 0.8,
+        max_tokens: options?.maxTokens ?? 500,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Kimi API error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json() as { choices: Array<{ message: { content: string } }> };
     return data.choices[0].message.content;
   }
 
@@ -156,7 +216,7 @@ class AnthropicProvider implements LLMProvider {
       }),
     });
 
-    const data = await response.json();
+    const data = await response.json() as { content: Array<{ text: string }> };
     return data.content[0].text;
   }
 

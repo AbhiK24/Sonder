@@ -447,7 +447,7 @@ export interface GenerateOptions {
 }
 
 export interface ModelConfig {
-  provider: 'ollama' | 'openai' | 'anthropic' | 'minimax' | 'lmstudio';
+  provider: 'ollama' | 'openai' | 'anthropic' | 'minimax' | 'lmstudio' | 'kimi';
   endpoint?: string;
   modelName: string;
   apiKey?: string;

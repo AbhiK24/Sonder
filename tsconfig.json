@@ -11,14 +11,11 @@
     "resolveJsonModule": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true,
-    "outDir": "./dist",
-    "rootDir": "./src",
-    "baseUrl": ".",
-    "paths": {
-      "@sonder/engine": ["packages/engine/src"],
-      "@sonder/engine/*": ["packages/engine/src/*"]
-    }
+    "sourceMap": true
   },
+  "references": [
+    { "path": "packages/engine" }
+  ],
+  "files": [],
   "exclude": ["node_modules", "dist"]
 }

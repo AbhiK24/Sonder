@@ -5,7 +5,7 @@
  * See: Wanderers_Rest_Prompts_Spec.md (Assertion Extraction)
  */
 
-import type { NPC, Message, Assertion } from '../types/index.js';
+import type { NPC, Message, Assertion, NPCIdentity, NPCMemory, Statement } from '../types/index.js';
 import { loadIdentity, loadMemory, loadStatements, saveMemory, saveStatements } from './files.js';
 
 export class MemoryManager {
@@ -19,9 +19,9 @@ export class MemoryManager {
    * Load all memory files for an NPC
    */
   async loadNPCMemory(npcId: string): Promise<{
-    identity: ReturnType<typeof loadIdentity>;
-    memory: ReturnType<typeof loadMemory>;
-    statements: ReturnType<typeof loadStatements>;
+    identity: NPCIdentity;
+    memory: NPCMemory;
+    statements: Statement[];
   }> {
     const basePath = `${this.savePath}/npcs/${npcId}`;
 
