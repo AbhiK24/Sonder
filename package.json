@@ -8,6 +8,8 @@
     "dev": "pnpm --filter @sonder/engine dev",
     "dashboard": "pnpm --filter @sonder/dashboard dev",
     "telegram": "pnpm --filter @sonder/engine telegram",
+    "create-npc": "pnpm --filter @sonder/engine create-npc",
+    "generate-images": "pnpm --filter @sonder/engine generate-images",
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "eslint packages/*/src/**/*.ts",

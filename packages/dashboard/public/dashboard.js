@@ -52,7 +52,7 @@ function renderNPCCard(npc) {
   const meta = NPC_META[npc.id] || { category: 'unknown', placeholder: '?' };
   const trustLevel = getTrustLevel(npc.trust);
   const conversations = Math.floor((npc.historyLength || 0) / 2);
-  const hasImage = false; // Set to true when images are added
+  const hasImage = true; // Images are now generated
 
   return `
     <div class="npc-card ${meta.category} ${npc.trust < 30 ? 'not-met' : ''}">
