@@ -18,6 +18,8 @@ import { Persistence } from './utils/persistence.js';
 import { FactStore, Fact } from './utils/fact-store.js';
 import { AssertionExtractor } from './utils/assertion-extractor.js';
 import { LieDetector, LieAlert } from './utils/lie-detector.js';
+import { FTUE_CASE, FTUEProgress, createFTUEProgress, checkFTUEProgression } from './cases/ftue-case.js';
+import { Case, CaseManager, CaseGenerator } from './cases/index.js';
 import type { ModelConfig, NPCIdentity, NPCMemory, LLMProvider } from './types/index.js';
 
 // Load .env
@@ -49,6 +51,8 @@ interface ChatState {
   events: WorldEvent[];
   day: number;
   factStore: FactStore;
+  ftueProgress: FTUEProgress;
+  caseManager: CaseManager;
 }
 
 // =============================================================================
@@ -63,6 +67,9 @@ let loadedNPCs: Map<string, { identity: NPCIdentity; memory: NPCMemory }> = new 
 // Persistence
 const saveDir = process.env.SAVE_PATH?.replace('~', process.env.HOME || '') || './saves';
 const persistence = new Persistence(saveDir);
+
+// Case generator (initialized after provider is created)
+let caseGenerator: CaseGenerator;
 
 function getState(chatId: number): ChatState {
   if (!chatStates.has(chatId)) {
@@ -99,6 +106,14 @@ function getState(chatId: number): ChatState {
         ? FactStore.deserialize((saved as any).facts)
         : new FactStore();
 
+      // Restore FTUE progress
+      const ftueProgress: FTUEProgress = (saved as any).ftueProgress || createFTUEProgress();
+
+      // Restore case manager
+      const caseManager = (saved as any).caseManager
+        ? CaseManager.deserialize((saved as any).caseManager, caseGenerator)
+        : new CaseManager(caseGenerator, [{ ...FTUE_CASE }]);
+
       chatStates.set(chatId, {
         currentNPC: saved.currentNPC,
         npcs,
@@ -106,6 +121,8 @@ function getState(chatId: number): ChatState {
         events: saved.events.map(e => ({ ...e, time: new Date(e.time) })),
         day: saved.day,
         factStore,
+        ftueProgress,
+        caseManager,
       });
       console.log(`[${chatId}] Loaded save (Day ${saved.day}, ${factStore.getAllFacts().length} facts)`);
     } else {
@@ -126,6 +143,8 @@ function getState(chatId: number): ChatState {
         events: [],
         day: 1,
         factStore: new FactStore(),
+        ftueProgress: createFTUEProgress(),
+        caseManager: new CaseManager(caseGenerator, [{ ...FTUE_CASE }]),
       });
     }
   }
@@ -159,6 +178,8 @@ function saveState(chatId: number): void {
     day: state.day,
     savedAt: new Date().toISOString(),
     facts: state.factStore.serialize(),
+    ftueProgress: state.ftueProgress,
+    caseManager: state.caseManager.serialize(),
   } as any);
 }
 
@@ -499,10 +520,14 @@ async function main() {
 
   const provider = createProvider(modelConfig);
 
+  // Initialize case generator
+  caseGenerator = new CaseGenerator(provider);
+
   // Load all NPCs
   const soulPath = resolve(__dirname, '../../../packages/souls/wanderers-rest/npcs');
 
-  const npcIds = ['maren', 'kira'];
+  // Townspeople + Visitors (always try to load, some may not exist yet)
+  const npcIds = ['maren', 'kira', 'aldric', 'elena', 'thom'];
   for (const npcId of npcIds) {
     try {
       const npcPath = resolve(soulPath, npcId);
@@ -511,7 +536,8 @@ async function main() {
       loadedNPCs.set(npcId, { identity, memory });
       console.log(`Loaded: ${identity.name} (${identity.role})`);
     } catch (e) {
-      console.error(`Failed to load NPC ${npcId}:`, e);
+      // Silent fail for NPCs not yet created
+      console.log(`Skipped: ${npcId} (not found)`);
     }
   }
   console.log();
@@ -548,15 +574,16 @@ async function main() {
       `\`THINK\` - Your gut instinct speaks\n` +
       `\`OBSERVE\` - Watch who you're talking to\n` +
       `\`STATUS\` - See all relationships\n` +
+      `\`CASE\` - Current mysteries\n` +
+      `\`CLUES\` - What you've discovered\n` +
       `\`FACTS\` - What you've learned\n` +
       `\`SUSPICIONS\` - Inconsistencies noticed\n` +
       `\`RECAP\` - What happened while away\n` +
       `\`TOKENS\` - View token usage\n` +
       `\`LEAVE\` - Step away\n` +
       `\`RESET\` - Start over\n\n` +
-      `*Switch NPCs:*\n` +
-      `\`MAREN\` - Talk to the barkeep\n` +
-      `\`KIRA\` - Talk to the merchant\n\n` +
+      `*Talk to (ALL CAPS):*\n` +
+      `MAREN, KIRA, ALDRIC, ELENA, THOM\n\n` +
       `_Just type normally to talk._`,
       { parse_mode: 'Markdown' }
     );
@@ -721,6 +748,56 @@ async function main() {
       return;
     }
 
+    // CASE - Show current mysteries
+    if (trimmed === 'CASE') {
+      const activeCases = state.caseManager.getActiveCases();
+      if (activeCases.length === 0) {
+        await ctx.reply('_No active mysteries. The tavern is quiet... for now._', { parse_mode: 'Markdown' });
+        return;
+      }
+
+      const lines = ['*Active Mysteries*\n'];
+      for (const c of activeCases) {
+        const progress = c.revealedClues.length;
+        const total = c.clues.length;
+        const suspects = c.suspects.filter(s => s.suspicionLevel > 0).length;
+        lines.push(`\n*${c.title}*`);
+        lines.push(`_${c.hook}_`);
+        lines.push(`Clues: ${progress}/${total} | Suspects: ${suspects}`);
+      }
+
+      await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown' });
+      return;
+    }
+
+    // CLUES - Show discovered clues
+    if (trimmed === 'CLUES') {
+      const activeCases = state.caseManager.getActiveCases();
+      if (activeCases.length === 0) {
+        await ctx.reply('_No clues to review._', { parse_mode: 'Markdown' });
+        return;
+      }
+
+      const lines = ['*Your Clues*\n'];
+      for (const c of activeCases) {
+        const revealed = c.clues.filter(cl => cl.revealed);
+        if (revealed.length === 0) continue;
+
+        lines.push(`\n_${c.title}:_`);
+        for (const clue of revealed) {
+          lines.push(`• ${clue.content} _(from ${clue.source})_`);
+        }
+      }
+
+      if (lines.length === 1) {
+        await ctx.reply('_You haven\'t discovered any clues yet. Keep asking questions._', { parse_mode: 'Markdown' });
+        return;
+      }
+
+      await ctx.reply(lines.join('\n'), { parse_mode: 'Markdown' });
+      return;
+    }
+
     // === NPC SWITCHING ===
     for (const [npcId, npcData] of loadedNPCs) {
       if (trimmed === npcId.toUpperCase() || trimmed === npcData.identity.name.toUpperCase()) {
@@ -840,6 +917,53 @@ ${npc.identity.name}:`;
 
       console.log(`[${chatId}] "${input.slice(0, 30)}..." → ${currentNpc.identity.name}`);
       await ctx.reply(`_${response}_`, { parse_mode: 'Markdown' });
+
+      // === FTUE PROGRESSION ===
+      // Check if Maren should reveal more of the story
+      if (state.currentNPC === 'maren' && !state.ftueProgress.complete) {
+        const marenTrust = currentNpc.trust;
+        const { newStage, dialogue, newNPCs } = checkFTUEProgression(
+          state.ftueProgress.stage,
+          marenTrust
+        );
+
+        if (newStage > state.ftueProgress.stage) {
+          state.ftueProgress.stage = newStage;
+
+          // Mark FTUE complete if reached final stage
+          if (newStage >= 7) {
+            state.ftueProgress.complete = true;
+          }
+
+          // Maren reveals something
+          if (dialogue) {
+            await new Promise(r => setTimeout(r, 1500)); // Dramatic pause
+            await ctx.reply(`\n_Maren leans closer..._\n\n_"${dialogue}"_`, { parse_mode: 'Markdown' });
+          }
+
+          // Introduce new NPCs
+          for (const npcId of newNPCs) {
+            if (!state.ftueProgress.npcsIntroduced.includes(npcId)) {
+              state.ftueProgress.npcsIntroduced.push(npcId);
+            }
+          }
+
+          // Reveal clues for this stage
+          const ftueCase = state.caseManager.getCase('ftue_harren_death');
+          if (ftueCase) {
+            for (const clue of ftueCase.clues) {
+              if (!clue.revealed &&
+                  clue.revealCondition.type === 'trust' &&
+                  marenTrust >= (clue.revealCondition.value as number)) {
+                state.caseManager.revealClue('ftue_harren_death', clue.id);
+                console.log(`[${chatId}] Revealed clue: ${clue.id}`);
+              }
+            }
+          }
+
+          saveState(chatId);
+        }
+      }
 
     } catch (error) {
       console.error('Error:', error);
