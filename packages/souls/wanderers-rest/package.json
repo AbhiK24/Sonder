@@ -1,0 +1,20 @@
+{
+  "name": "@sonder/wanderers-rest",
+  "version": "0.1.0",
+  "description": "Wanderer's Rest - A tavern mystery soul for Sonder",
+  "type": "module",
+  "main": "./index.js",
+  "files": [
+    "world/",
+    "npcs/",
+    "index.js"
+  ],
+  "keywords": [
+    "sonder",
+    "soul",
+    "tavern",
+    "mystery",
+    "interactive-fiction"
+  ],
+  "license": "SEE LICENSE IN LICENSE.md"
+}

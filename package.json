@@ -1,0 +1,43 @@
+{
+  "name": "sonder",
+  "version": "0.1.0",
+  "description": "An engine for chat-based games where NPCs feel alive. Local-first, LLM-powered, conversation-driven.",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "pnpm --filter @sonder/engine dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "eslint packages/*/src/**/*.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "keywords": [
+    "game-engine",
+    "llm",
+    "npc",
+    "interactive-fiction",
+    "chatbot",
+    "telegram-bot",
+    "local-first",
+    "ai-game",
+    "narrative-game"
+  ],
+  "author": "AbhiK24",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AbhiK24/Sonder.git"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "typescript": "^5.3.3",
+    "eslint": "^8.56.0",
+    "@typescript-eslint/eslint-plugin": "^6.19.0",
+    "@typescript-eslint/parser": "^6.19.0",
+    "prettier": "^3.2.4"
+  },
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "packageManager": "pnpm@8.14.0"
+}

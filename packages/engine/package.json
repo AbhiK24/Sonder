@@ -1,0 +1,39 @@
+{
+  "name": "@sonder/engine",
+  "version": "0.1.0",
+  "description": "Core engine for Sonder - chat-based games with living NPCs",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    },
+    "./types": {
+      "types": "./dist/types/index.d.ts",
+      "import": "./dist/types/index.js"
+    }
+  },
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "test": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "grammy": "^1.21.1",
+    "ollama": "^0.5.0",
+    "openai": "^4.28.0",
+    "better-sqlite3": "^9.4.1",
+    "zod": "^3.22.4",
+    "gray-matter": "^4.0.3",
+    "nanoid": "^5.0.5"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.8",
+    "tsx": "^4.7.0",
+    "vitest": "^1.2.2"
+  },
+  "license": "MIT"
+}
