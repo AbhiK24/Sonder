@@ -13,165 +13,228 @@ Local-first. LLM-powered. Conversation-driven. Your world grows on your machine.
 Sonder is a game engine for building text-based games where:
 
 - **NPCs remember everything** — Every conversation is stored. Reference what they said weeks ago.
-- **Conversations have consequences** — What you say matters. Trust builds. Secrets spread. People leave.
+- **NPCs can lie** — Track what each character claims. Cross-reference. Catch contradictions.
+- **Conversations have consequences** — What you say matters. Trust builds. Secrets spread.
 - **The world lives without you** — Events happen while you're away. Return to find things changed.
 - **Your world is yours alone** — Local-first. No servers. Your save, your story.
 
+## 🎮 Play Now
+
+The first soul, **Wanderer's Rest**, is playable on Telegram:
+
+```bash
+# Clone and install
+git clone https://github.com/AbhiK24/Sonder.git
+cd Sonder && pnpm install
+
+# Configure (add your API keys)
+cp .env.example .env
+
+# Run the bot
+pnpm telegram
+```
+
+Then message **@WandererRestBot** on Telegram.
+
 ## The First Soul: Wanderer's Rest
 
-*Run a tavern. Know everyone. Solve their problems. Through conversation alone.*
+*You inherit a tavern. The previous owner died under mysterious circumstances. Solve the mystery through conversation alone.*
 
-You inherit a failing tavern at a crossroads. The locals are skeptical. When they have problems — thefts, feuds, mysteries — they come to you. Not because you have power. Because you *know people*.
+**NPCs:**
+| Character | Role | Category |
+|-----------|------|----------|
+| **Maren** | Barkeep | Townspeople |
+| **Kira** | Traveling Merchant | Visitor |
+| **Aldric** | Blacksmith | Townspeople |
+| **Elena** | Herbalist | Townspeople |
+| **Thom** | Guard Captain | Townspeople |
+| **???** | Hooded Figure | Stranger |
 
-Your only tools: conversation, observation, and memory.
+**The Mystery:** Old Harren "fell" down the cellar stairs. Maren doesn't believe it. As trust builds, she reveals more. Someone in town is lying.
+
+## Features
+
+### 💬 Telegram Bot with Game Commands
+
+Talk naturally or use ALL CAPS commands:
+
+| Command | Description |
+|---------|-------------|
+| `LOOK` | The tavern describes itself |
+| `THINK` | Your gut instinct speaks |
+| `OBSERVE` | Watch who you're talking to |
+| `STATUS` | See all relationships |
+| `CASE` | View active mysteries |
+| `CLUES` | Review discovered evidence |
+| `FACTS` | What you've learned |
+| `SUSPICIONS` | Contradictions noticed |
+| `TOKENS` | View LLM token usage |
+| `DASHBOARD` | Link to visual dashboard |
+
+Switch NPCs by name: `MAREN`, `KIRA`, `ALDRIC`, etc.
+
+### 🔍 Lie Detection System
+
+NPCs make claims. The system tracks them:
+
+```
+Aldric: "I was at the forge all night."
+[Fact stored: aldric, "was at forge all night", day 2]
+
+Later...
+Kira: "The forge was cold when I passed it."
+[Contradiction detected!]
+
+→ Your gut speaks: "Something about what Aldric said doesn't add up..."
+```
+
+### 🌙 World Tick (Events While Away)
+
+Real time passes. 1 real day = 1 game day.
+
+- Return after 1+ hours → Events happened while you were gone
+- NPCs interact with each other
+- Clues surface, rumors spread
+- The world doesn't wait for you
+
+### 📊 Visual Dashboard
+
+```bash
+pnpm dashboard
+# Opens at http://localhost:3000
+```
+
+See your game visually:
+- NPC portraits with trust meters
+- Case progress board
+- Clues and facts journal
+- Suspicions panel
+
+### 🎨 Auto-Generated NPC Portraits
+
+```bash
+# Generate all NPC images
+pnpm generate-images
+
+# Create a new NPC with portrait
+pnpm create-npc
+```
+
+Uses DALL-E 3 to create consistent fantasy character art.
+
+### 🤖 Bring Your Own Model (BYOM)
+
+| Provider | Setup | Cost |
+|----------|-------|------|
+| **Kimi** (Moonshot) | API key | ~$0.01/session |
+| **OpenAI** | API key | ~$0.01/session |
+| **Anthropic** | API key | ~$0.01/session |
+| **Ollama** | Local install | Free |
 
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────┐
-│                         SONDER                               │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│   ┌─────────────┐    ┌─────────────┐    ┌─────────────┐    │
-│   │   Engine    │    │    Soul     │    │    Save     │    │
-│   │   (MIT)     │    │    (IP)     │    │  (Yours)    │    │
-│   └─────────────┘    └─────────────┘    └─────────────┘    │
-│         │                  │                  │             │
-│   TypeScript         World Bible          NPCs state        │
-│   LLM providers      NPCs identity        Memory logs       │
-│   Chat integration   Aesthetic            Your story        │
-│   World simulation   Starting state                         │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-## Features
-
-### Bring Your Own Model (BYOM)
-
-We don't ship a model. You configure yours:
-
-| Provider | Setup | Cost |
-|----------|-------|------|
-| **Ollama** | Local install | Free |
-| **LM Studio** | Local GUI | Free |
-| **OpenAI** | API key | ~$0.01/session |
-| **Anthropic** | API key | ~$0.01/session |
-| **MiniMax** | API key (4M context) | ~$0.01/session |
-
-### OpenClaw-Style Memory
-
-Markdown files you can read and edit:
-
-```
-~/.sonder/saves/my-tavern/
-├── npcs/
-│   └── maren/
-│       ├── IDENTITY.md     # Who she is
-│       ├── MEMORY.md       # What she knows
-│       ├── STATEMENTS.md   # What she's said
-│       └── logs/           # Daily conversations
-├── player/
-│   └── PROFILE.md          # Your reputation
-└── cases/
-    └── active/             # Current mysteries
-```
-
-### Two Narrative Voices
-
-**The Tavern** — The building itself observes. Short, atmospheric, never judges.
-
-```
-Fire low. Three souls in the common room.
-The stranger watches the door. Kira watches the stranger.
-Maren watches you.
-```
-
-**Your Gut** — Your internal voice. Stakes, stats, options.
-
-```
-You promised the miller. Sundown.
-→ Reputation: On the line
-→ Time: 3 hours
-→ Kira knows something — trust too low to push
-```
-
-### Natural Language Everything
-
-No slash commands required. Just talk.
-
-```
-"Hey Maren, busy night?"
-"What do you know about the stranger?"
-"I want to talk to Kira"
-"Look around"
-"I know you're lying"
-```
-
-## Quick Start
-
-```bash
-# Clone
-git clone https://github.com/AbhiK24/Sonder.git
-cd Sonder
-
-# Install
-pnpm install
-
-# Configure (edit with your settings)
-cp .env.example .env
-
-# Run
-pnpm dev
-```
-
-## Project Structure
-
-```
 sonder/
 ├── packages/
-│   ├── engine/                 # @sonder/engine (MIT)
+│   ├── engine/                 # Core game engine
 │   │   └── src/
-│   │       ├── core/           # Game controller, world engine
-│   │       ├── llm/            # Provider abstraction
-│   │       ├── memory/         # Markdown file handling
-│   │       ├── npcs/           # NPC management
-│   │       ├── chat/           # Telegram/Discord
-│   │       ├── prompts/        # LLM prompts
-│   │       └── types/          # TypeScript types
+│   │       ├── llm/            # LLM providers (Kimi, OpenAI, Ollama)
+│   │       ├── memory/         # Markdown file parsing
+│   │       ├── cases/          # Case system & FTUE
+│   │       ├── utils/          # Fact store, lie detection, tokens
+│   │       ├── scripts/        # NPC creation, image generation
+│   │       └── telegram-bot.ts # Main bot
+│   │
+│   ├── dashboard/              # Visual web dashboard
+│   │   ├── public/             # HTML/CSS/JS
+│   │   ├── assets/npcs/        # Generated portraits
+│   │   └── src/server.ts       # Express server
 │   │
 │   └── souls/
-│       └── wanderers-rest/     # First soul
-│           ├── world/          # World bible, aesthetic
+│       └── wanderers-rest/     # First playable soul
 │           └── npcs/           # NPC identity files
-│
-└── docs/                       # Specifications
+│               ├── maren/
+│               ├── kira/
+│               ├── aldric/
+│               ├── elena/
+│               ├── thom/
+│               └── hooded/
 ```
 
-## Documentation
+## NPC Identity Files
 
-| Document | Description |
-|----------|-------------|
-| [World Tick Spec](docs/specs/world-tick.md) | How the world simulates |
-| [Case Generation Spec](docs/specs/case-generation.md) | How mysteries emerge |
-| [Router Spec](docs/specs/router.md) | How input becomes action |
-| [Prompts Spec](docs/specs/prompts.md) | All LLM prompts |
+Each NPC is defined by markdown files you can read and edit:
+
+```
+npcs/maren/
+├── IDENTITY.md     # Personality, voice, quirks, secrets
+├── MEMORY.md       # What she knows about others
+└── STATEMENTS.md   # Claims she's made (verified/unverified)
+```
+
+Example `IDENTITY.md`:
+```markdown
+# Maren
+
+## Role
+Barkeep
+
+## Personality
+- Watchful and protective
+- Slow to trust, fiercely loyal once earned
+- Knows everyone's secrets, keeps them
+
+## Voice Patterns
+- Short sentences. Doesn't waste words.
+- Speaks in observations, not opinions.
+
+## Secrets
+- Found Harren's body. Saw something she hasn't told anyone.
+```
+
+## Scripts
+
+```bash
+pnpm telegram          # Run Telegram bot
+pnpm dashboard         # Run visual dashboard
+pnpm create-npc        # Interactive NPC creator
+pnpm generate-images   # Generate NPC portraits
+pnpm typecheck         # TypeScript check
+```
+
+## Configuration (.env)
+
+```bash
+# LLM Provider (kimi, openai, anthropic, ollama)
+LLM_PROVIDER=kimi
+KIMI_API_KEY=sk-...
+
+# For image generation
+OPENAI_API_KEY=sk-...
+
+# Telegram Bot
+TELEGRAM_BOT_TOKEN=...
+```
 
 ## Development Status
 
-🚧 **Early Development** — Not yet playable
+✅ **Playable Alpha**
 
-- [x] Architecture design
-- [x] Technical specifications
-- [x] Core types
-- [x] Prompt templates
-- [x] First soul (Wanderer's Rest)
-- [x] First NPC (Maren)
-- [ ] LLM provider integration
-- [ ] Conversation loop
-- [ ] World simulation
-- [ ] Telegram bot
-- [ ] Case generation
+- [x] Telegram bot with conversation
+- [x] Multiple NPCs with unique voices
+- [x] Trust system & relationship tracking
+- [x] Two narrative voices (Tavern + Gut)
+- [x] World tick (events while away)
+- [x] Fact extraction from conversations
+- [x] Lie detection & contradiction alerts
+- [x] Case system with FTUE mystery
+- [x] Persistence (save/load)
+- [x] Visual dashboard
+- [x] NPC portrait generation
+- [x] Token usage tracking
+- [ ] Procedural case generation (after day 7)
+- [ ] More souls/worlds
+- [ ] Discord integration
 
 ## Philosophy
 
@@ -183,8 +246,8 @@ Most game NPCs are vending machines. Insert coin, receive dialogue. Sonder NPCs:
 - Hold opinions about you
 - Talk to each other when you're not there
 - Keep secrets (and sometimes slip)
-- Leave if you betray them
-- Die if you fail them
+- Contradict each other (intentionally or not)
+- Can be caught in lies
 
 **The engine is open. The worlds are infinite. The stories are yours.**
 
@@ -192,10 +255,6 @@ Most game NPCs are vending machines. Insert coin, receive dialogue. Sonder NPCs:
 
 - **Engine** (`packages/engine`): MIT
 - **Souls** (`packages/souls/*`): See individual LICENSE files
-
-## Contributing
-
-Early days. Open an issue to discuss before PRing.
 
 ## Credits
 
