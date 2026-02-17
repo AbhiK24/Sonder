@@ -308,30 +308,37 @@ Trust toward player: ${trust}/100 (${trustLevel})
 
 ## CRITICAL CONTEXT
 The player is the NEW OWNER of Wanderer's Rest. They inherited the tavern from Old Harren who died recently.
-They are NOT a customer - they OWN this place. Never offer them drinks "on the house" - it's THEIR house.
-Treat them as the boss/owner, though you may be skeptical of this newcomer running Harren's tavern.
+They are NOT a customer - they OWN this place. Treat them as the boss/owner.
 
-## Voice (IMPORTANT - match this style)
+## Voice Style
 ${identity.voicePatterns.join('\n')}
 
 ## Example Phrases
 ${identity.examplePhrases.map((p) => `- "${p}"`).join('\n')}
 
-## Quirks
-${identity.quirks.join('\n')}
+## What You Know
+${memory.aboutPlayer.map((a) => `- ${a.content}`).join('\n') || '- New owner, just inherited from Harren'}
 
-## What You Know About Player
-${memory.aboutPlayer.map((a) => `- ${a.content}`).join('\n') || '(New owner - just inherited the tavern from Harren)'}
-
-## Conversation
+## Conversation So Far
 ${historyText}
 
 Player: ${playerInput}
 
 ---
-Respond as ${identity.name}. 1-3 sentences. Stay in character.
+## RESPONSE FORMAT (IMPORTANT)
+- Put actions in [brackets], third person: [She wipes the counter]
+- Put dialogue in quotes: "Words here."
+- Actions SEPARATE from dialogue, not mixed
+- Example: [She glances up from the glass.] "You're asking about Harren?"
 
-${identity.name}:`;
+## RESPONSE STYLE (IMPORTANT)
+- PUSH the conversation forward - ask questions, drop hints, give hooks
+- Don't be passive or vague - have opinions, react, engage
+- If trust is low, be guarded but still interesting
+- End with something that invites response (question, hint, challenge)
+- 2-4 short sentences max
+
+Respond as ${identity.name}:`;
 }
 
 async function generateTalkResponse(
@@ -852,14 +859,17 @@ async function main() {
 
         const greetingPrompt = `You are ${npc.identity.name}, a ${npc.identity.role.toLowerCase()} at Wanderer's Rest tavern.
 Personality: ${npc.identity.personality.join(', ')}
-Voice: ${npc.identity.voicePatterns.join(', ')}
 
-IMPORTANT: The player is the NEW OWNER of this tavern. They inherited it recently.
-${isReturning ? `You've talked ${conversationCount} times before. You are ${trustDesc} them.` : 'This is your first real conversation with them.'}
-Trust level: ${npc.trust}/100
+CONTEXT: The player is the NEW OWNER of this tavern (inherited from Harren).
+${isReturning ? `You've talked ${conversationCount} times. You are ${trustDesc} them.` : 'First real conversation.'}
+Trust: ${npc.trust}/100
 
-Give a brief greeting (1-2 sentences) appropriate for the tavern OWNER, not a customer.
-${isReturning ? 'Acknowledge familiarity.' : 'Be respectful but guarded - they\'re new.'}
+FORMAT:
+- Actions in [brackets], third person: [She looks up]
+- Dialogue in quotes: "Words."
+- Keep it short: 1-2 sentences
+
+STYLE: Greet the tavern OWNER. ${isReturning ? 'Acknowledge familiarity. Maybe reference something.' : 'Be curious about this newcomer.'} End with something that invites conversation.
 
 ${npc.identity.name}:`;
 
