@@ -306,6 +306,11 @@ Role: ${identity.role}
 Personality: ${identity.personality.join(', ')}
 Trust toward player: ${trust}/100 (${trustLevel})
 
+## CRITICAL CONTEXT
+The player is the NEW OWNER of Wanderer's Rest. They inherited the tavern from Old Harren who died recently.
+They are NOT a customer - they OWN this place. Never offer them drinks "on the house" - it's THEIR house.
+Treat them as the boss/owner, though you may be skeptical of this newcomer running Harren's tavern.
+
 ## Voice (IMPORTANT - match this style)
 ${identity.voicePatterns.join('\n')}
 
@@ -316,7 +321,7 @@ ${identity.examplePhrases.map((p) => `- "${p}"`).join('\n')}
 ${identity.quirks.join('\n')}
 
 ## What You Know About Player
-${memory.aboutPlayer.map((a) => `- ${a.content}`).join('\n') || '(New arrival - just inherited the tavern)'}
+${memory.aboutPlayer.map((a) => `- ${a.content}`).join('\n') || '(New owner - just inherited the tavern from Harren)'}
 
 ## Conversation
 ${historyText}
@@ -547,8 +552,24 @@ async function main() {
   // /start
   bot.command('start', async (ctx) => {
     const chatId = ctx.chat.id;
-    chatStates.delete(chatId); // Clear old state
-    const state = getState(chatId); // Create fresh state
+
+    // Check if save exists
+    const existingSave = persistence.load(chatId);
+
+    if (existingSave && existingSave.day > 1) {
+      // Returning player - offer to continue
+      await ctx.reply(
+        `*Welcome back to Wanderer's Rest*\n\n` +
+        `Day ${existingSave.day}. Your tavern awaits.\n\n` +
+        `Type anything to continue, or \`RESET\` to start fresh.`,
+        { parse_mode: 'Markdown' }
+      );
+      return;
+    }
+
+    // New player - fresh start
+    chatStates.delete(chatId);
+    const state = getState(chatId);
 
     await ctx.reply(
       `*Wanderer's Rest*\n\n` +
@@ -825,12 +846,20 @@ async function main() {
 
         // Generate a greeting from the new NPC
         await ctx.replyWithChatAction('typing');
-        const greetingPrompt = `You are ${npc.identity.name}, a ${npc.identity.role.toLowerCase()}.
+        const conversationCount = Math.floor(npc.history.length / 2);
+        const isReturning = conversationCount > 0;
+        const trustDesc = npc.trust < 30 ? 'wary of' : npc.trust < 60 ? 'warming to' : 'comfortable with';
+
+        const greetingPrompt = `You are ${npc.identity.name}, a ${npc.identity.role.toLowerCase()} at Wanderer's Rest tavern.
 Personality: ${npc.identity.personality.join(', ')}
 Voice: ${npc.identity.voicePatterns.join(', ')}
 
-The player approaches you to talk. Give a brief greeting (1-2 sentences) in character.
+IMPORTANT: The player is the NEW OWNER of this tavern. They inherited it recently.
+${isReturning ? `You've talked ${conversationCount} times before. You are ${trustDesc} them.` : 'This is your first real conversation with them.'}
 Trust level: ${npc.trust}/100
+
+Give a brief greeting (1-2 sentences) appropriate for the tavern OWNER, not a customer.
+${isReturning ? 'Acknowledge familiarity.' : 'Be respectful but guarded - they\'re new.'}
 
 ${npc.identity.name}:`;
 
