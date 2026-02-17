@@ -332,11 +332,13 @@ Player: ${playerInput}
 - Example: [She glances up from the glass.] "You're asking about Harren?"
 
 ## RESPONSE STYLE (IMPORTANT)
-- PUSH the conversation forward - ask questions, drop hints, give hooks
-- Don't be passive or vague - have opinions, react, engage
-- If trust is low, be guarded but still interesting
-- End with something that invites response (question, hint, challenge)
+- You KNOW the situation. Don't ask obvious questions like "what brings you here"
+- PUSH forward - drop hints about Harren, the mystery, your opinions
+- Have a personality. React with attitude. Be memorable.
+- If trust is low, be guarded but intriguing - hint at things you won't say yet
+- End with something that invites response (a challenge, a hint, a loaded statement)
 - 2-4 short sentences max
+- NO generic tavern talk. Every line should reveal character or advance intrigue.
 
 Respond as ${identity.name}:`;
 }
@@ -869,7 +871,7 @@ FORMAT:
 - Dialogue in quotes: "Words."
 - Keep it short: 1-2 sentences
 
-STYLE: Greet the tavern OWNER. ${isReturning ? 'Acknowledge familiarity. Maybe reference something.' : 'Be curious about this newcomer.'} End with something that invites conversation.
+STYLE: ${isReturning ? `You know them now. Reference past conversations or hint at something new.` : `You've been waiting. Harren's replacement is finally here. React to THAT - don't ask obvious questions.`} Be direct, have attitude. Say something that makes them want to respond.
 
 ${npc.identity.name}:`;
 
