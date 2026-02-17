@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Wanderer's Rest - Dashboard</title>
+  <link rel="stylesheet" href="style.css">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <!-- Header -->
+    <header class="tavern-header">
+      <div class="tavern-sign">
+        <h1>Wanderer's Rest</h1>
+        <p class="tagline">Where secrets find their keepers</p>
+      </div>
+      <div class="day-counter">
+        <span class="label">Day</span>
+        <span class="day-number" id="currentDay">1</span>
+      </div>
+    </header>
+
+    <!-- Tavern Atmosphere -->
+    <section class="atmosphere" id="atmosphere">
+      <p>The fire crackles. Shadows dance on old wood. The tavern waits.</p>
+    </section>
+
+    <!-- NPCs Grid -->
+    <section class="section">
+      <h2 class="section-title">Souls of the Tavern</h2>
+      <div class="npc-grid" id="npcGrid">
+        <!-- NPCs will be inserted here -->
+      </div>
+    </section>
+
+    <!-- Active Case -->
+    <section class="section">
+      <h2 class="section-title">The Mystery</h2>
+      <div class="case-board" id="caseBoard">
+        <!-- Case info will be inserted here -->
+      </div>
+    </section>
+
+    <!-- Clues & Facts -->
+    <section class="section">
+      <h2 class="section-title">Your Journal</h2>
+      <div class="journal">
+        <div class="journal-column">
+          <h3>Clues Discovered</h3>
+          <ul class="clue-list" id="clueList">
+            <!-- Clues will be inserted here -->
+          </ul>
+        </div>
+        <div class="journal-column">
+          <h3>Known Facts</h3>
+          <ul class="fact-list" id="factList">
+            <!-- Facts will be inserted here -->
+          </ul>
+        </div>
+      </div>
+    </section>
+
+    <!-- Suspicions -->
+    <section class="section">
+      <h2 class="section-title">Suspicions</h2>
+      <div class="suspicions" id="suspicions">
+        <p class="empty-state">Your gut tells you nothing seems off... yet.</p>
+      </div>
+    </section>
+
+    <!-- Stats -->
+    <section class="section stats-section">
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="stat-label">Conversations</span>
+          <span class="stat-value" id="totalConvos">0</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Facts Learned</span>
+          <span class="stat-value" id="totalFacts">0</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Clues Found</span>
+          <span class="stat-value" id="totalClues">0</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-label">Tokens Used</span>
+          <span class="stat-value" id="totalTokens">0</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Footer -->
+    <footer class="footer">
+      <p>Sonder &mdash; Every soul has a story</p>
+      <p class="last-updated">Last updated: <span id="lastUpdated">Never</span></p>
+    </footer>
+  </div>
+
+  <script src="dashboard.js"></script>
+</body>
+</html>

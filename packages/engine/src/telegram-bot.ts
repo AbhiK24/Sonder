@@ -580,6 +580,7 @@ async function main() {
       `\`SUSPICIONS\` - Inconsistencies noticed\n` +
       `\`RECAP\` - What happened while away\n` +
       `\`TOKENS\` - View token usage\n` +
+      `\`DASHBOARD\` - Visual game view\n` +
       `\`LEAVE\` - Step away\n` +
       `\`RESET\` - Start over\n\n` +
       `*Talk to (ALL CAPS):*\n` +
@@ -700,6 +701,19 @@ async function main() {
     // TOKENS - Show token usage
     if (trimmed === 'TOKENS') {
       await ctx.reply(tokenTracker.formatStats(chatId), { parse_mode: 'Markdown' });
+      return;
+    }
+
+    // DASHBOARD - Link to visual dashboard
+    if (trimmed === 'DASHBOARD') {
+      const dashboardUrl = process.env.DASHBOARD_URL || 'http://localhost:3000';
+      await ctx.reply(
+        `*Wanderer's Rest Dashboard*\n\n` +
+        `View your game visually:\n` +
+        `${dashboardUrl}/api/state/${chatId}\n\n` +
+        `_Run \`pnpm dashboard\` locally to see the full visual dashboard._`,
+        { parse_mode: 'Markdown' }
+      );
       return;
     }
 
