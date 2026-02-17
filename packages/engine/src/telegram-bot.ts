@@ -287,6 +287,95 @@ function getModelConfig(): ModelConfig {
 // Response Generators
 // =============================================================================
 
+// NPC backstories with trust-gated reveals
+function getBackstory(npcId: string, trust: number): string {
+  const backstories: Record<string, { facts: string; canReveal: string; cantReveal: string }> = {
+    maren: {
+      facts: `WHAT YOU KNOW FOR CERTAIN:
+- Harren died 3 weeks ago, found at bottom of cellar stairs
+- YOU found the body - the cellar door was locked FROM THE OUTSIDE
+- You had to break the lock to get in
+- He had bruises on his arms (defensive wounds)
+- A hooded stranger asked about Harren that week, then vanished
+- Harren got a letter day before - burned it, looked scared
+- Guard Captain Thom ruled it "accident" in hours, no real investigation
+- Harren was nervous his last weeks, kept looking over his shoulder
+- You've worked here 40 years. Harren knew those stairs. He didn't "fall."`,
+      canReveal: trust < 40
+        ? `WHAT YOU'LL SAY NOW: "He fell. That's what they say." Don't share your doubts yet.`
+        : trust < 55
+        ? `WHAT YOU'LL SAY NOW: You can hint it wasn't an accident. "Men don't just fall after 30 years."`
+        : trust < 70
+        ? `WHAT YOU'LL SAY NOW: Can mention the locked door, Thom's quick ruling, your doubts.`
+        : trust < 85
+        ? `WHAT YOU'LL SAY NOW: Can discuss the stranger, Harren's fear, the letter.`
+        : `WHAT YOU'LL SAY NOW: Can reveal almost everything, including the black sun seal.`,
+      cantReveal: trust < 85
+        ? `DON'T REVEAL YET: The black sun seal on the letter. Save for high trust.`
+        : `You can reveal everything now.`,
+    },
+    kira: {
+      facts: `WHAT YOU KNOW:
+- You're a traveling merchant, been coming here for years
+- You saw the blacksmith's forge was COLD the night Harren died (Aldric lied about being there)
+- You noticed the hooded stranger - they asked YOU about Harren's habits
+- You know Harren had enemies from his past - he never said who
+- You trade in information as much as goods`,
+      canReveal: trust < 50
+        ? `WHAT YOU'LL SAY NOW: Be evasive. "I just sell things. I don't get involved."`
+        : `WHAT YOU'LL SAY NOW: Can share what you noticed - the cold forge, the stranger.`,
+      cantReveal: `DON'T REVEAL: That you know more about the Black Sun than you let on.`,
+    },
+    aldric: {
+      facts: `WHAT YOU KNOW:
+- Harren owed you money for a special lockbox you made
+- You WERE near the tavern that night (not at the forge - you lied)
+- You saw Harren arguing with a hooded figure outside
+- You didn't kill him but you're hiding that you saw something`,
+      canReveal: trust < 60
+        ? `WHAT YOU'LL SAY NOW: Stick to your lie - "I was at the forge." Be defensive.`
+        : `WHAT YOU'LL SAY NOW: Might admit you weren't at the forge if pressed hard.`,
+      cantReveal: `DON'T REVEAL: That you saw Harren with the hooded figure. You're scared.`,
+    },
+    thom: {
+      facts: `WHAT YOU KNOW:
+- You received a message warning you to rule it an accident - or else
+- Harren had a ledger with evidence of your bribes
+- The ledger is missing - convenient for you
+- You didn't kill Harren but you're glad he's dead
+- Your patrol saw someone fleeing town that night but you told them to ignore it`,
+      canReveal: trust < 70
+        ? `WHAT YOU'LL SAY NOW: Be authoritative. "The matter is closed. It was an accident."`
+        : `WHAT YOU'LL SAY NOW: Might hint that you didn't have a choice.`,
+      cantReveal: `DON'T REVEAL: The threatening message, your corruption, the fleeing figure.`,
+    },
+    elena: {
+      facts: `WHAT YOU KNOW:
+- You examined Harren's body - those wounds were NOT from a fall
+- You saw strangulation marks, defensive bruises
+- Thom asked you to stay quiet about your findings
+- You wanted something from Harren's cellar (rare herb) but that's irrelevant to his death
+- You were treating a sick child that night (your alibi is real)`,
+      canReveal: trust < 50
+        ? `WHAT YOU'LL SAY NOW: Be careful. "The wounds were... unusual. That's all I'll say."`
+        : `WHAT YOU'LL SAY NOW: Can describe what you actually saw - it was murder.`,
+      cantReveal: `DON'T REVEAL: That Thom pressured you to stay quiet.`,
+    },
+  };
+
+  const npc = backstories[npcId];
+  if (!npc) return '';
+
+  return `\n## YOUR BACKSTORY (NEVER CONTRADICT THIS)
+${npc.facts}
+
+${npc.canReveal}
+
+${npc.cantReveal}
+
+CRITICAL: Stay consistent. If you said something before, don't contradict it. The facts above are TRUE.`;
+}
+
 function buildTalkPrompt(
   npc: NPCState,
   playerInput: string
@@ -298,6 +387,7 @@ function buildTalkPrompt(
     .join('\n');
 
   const trustLevel = trust < 30 ? 'skeptical' : trust < 60 ? 'warming' : 'trusting';
+  const backstory = getBackstory(identity.name.toLowerCase(), trust);
 
   return `You are ${identity.name}, a character in "Wanderer's Rest" tavern game.
 
@@ -318,6 +408,7 @@ ${identity.examplePhrases.map((p) => `- "${p}"`).join('\n')}
 
 ## What You Know
 ${memory.aboutPlayer.map((a) => `- ${a.content}`).join('\n') || '- New owner, just inherited from Harren'}
+${backstory}
 
 ## Conversation So Far
 ${historyText}
