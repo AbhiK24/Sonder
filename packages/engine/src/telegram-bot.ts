@@ -53,6 +53,7 @@ interface ChatState {
   factStore: FactStore;
   ftueProgress: FTUEProgress;
   caseManager: CaseManager;
+  playerName: string | null;
 }
 
 // =============================================================================
@@ -123,6 +124,7 @@ function getState(chatId: number): ChatState {
         factStore,
         ftueProgress,
         caseManager,
+        playerName: (saved as any).playerName || null,
       });
       console.log(`[${chatId}] Loaded save (Day ${saved.day}, ${factStore.getAllFacts().length} facts)`);
     } else {
@@ -145,6 +147,7 @@ function getState(chatId: number): ChatState {
         factStore: new FactStore(),
         ftueProgress: createFTUEProgress(),
         caseManager: new CaseManager(caseGenerator, [{ ...FTUE_CASE }]),
+        playerName: null,
       });
     }
   }
@@ -180,7 +183,29 @@ function saveState(chatId: number): void {
     facts: state.factStore.serialize(),
     ftueProgress: state.ftueProgress,
     caseManager: state.caseManager.serialize(),
+    playerName: state.playerName,
   } as any);
+}
+
+// Extract player name from conversation
+function extractPlayerName(input: string): string | null {
+  const patterns = [
+    /(?:i'?m|i am|my name is|call me|they call me|name's|the name's)\s+([a-z]{2,15})/i,
+    /^([a-z]{2,15})(?:\s+here|,?\s+at your service|,?\s+nice to meet)/i,
+  ];
+
+  for (const pattern of patterns) {
+    const match = input.match(pattern);
+    if (match) {
+      const name = match[1];
+      // Filter out common words that aren't names
+      const notNames = ['the', 'new', 'owner', 'here', 'just', 'your', 'fine', 'good', 'well', 'not', 'yes', 'no'];
+      if (!notNames.includes(name.toLowerCase())) {
+        return name.charAt(0).toUpperCase() + name.slice(1).toLowerCase();
+      }
+    }
+  }
+  return null;
 }
 
 function getCurrentNPC(state: ChatState): NPCState | undefined {
@@ -503,12 +528,14 @@ CRITICAL RULES:
 
 function buildTalkPrompt(
   npc: NPCState,
-  playerInput: string
+  playerInput: string,
+  playerName: string | null
 ): string {
   const { identity, memory, trust, history } = npc;
   const recentHistory = history.slice(-10);
+  const playerLabel = playerName || 'Player';
   const historyText = recentHistory
-    .map((m) => `${m.role === 'player' ? 'Player' : identity.name}: ${m.content}`)
+    .map((m) => `${m.role === 'player' ? playerLabel : identity.name}: ${m.content}`)
     .join('\n');
 
   const trustLevel = trust < 30 ? 'skeptical' : trust < 60 ? 'warming' : 'trusting';
@@ -524,6 +551,7 @@ Trust toward player: ${trust}/100 (${trustLevel})
 ## CRITICAL CONTEXT
 The player is the NEW OWNER of Wanderer's Rest. They inherited the tavern from Old Harren who died recently.
 They are NOT a customer - they OWN this place. Treat them as the boss/owner.
+${playerName ? `The player's name is ${playerName}. Use their name naturally in conversation.` : `You don't know the player's name yet.`}
 
 ## Voice Style
 ${identity.voicePatterns.join('\n')}
@@ -563,9 +591,10 @@ async function generateTalkResponse(
   provider: LLMProvider,
   npc: NPCState,
   input: string,
-  chatId: number
+  chatId: number,
+  playerName: string | null
 ): Promise<string> {
-  const prompt = buildTalkPrompt(npc, input);
+  const prompt = buildTalkPrompt(npc, input, playerName);
   const response = await provider.generate(prompt, { temperature: 0.8, maxTokens: 200 });
 
   // Track tokens
@@ -963,6 +992,29 @@ async function main() {
       return;
     }
 
+    // NAME - Check or set player name
+    if (trimmed === 'NAME') {
+      if (state.playerName) {
+        await ctx.reply(`_You are ${state.playerName}, owner of Wanderer's Rest._`, { parse_mode: 'Markdown' });
+      } else {
+        await ctx.reply(`_You haven't introduced yourself yet. Just say "I'm [name]" in conversation._`, { parse_mode: 'Markdown' });
+      }
+      return;
+    }
+
+    // NAME [name] - Set name directly
+    if (trimmed.startsWith('NAME ')) {
+      const newName = input.slice(5).trim();
+      if (newName.length >= 2 && newName.length <= 15 && /^[a-zA-Z]+$/.test(newName)) {
+        state.playerName = newName.charAt(0).toUpperCase() + newName.slice(1).toLowerCase();
+        saveState(chatId);
+        await ctx.reply(`_You are now known as ${state.playerName}._`, { parse_mode: 'Markdown' });
+      } else {
+        await ctx.reply(`_Name should be 2-15 letters only._`, { parse_mode: 'Markdown' });
+      }
+      return;
+    }
+
     // FACTS - Show what player has learned
     if (trimmed === 'FACTS') {
       const facts = state.factStore.getAllFacts();
@@ -1110,10 +1162,20 @@ ${npc.identity.name}:`;
       return;
     }
 
+    // === PLAYER NAME EXTRACTION ===
+    if (!state.playerName) {
+      const extractedName = extractPlayerName(input);
+      if (extractedName) {
+        state.playerName = extractedName;
+        console.log(`[${chatId}] Player introduced themselves as: ${extractedName}`);
+        saveState(chatId);
+      }
+    }
+
     await ctx.replyWithChatAction('typing');
 
     try {
-      const response = await generateTalkResponse(provider, currentNpc, input.trim(), chatId);
+      const response = await generateTalkResponse(provider, currentNpc, input.trim(), chatId, state.playerName);
 
       // Update history
       currentNpc.history.push({ role: 'player', content: input.trim() });
