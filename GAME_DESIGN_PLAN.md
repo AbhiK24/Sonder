@@ -592,4 +592,222 @@ Repeat until solved or Day 14
 
 ---
 
+## THE FIVE RULES (Skeleton for AI to hang content on)
+
+These are HARDCODED. AI generates content within these constraints.
+
+---
+
+### 1. WIN CONDITION - What does "solved" mean?
+
+**Options:**
+
+| Option | Description | Pros | Cons |
+|--------|-------------|------|------|
+| **A: Correct Accusation** | Player accuses the right person with enough evidence | Clear, satisfying | Binary, one moment |
+| **B: Truth Uncovered** | Player discovers what happened (even without accusation) | More nuanced | Harder to measure |
+| **C: Case Closed** | Accumulate enough evidence to "close" the case | Progressive | Less dramatic |
+| **D: Confession Obtained** | Get the guilty party to confess | Most satisfying | Hard to design |
+
+**Suggested: A + D Combined**
+- Player must ACCUSE someone
+- If correct + enough evidence → confrontation scene
+- Guilty party confesses or is caught
+- Clear victory moment
+
+**Victory Tiers:**
+```
+PERFECT: Accused correctly + all clues found + confession obtained
+GOOD: Accused correctly + most clues found
+PARTIAL: Accused correctly but missing key evidence
+HOLLOW: Accused correctly by luck, don't understand why
+```
+
+---
+
+### 2. LOSE CONDITION - What does "failed" mean?
+
+**Options:**
+
+| Option | Description | Pros | Cons |
+|--------|-------------|------|------|
+| **A: Wrong Accusation** | Accuse innocent person | Clear stakes | Harsh, one mistake = done |
+| **B: Time Runs Out** | Day 14 passes, case goes cold | Creates urgency | Feels arbitrary |
+| **C: Trust Collapse** | All NPCs stop talking to you | Consequence of actions | Slow, boring |
+| **D: Killer Escapes** | Evidence destroyed, killer flees | Dramatic | Player feels cheated |
+
+**Suggested: B + D Combined**
+- Day 14: Case officially closed by Thom
+- Evidence is destroyed/buried
+- Hooded figure escapes forever
+- Truth becomes unknowable
+- NPCs move on, won't discuss it
+
+**Failure Tiers:**
+```
+COLD CASE: Ran out of time, never accused anyone
+WRONG MAN: Accused innocent, real killer escaped
+CHAOS: Multiple wrong accusations, everyone hates you
+ABANDONED: Stopped playing, world moved on without you
+```
+
+**Wrong Accusation = Soft Fail:**
+- Not game over
+- But: Major trust loss, real killer harder to catch
+- Limited accusations (3 total?)
+
+---
+
+### 3. DAILY CONTRACT - What does player get each day?
+
+**The Promise:**
+Every real day, the player receives:
+
+```
+MORNING (Push notification)
+├── One message from an NPC
+├── Contains: new info, rumor, event, or summons
+└── Creates reason to open game
+
+DURING DAY (When player engages)
+├── NPCs available to talk
+├── One "daily clue" discoverable
+├── Actions have consequences
+└── Words spread in real-time
+
+EVENING (When player checks back)
+├── Consequence report
+├── "Here's what spread today"
+├── Preview of tomorrow's tension
+└── World tick begins
+
+OVERNIGHT (Passive)
+├── NPCs interact off-screen
+├── Events generated
+├── Tomorrow's content prepared
+└── Day advances
+```
+
+**The Daily Clue:**
+- Each day, ONE key piece of information is available
+- Might come from: NPC conversation, event, discovery
+- Miss it? Harder to get later (not impossible)
+- Creates "did I find today's clue?" tension
+
+**Minimum Engagement:**
+- ~5 minutes to get daily value
+- Deeper investigation rewards more
+- But casual play still progresses
+
+---
+
+### 4. ACTION SPACE - What can player actually DO?
+
+**Currently:** Talk to NPCs (that's it)
+
+**Proposed Actions:**
+
+```
+TALK [NPC]          - Conversation (current system)
+ASK [NPC] ABOUT [X] - Directed questioning (more pointed)
+ACCUSE [NPC]        - Formal accusation (high stakes)
+INVESTIGATE [PLACE] - Examine location (cellar, room, etc)
+SHOW [CLUE] TO [NPC]- Present evidence, get reaction
+WAIT                - Skip to next time period
+THINK               - Review what you know (gut voice)
+CONFRONT [NPC]      - Aggressive questioning (risky)
+```
+
+**Action Consequences:**
+
+| Action | Consequence |
+|--------|-------------|
+| TALK | Trust +1, info exchanged, words may spread |
+| ASK ABOUT | Direct answer, but NPC notices your interest |
+| ACCUSE | Major - right = win, wrong = penalty |
+| INVESTIGATE | May find clues, takes time |
+| SHOW CLUE | NPC reacts, may reveal more or get defensive |
+| CONFRONT | May crack them, may backfire badly |
+
+**Limited Resources:**
+- 3 accusations total (use wisely)
+- Confrontations damage trust
+- Time passes (can't do everything in one day)
+
+---
+
+### 5. CONSEQUENCE RULES - What happens when they act?
+
+**Rule 1: Words Spread**
+```
+Anything you say to NPC may spread to connected NPCs.
+By evening, others may know what you asked about.
+
+Gossip Network:
+Maren ↔ Kira (close friends, share everything)
+Aldric ↔ Thom (drinking buddies)
+Elena ↔ Maren (professional respect)
+Thom → Everyone (he's the authority)
+```
+
+**Rule 2: NPCs React to Reputation**
+```
+Reputation: Newcomer → Curious → Investigator → Threatening → Dangerous
+
+Low reputation: NPCs are helpful
+High reputation: NPCs get nervous, guarded, or hostile
+```
+
+**Rule 3: Wrong Accusations Cost**
+```
+First wrong accusation: -20 trust with everyone, warning
+Second wrong accusation: -30 trust, NPCs stop sharing secrets
+Third wrong accusation: Game over - nobody trusts you
+```
+
+**Rule 4: Time Costs**
+```
+Each action takes time. Day has limited slots:
+- Morning: 2 actions
+- Afternoon: 3 actions
+- Evening: 2 actions
+
+Choose wisely. Can't talk to everyone every day.
+```
+
+**Rule 5: Clues Connect**
+```
+When player has 2+ related clues, system notices.
+"You realize: Aldric's alibi contradicts Kira's observation."
+Unlocks new dialogue options.
+```
+
+**Rule 6: NPCs Have Goals**
+```
+NPCs aren't just info dispensers. They want things:
+- Maren: Protect tavern, find truth
+- Aldric: Avoid suspicion, get paid
+- Thom: Bury the case, protect himself
+- Kira: Stay neutral, profit
+- Elena: Stay out of it, heal people
+
+Their goals affect what they tell you and when.
+```
+
+---
+
+## SUMMARY: The Skeleton
+
+```
+WIN:    Accuse correctly + get confession
+LOSE:   Day 14 + no solution, or 3 wrong accusations
+DAILY:  Morning hook → Investigation → Evening consequences
+ACTIONS: Talk, Ask, Accuse, Investigate, Show, Confront
+RULES:  Words spread, reputation matters, accusations cost, time is limited
+```
+
+AI generates CONTENT within this STRUCTURE.
+
+---
+
 *This is a living document. Update as decisions are made.*
