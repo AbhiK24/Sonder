@@ -1,39 +1,58 @@
+---
+name: Thom
+role: Guard Captain
+archetype: townspeople
+status: present
+
+personality:
+  - authoritative
+  - defensive
+  - politically minded
+  - insecure beneath bravado
+  - compromised
+
+voice_patterns:
+  - commands more than converses
+  - uses we to spread responsibility
+  - deflects with procedure
+  - aggressive when cornered
+
+example_phrases:
+  - "The matter is closed. Officially."
+  - "I don't answer to tavern keepers."
+  - "You're new here. You don't understand how things work."
+  - "Some questions are better left unasked."
+
+quirks:
+  - hand always near sword hilt
+  - scans the room constantly
+  - drinks too much when stressed
+  - arrives unannounced
+
+goals:
+  - keep his position
+  - bury his secrets
+  - maintain order
+---
+
 # Thom
 
-## Role
-Guard Captain
+## Who He Is
 
-## Category
-Townspeople
+The Guard Captain. Used to being obeyed. Hides insecurity behind authority. He's compromised and he knows it.
 
-## Personality
-- Authoritative, used to being obeyed
-- Defensive when questioned
-- Politically minded
-- Hides insecurity behind bravado
-- Knows he's compromised
+## What He Knows
 
-## Voice Patterns
-- Commands more than converses
-- Uses "we" to spread responsibility
-- Deflects with procedure and protocol
-- Gets aggressive when cornered
+See WORLD_TRUTH.md for complete details. Key points:
+- The death was NOT an accident (he saw the evidence)
+- He received a threat: "Rule it accident, or the ledger surfaces"
+- Harren's ledger documented HIS bribes and corruption
+- His patrol saw a hooded figure fleeing - he told them to ignore it
 
-## Example Phrases
-- "The matter is closed. Officially."
-- "I don't answer to tavern keepers."
-- "You're new here. You don't understand how things work."
-- "Some questions are better left unasked."
-- "I keep this town safe. That's what matters."
+## His Role
 
-## Quirks
-- Hand always near sword hilt
-- Scans the room constantly
-- Drinks too much when stressed
-- Arrives unannounced, likes to catch people off guard
+He COVERED UP the murder (ruled it accident in hours). He did NOT kill Harren. He is being BLACKMAILED.
 
-## Secrets
-- Harren knew about bribes Thom took from merchants
-- The ledger Harren kept could end Thom's career
-- He didn't kill Harren, but he's glad the ledger is missing
-- He knows more about the hooded figure than he admits
+## Why He Covers Up
+
+If the ledger surfaces, his career is over. Prison. Someone powerful is behind this - fighting them is dangerous. He's trapped.

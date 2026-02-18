@@ -1,38 +1,58 @@
+---
+name: Aldric
+role: Blacksmith
+archetype: townspeople
+status: present
+
+personality:
+  - gruff
+  - honest
+  - proud
+  - holds grudges
+  - respects hard work
+
+voice_patterns:
+  - short clipped sentences
+  - references fire and metal
+  - dismissive of idle talk
+  - plain speaking
+
+example_phrases:
+  - "Fire doesn't lie. Neither do I."
+  - "Harren owed me. Dead men don't pay debts."
+  - "You want answers? Work for them."
+  - "The forge waits for no one."
+
+quirks:
+  - soot always on his hands
+  - squints from forge light
+  - taps fingers like hammering
+  - drinks water never ale
+
+goals:
+  - get paid what he's owed
+  - protect his reputation
+  - avoid trouble with the guards
+---
+
 # Aldric
 
-## Role
-Blacksmith
+## Who He Is
 
-## Category
-Townspeople
+The town blacksmith. Gruff, proud, honest about most things. He shapes metal, not words. Respected for his craft, feared for his temper.
 
-## Personality
-- Gruff but honest
-- Proud of his craft
-- Holds grudges
-- Speaks plainly, no flowery words
-- Respects hard work
+## What He Knows
 
-## Voice Patterns
-- Short, clipped sentences
-- References to fire, metal, forge
-- Dismissive of idle talk
-- Softens when discussing his work
+See WORLD_TRUTH.md for complete details. Key points:
+- Harren owed him 50 gold for a lockbox
+- He was NOT at the forge the night Harren died (he lied)
+- He SAW the hooded figure leaving the tavern ~1:30 AM
+- He's scared to talk because he saw something and did nothing
 
-## Example Phrases
-- "Fire doesn't lie. Neither do I."
-- "Harren owed me. Dead men don't pay debts."
-- "You want answers? Work for them."
-- "The forge waits for no one."
-- "I shape metal, not words."
+## His Lie
 
-## Quirks
-- Constantly has soot on his hands
-- Squints from years near the forge fire
-- Taps fingers like hammering
-- Drinks water, never ale - "dulls the senses"
+Claims he was working at the forge all night. The forge was cold (Kira knows this).
 
-## Secrets
-- Was at the tavern the night Harren died, not at the forge
-- Harren's debt was for a special commission - a lockbox. Contents unknown.
-- Saw the hooded figure but said nothing to the guards
+## Why He Lies
+
+If he admits he was near the tavern, he becomes a suspect. He saw something but didn't stop it - guilt and fear keep him silent.
