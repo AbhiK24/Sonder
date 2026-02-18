@@ -42,3 +42,7 @@ saves/
 *.pem
 *.key
 credentials.json
+
+# Private docs (not for public repo)
+*_inv.md
+*_private.md
