@@ -15,6 +15,7 @@ export type IntegrationType =
   | 'todoist'
   | 'notion'
   | 'gmail'
+  | 'resend'
   | 'whatsapp'
   | 'telegram'
   | 'slack'
@@ -182,18 +183,29 @@ export interface EmailFilter {
 }
 
 export interface EmailAdapter extends BaseIntegrationAdapter {
-  type: 'gmail';
+  type: 'gmail' | 'resend';
 
-  // Read (subjects/snippets only by default for privacy)
-  getMessages(filter: EmailFilter): Promise<IntegrationResult<EmailSummary[]>>;
-  getMessage(messageId: string): Promise<IntegrationResult<EmailMessage>>;
+  // Read (subjects/snippets only by default for privacy) - Gmail only
+  getMessages?(filter: EmailFilter): Promise<IntegrationResult<EmailSummary[]>>;
+  getMessage?(messageId: string): Promise<IntegrationResult<EmailMessage>>;
 
-  // Create draft (safe)
-  createDraft(email: EmailMessage): Promise<IntegrationResult<{ draftId: string }>>;
+  // Create draft (safe) - Gmail only
+  createDraft?(email: EmailMessage): Promise<IntegrationResult<{ draftId: string }>>;
 
   // Send (requires confirmation)
   sendEmail(email: EmailMessage, confirmed: boolean): Promise<IntegrationResult<{ messageId: string }>>;
-  sendDraft(draftId: string, confirmed: boolean): Promise<IntegrationResult<{ messageId: string }>>;
+  sendDraft?(draftId: string, confirmed: boolean): Promise<IntegrationResult<{ messageId: string }>>;
+}
+
+/**
+ * Simple send-only email adapter (for Resend, Postmark, etc.)
+ * Much simpler setup - just an API key, no OAuth
+ */
+export interface SimpleEmailAdapter extends BaseIntegrationAdapter {
+  type: 'resend';
+
+  // Send only - no inbox access
+  sendEmail(email: EmailMessage, confirmed: boolean): Promise<IntegrationResult<{ messageId: string }>>;
 }
 
 // =============================================================================

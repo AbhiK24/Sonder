@@ -1,12 +1,17 @@
 /**
- * Email Integration (Gmail)
+ * Email Integrations
  *
- * Read email subjects/snippets, create drafts, send with confirmation.
- * Safety: Can read, draft, and send (with confirmation). Never delete.
+ * Two adapters:
+ * - Gmail: Full inbox access (OAuth - complex setup)
+ * - Resend: Send-only (API key - dead simple)
+ *
+ * For agent outbound emails, use Resend. It's just an API key.
+ * For reading user's inbox, use Gmail (if they want that feature).
  */
 
 import {
   EmailAdapter,
+  SimpleEmailAdapter,
   EmailMessage,
   EmailSummary,
   EmailFilter,
@@ -478,13 +483,187 @@ export class GmailAdapter implements EmailAdapter {
 }
 
 // =============================================================================
+// Resend Adapter (Simple - just API key)
+// =============================================================================
+
+/**
+ * Resend adapter for agent outbound emails.
+ *
+ * Setup:
+ * 1. Sign up at resend.com
+ * 2. Add your domain (or use their test domain)
+ * 3. Get API key
+ * 4. Done. That's it. No OAuth, no consent screens.
+ */
+export class ResendAdapter implements SimpleEmailAdapter {
+  type = 'resend' as const;
+  status: IntegrationStatus = 'disconnected';
+
+  private apiKey: string | null = null;
+  private fromAddress: string | null = null;
+
+  private static readonly API_BASE = 'https://api.resend.com';
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
+  async connect(credentials: IntegrationCredentials): Promise<IntegrationResult<void>> {
+    try {
+      this.status = 'connecting';
+
+      if (!credentials.apiKey) {
+        this.status = 'error';
+        return {
+          success: false,
+          error: 'No API key provided. Get one from resend.com/api-keys'
+        };
+      }
+
+      this.apiKey = credentials.apiKey;
+      this.fromAddress = credentials.metadata?.fromAddress as string || null;
+
+      // Verify API key works
+      const check = await this.healthCheck();
+      if (!check.success) {
+        this.status = 'error';
+        return check;
+      }
+
+      this.status = 'connected';
+      return { success: true };
+    } catch (error) {
+      this.status = 'error';
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Connection failed'
+      };
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    this.apiKey = null;
+    this.fromAddress = null;
+    this.status = 'disconnected';
+  }
+
+  isConnected(): boolean {
+    return this.status === 'connected' && this.apiKey !== null;
+  }
+
+  async healthCheck(): Promise<IntegrationResult<void>> {
+    if (!this.apiKey) {
+      return { success: false, error: 'Not connected' };
+    }
+
+    try {
+      // Resend doesn't have a dedicated health endpoint, but we can list domains
+      const response = await fetch(`${ResendAdapter.API_BASE}/domains`, {
+        headers: { Authorization: `Bearer ${this.apiKey}` }
+      });
+
+      if (response.status === 401) {
+        return { success: false, error: 'Invalid API key' };
+      }
+
+      if (!response.ok) {
+        return { success: false, error: `API error: ${response.status}` };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Health check failed'
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Send
+  // ---------------------------------------------------------------------------
+
+  async sendEmail(
+    email: EmailMessage,
+    confirmed: boolean
+  ): Promise<IntegrationResult<{ messageId: string }>> {
+    if (!confirmed) {
+      return {
+        success: false,
+        error: 'Email send requires confirmation. Set confirmed=true after user confirms.'
+      };
+    }
+
+    if (!this.isConnected()) {
+      return { success: false, error: 'Not connected' };
+    }
+
+    try {
+      const from = email.from || this.fromAddress;
+      if (!from) {
+        return {
+          success: false,
+          error: 'No "from" address. Set in email or credentials.metadata.fromAddress'
+        };
+      }
+
+      const payload: Record<string, unknown> = {
+        from,
+        to: email.to,
+        subject: email.subject,
+      };
+
+      // Prefer HTML if available, fall back to text
+      if (email.bodyHtml) {
+        payload.html = email.bodyHtml;
+      } else {
+        payload.text = email.body;
+      }
+
+      if (email.cc?.length) {
+        payload.cc = email.cc;
+      }
+
+      const response = await fetch(`${ResendAdapter.API_BASE}/emails`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({ message: 'Unknown error' }));
+        return {
+          success: false,
+          error: `Failed to send: ${error.message || response.status}`
+        };
+      }
+
+      const result = await response.json();
+      return { success: true, data: { messageId: result.id } };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to send email'
+      };
+    }
+  }
+}
+
+// =============================================================================
 // Factory
 // =============================================================================
 
-export function createEmailAdapter(type: 'gmail'): EmailAdapter {
+export function createEmailAdapter(type: 'gmail'): EmailAdapter;
+export function createEmailAdapter(type: 'resend'): SimpleEmailAdapter;
+export function createEmailAdapter(type: 'gmail' | 'resend'): EmailAdapter | SimpleEmailAdapter {
   switch (type) {
     case 'gmail':
       return new GmailAdapter();
+    case 'resend':
+      return new ResendAdapter();
     default:
       throw new Error(`Unknown email adapter type: ${type}`);
   }
