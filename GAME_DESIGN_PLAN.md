@@ -810,4 +810,352 @@ AI generates CONTENT within this STRUCTURE.
 
 ---
 
+## THE SIMULATION MODEL (Inspired by Stanford Simulacra)
+
+### Reference: Stanford Generative Agents Paper
+Source: [arXiv:2304.03442](https://arxiv.org/abs/2304.03442)
+
+---
+
+### Stanford Architecture (What They Did)
+
+**Three Core Components:**
+
+```
+1. MEMORY STREAM
+   ├── Complete record of experiences in natural language
+   ├── Timestamped observations
+   ├── "Saw Aldric at the forge at 10am"
+   └── Raw, unprocessed events
+
+2. REFLECTION
+   ├── Periodic synthesis of memories into insights
+   ├── "I've noticed Aldric avoids Thom lately"
+   ├── Higher-level patterns, not just events
+   └── Triggers: time passed OR importance threshold
+
+3. PLANNING
+   ├── Daily schedule (wake, work, eat, sleep)
+   ├── Multi-timescale goals (today, this week, life)
+   ├── Plans can be interrupted/revised
+   └── React to unexpected events
+```
+
+**Memory Retrieval (Critical):**
+```
+When deciding what to do:
+1. Recency - Recent memories weighted higher
+2. Importance - Significant events weighted higher
+3. Relevance - Related to current situation weighted higher
+
+Score = Recency × Importance × Relevance
+Retrieve top-K memories for context
+```
+
+**Emergent Behaviors They Observed:**
+- Valentine's party self-organized from single seed
+- Agents coordinated timing without programming
+- Relationships formed and evolved
+- Information spread through social network
+- Agents developed opinions about each other
+
+**What Made It Work:**
+- Agents had ROUTINES (predictable baseline)
+- Agents had GOALS (desires that drive action)
+- Agents REMEMBERED (continuity across time)
+- Agents REFLECTED (formed opinions, not just recalled)
+- Agents INTERACTED (with each other, not just player)
+
+---
+
+### Our Architecture (Adapted for Wanderer's Rest)
+
+**Per-NPC State:**
+
+```
+NPC {
+  identity: {
+    name, role, personality, voice
+  }
+
+  memory_stream: [
+    { time, observation, importance }
+    // "Day 3, 10am: New owner asked about Harren's death"
+    // "Day 3, 2pm: Aldric seemed nervous at lunch"
+  ]
+
+  reflections: [
+    { insight, supporting_memories, day_formed }
+    // "The new owner is investigating Harren's death seriously"
+    // "Aldric is hiding something about that night"
+  ]
+
+  relationships: {
+    [npc_id]: {
+      trust: 0-100,
+      opinion: string,
+      recent_interactions: []
+    }
+  }
+
+  current_goals: [
+    { goal, priority, deadline }
+    // "Avoid suspicion" (high, ongoing)
+    // "Collect debt from estate" (medium, day 7)
+  ]
+
+  daily_schedule: [
+    { time, activity, location }
+    // 6am: Wake, prepare bar
+    // 8am: Open tavern
+    // 12pm: Lunch rush
+    // ...
+  ]
+
+  emotional_state: {
+    mood: string,
+    stress: 0-100,
+    triggers: []
+  }
+}
+```
+
+---
+
+### IMPROVEMENTS ON STANFORD (Our Additions)
+
+**1. Emotional State Modeling**
+```
+Stanford: Implicit in memories
+Us: Explicit emotional state that affects behavior
+
+stress > 80 → more likely to slip up, reveal secrets
+mood = anxious → shorter responses, evasive
+triggers = ["Harren", "that night"] → emotional reaction
+```
+
+**2. Relationship Graph with Dynamics**
+```
+Stanford: Agents had relationships
+Us: Relationships CHANGE based on events
+
+trust_delta when:
+  - You share secret with them: +10
+  - They hear you accused their friend: -20
+  - You help them: +15
+  - You ignore them for 3 days: -5
+```
+
+**3. Goal Conflict Detection**
+```
+Stanford: Agents had goals
+Us: System detects when goals CONFLICT
+
+Aldric goal: "Avoid suspicion"
+Player action: "Asking about forge alibi"
+Conflict detected → Aldric becomes defensive
+
+Maren goal: "Find truth about Harren"
+Thom goal: "Bury the case"
+Conflict detected → Tension scene generated
+```
+
+**4. Information Propagation Model**
+```
+Stanford: Info spread organically
+Us: Explicit gossip network with rules
+
+When NPC learns something:
+  - Check relationship graph
+  - Will they share? (based on trust, relevance)
+  - With whom? (based on closeness)
+  - How fast? (based on importance)
+  - How accurately? (based on telephone effect)
+```
+
+**5. Environmental Pressure**
+```
+Stanford: Open-ended simulation
+Us: Mystery creates pressure that escalates
+
+Day 1-7: Low pressure, NPCs relaxed
+Day 8-11: Pressure building, NPCs nervous
+Day 12-14: High pressure, secrets slip, confrontations happen
+
+Pressure affects: mood, willingness to talk, likelihood of events
+```
+
+**6. Player as Perturbation**
+```
+Stanford: Player could interact
+Us: Player presence explicitly modeled
+
+When player talks to NPC:
+  - NPC's stress changes
+  - Nearby NPCs notice
+  - Conversation enters memory stream
+  - Ripple effects propagate
+
+When player is ABSENT:
+  - NPCs interact with each other
+  - Events still happen
+  - Drama unfolds
+```
+
+---
+
+### MEASURING "BETTER" SIMULATIONS
+
+**1. Believability (Human Eval)**
+```
+Test: Show human transcript of NPC day
+Ask: "Does this feel like a real person?"
+Metrics:
+  - Consistency (do they contradict themselves?)
+  - Personality (do they stay in character?)
+  - Reactivity (do they respond to events logically?)
+```
+
+**2. Emergence (System Eval)**
+```
+Test: Run simulation with seed event
+Measure:
+  - Did unexpected-but-logical events occur?
+  - Did NPCs form new relationships?
+  - Did information spread realistically?
+  - Did conflicts arise naturally?
+```
+
+**3. Narrative Coherence (Human Eval)**
+```
+Test: Show human 7-day summary
+Ask: "Does this feel like a story?"
+Metrics:
+  - Cause and effect clear?
+  - Character arcs visible?
+  - Tension builds?
+  - Resolution satisfying?
+```
+
+**4. Engagement (User Metrics)**
+```
+Measure:
+  - How often does player check in?
+  - How long do they stay?
+  - Do they ask follow-up questions?
+  - Do they feel compelled to intervene?
+```
+
+**5. Consistency Over Time**
+```
+Test: Check NPC behavior across days
+Measure:
+  - Memory retrieval accuracy
+  - Personality drift (should be low)
+  - Relationship continuity
+  - Goal progression
+```
+
+---
+
+### THE HUMAN'S ROLE (Peeking & Intervention)
+
+**Why Human Matters:**
+
+```
+SIMULATION WITHOUT HUMAN:
+└── NPCs interact
+└── Events happen
+└── But... for whom?
+└── No witness = no story
+
+SIMULATION WITH HUMAN PEEKING:
+└── Human attention = spotlight
+└── "What the human watches becomes important"
+└── Creates narrative focus
+└── Gives meaning to events
+```
+
+**Human as Director:**
+```
+Pure simulation: Aimless, everything equally weighted
+Human attention: Creates hierarchy of importance
+
+Human asks about Aldric → Aldric scenes become "main plot"
+Human ignores Elena → Elena becomes "subplot"
+Human witnesses confrontation → It becomes "the climax"
+```
+
+**Human as Pressure:**
+```
+Equilibrium: NPCs settle into routines
+Human questions: Disrupts equilibrium
+
+"Where were you that night?"
+→ Aldric's stress increases
+→ He talks to Thom about it
+→ Thom gets nervous
+→ Thom visits Elena
+→ Cascade of reactions
+
+Human is the stone in the pond.
+```
+
+**Human as Validation:**
+```
+AI generates events
+Human reacts (or doesn't)
+Reaction = feedback signal
+
+Human finds something interesting → More of that
+Human skips something → Less of that
+Implicit training of narrative
+
+(We can use this to tune what the simulation emphasizes)
+```
+
+**The Peeking Mechanic:**
+```
+PASSIVE VIEWING:
+- See summary of what happened
+- "While you were away..."
+- Observatory mode
+
+ACTIVE INTERVENTION:
+- Talk to NPC, disrupt their day
+- Ask questions, create stress
+- Make accusations, force reactions
+
+HYBRID (Sweet Spot):
+- Watch the opera unfold
+- Choose moments to step on stage
+- Your presence matters but isn't required
+```
+
+---
+
+### DESIGN DECISION: Player as Viewer
+
+**Confirmed:**
+- Simulation runs whether player is there or not
+- NPCs have lives, goals, routines
+- Events emerge from NPC interactions
+- Player is witness who CAN intervene
+- Player attention shapes narrative focus
+- Player questions create perturbations
+
+**The New Metaphor:**
+```
+Old: Player is detective solving case
+New: Player is new owner watching drama unfold
+
+You inherited a tavern.
+You inherited its secrets.
+You inherited its people.
+
+Watch them. Or join them. Your choice.
+```
+
+---
+
 *This is a living document. Update as decisions are made.*
