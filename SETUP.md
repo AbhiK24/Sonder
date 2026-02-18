@@ -4,17 +4,71 @@ Complete guide to setting up Sonder with all integrations.
 
 ---
 
+## Understanding the Two Identities
+
+Sonder uses **two separate identities**:
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                         SONDER (System)                         │
+│                                                                 │
+│  Email: angels@yourdomain.com (or sonder.angels@gmail.com)     │
+│  WhatsApp: +1-415-555-0123 (Twilio number)                     │
+│  Telegram: @SonderAngelsBot                                     │
+│                                                                 │
+│  → This is WHO SENDS messages/invites                          │
+│  → Angels speak through this identity                          │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              │ sends to
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                          USER (You)                             │
+│                                                                 │
+│  Email: you@gmail.com (your personal email)                    │
+│  WhatsApp: +1-555-123-4567 (your phone)                        │
+│  Telegram: your chat with @SonderAngelsBot                     │
+│  Calendar: your Google Calendar                                 │
+│                                                                 │
+│  → This is WHO RECEIVES messages/invites                       │
+│  → Your calendar, your tasks, your inbox                       │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Example: Calendar Time Block
+
+When Menaka (the Strategist) creates a focus block for you:
+
+```
+┌─────────────────────────────────────────────────────┐
+│ Calendar Invite                                     │
+├─────────────────────────────────────────────────────┤
+│ From: Sonder Angels <angels@sonder.app>            │
+│ To: you@gmail.com                                   │
+│                                                     │
+│ 🎯 Focus Time: Proposal Draft                       │
+│ Tuesday 2:00 PM - 4:00 PM                          │
+│                                                     │
+│ Menaka scheduled this focus block for you.         │
+│ Your calendar looked clear - protect this time.    │
+│                                                     │
+│ [Accept] [Decline] [Maybe]                         │
+└─────────────────────────────────────────────────────┘
+```
+
+---
+
 ## Quick Start
 
 ```bash
-# Clone
+# Clone and install
 git clone https://github.com/AbhiK24/Sonder.git
 cd Sonder && pnpm install
 
 # Copy environment template
 cp .env.example .env
 
-# Edit .env with your credentials (see below)
+# Edit with your credentials
 nano .env
 
 # Run
@@ -23,120 +77,270 @@ pnpm telegram
 
 ---
 
-## Core Setup
+## Part 1: Core Setup (Required)
 
-### 1. LLM Provider (Required)
+### 1.1 LLM Provider
 
-Choose one:
+You need ONE of these:
 
-#### Option A: Kimi (Moonshot) — Recommended for cost
+#### Option A: Kimi/Moonshot (Recommended - Cheap)
+
+1. Go to [platform.moonshot.cn](https://platform.moonshot.cn/)
+2. Sign up (Chinese phone number required, or use Google)
+3. Go to API Keys → Create new key
+4. Copy the key
+
 ```bash
-# Get API key: https://platform.moonshot.cn/
-KIMI_API_KEY=sk-...
 LLM_PROVIDER=kimi
+KIMI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 #### Option B: OpenAI
+
+1. Go to [platform.openai.com/api-keys](https://platform.openai.com/api-keys)
+2. Create new secret key
+3. Copy the key
+
 ```bash
-# Get API key: https://platform.openai.com/api-keys
-OPENAI_API_KEY=sk-...
 LLM_PROVIDER=openai
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 #### Option C: Anthropic
+
+1. Go to [console.anthropic.com](https://console.anthropic.com/)
+2. Settings → API Keys → Create Key
+3. Copy the key
+
 ```bash
-# Get API key: https://console.anthropic.com/
-ANTHROPIC_API_KEY=sk-ant-...
 LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
-#### Option D: Ollama (Free, Local)
+#### Option D: Ollama (Free, runs locally)
+
+1. Install from [ollama.ai](https://ollama.ai)
+2. Pull a model:
+   ```bash
+   ollama pull qwen2.5:14b
+   ```
+
 ```bash
-# Install: https://ollama.ai
-# Pull a model: ollama pull qwen2.5:14b
+LLM_PROVIDER=ollama
 OLLAMA_ENDPOINT=http://localhost:11434
 OLLAMA_MODEL=qwen2.5:14b
-LLM_PROVIDER=ollama
 ```
 
-### 2. Telegram Bot (Required for chat)
+---
 
-1. Open Telegram, message [@BotFather](https://t.me/BotFather)
-2. Send `/newbot`
-3. Choose a name (e.g., "Sonder Angels")
-4. Choose a username (e.g., "SonderAngelsBot")
-5. Copy the token
+### 1.2 Telegram Bot (For chatting with angels)
+
+1. Open Telegram
+2. Search for [@BotFather](https://t.me/BotFather)
+3. Send `/newbot`
+4. Enter name: `Sonder Angels` (or whatever you want)
+5. Enter username: `YourSonderBot` (must end in `bot`)
+6. BotFather gives you a token like: `1234567890:ABCdefGHIjklMNOpqrsTUVwxyz`
 
 ```bash
 TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 ```
 
+**Test it:**
+```bash
+pnpm telegram
+# Then message your bot on Telegram
+```
+
 ---
 
-## Integration Setup
+## Part 2: Sonder's Identity (System Account)
 
-### Google Calendar + Gmail
+Sonder needs its own accounts to send FROM.
 
-Both use the same Google OAuth credentials.
+### 2.1 Sonder's Email (For sending invites/messages)
+
+#### Option A: Free Gmail Account (Easiest)
+
+1. Create a new Gmail: `sonder.angels.yourname@gmail.com`
+2. This is Sonder's email - angels send FROM here
+3. See Section 3.1 for OAuth setup
+
+```bash
+SONDER_EMAIL=sonder.angels.yourname@gmail.com
+```
+
+#### Option B: Custom Domain (Professional)
+
+1. Get a domain (e.g., `yourdomain.com`)
+2. Set up email with:
+   - Google Workspace ($6/mo)
+   - Zoho Mail (free tier)
+   - Fastmail
+3. Create: `angels@yourdomain.com`
+
+```bash
+SONDER_EMAIL=angels@yourdomain.com
+```
+
+#### Option C: SendGrid (For high volume)
+
+1. Sign up at [sendgrid.com](https://sendgrid.com)
+2. Verify a sender email or domain
+3. Create API key
+
+```bash
+SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxx
+SONDER_EMAIL=angels@yourdomain.com
+```
+
+---
+
+### 2.2 Sonder's WhatsApp Number (Twilio)
+
+#### Step 1: Create Twilio Account
+
+1. Go to [twilio.com/try-twilio](https://www.twilio.com/try-twilio)
+2. Sign up with email
+3. Verify your phone number
+4. You get $15 free credits
+
+#### Step 2: Get Credentials
+
+1. Go to [Twilio Console](https://console.twilio.com/)
+2. On the dashboard, find:
+   - **Account SID**: `ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx`
+   - **Auth Token**: Click to reveal, copy it
+
+```bash
+TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+```
+
+#### Step 3: Set Up WhatsApp Sandbox (Development)
+
+1. In Twilio Console, go to: **Messaging** → **Try it out** → **Send a WhatsApp message**
+2. You'll see instructions like:
+   ```
+   Send "join <word>-<word>" to +1 415 523 8886
+   ```
+3. Send that message from YOUR phone to join the sandbox
+4. Note the sandbox number
+
+```bash
+TWILIO_WHATSAPP_NUMBER=+14155238886
+```
+
+#### Step 4: Production Number (Optional, costs ~$1/month)
+
+1. Go to: **Phone Numbers** → **Buy a Number**
+2. Search for a number with SMS + Voice
+3. Purchase it
+4. Go to: **Messaging** → **WhatsApp Senders**
+5. Click "Request to enable your number for WhatsApp"
+6. Complete Facebook Business verification (takes 24-48 hours)
+7. Once approved, use your number
+
+```bash
+TWILIO_WHATSAPP_NUMBER=+1234567890  # Your purchased number
+```
+
+**Costs:**
+- Number: ~$1/month
+- Per message: $0.005-0.05 depending on country
+
+---
+
+## Part 3: User's Integrations (Your Accounts)
+
+These connect to YOUR accounts so angels can help you.
+
+### 3.1 Google Calendar + Gmail (Your Account)
+
+Angels need to:
+- READ your calendar (know when you're busy)
+- CREATE events (schedule focus blocks, send invites)
+- READ email subjects (know what needs attention)
+- DRAFT emails (help you write responses)
 
 #### Step 1: Create Google Cloud Project
 
-1. Go to [Google Cloud Console](https://console.cloud.google.com/)
-2. Create a new project (e.g., "Sonder")
-3. Enable APIs:
-   - [Calendar API](https://console.cloud.google.com/apis/library/calendar-json.googleapis.com)
-   - [Gmail API](https://console.cloud.google.com/apis/library/gmail.googleapis.com)
+1. Go to [console.cloud.google.com](https://console.cloud.google.com/)
+2. Click the project dropdown (top left) → **New Project**
+3. Name: `Sonder`
+4. Click **Create**
+5. Select your new project
 
-#### Step 2: Configure OAuth Consent Screen
+#### Step 2: Enable APIs
 
-1. Go to [OAuth Consent Screen](https://console.cloud.google.com/apis/credentials/consent)
-2. Choose "External" (or "Internal" if using Google Workspace)
+1. Go to [APIs & Services → Library](https://console.cloud.google.com/apis/library)
+2. Search and enable:
+   - **Google Calendar API** → Click → **Enable**
+   - **Gmail API** → Click → **Enable**
+
+#### Step 3: Configure OAuth Consent Screen
+
+1. Go to [OAuth consent screen](https://console.cloud.google.com/apis/credentials/consent)
+2. Select **External** → **Create**
 3. Fill in:
-   - App name: "Sonder"
+   - App name: `Sonder`
    - User support email: your email
    - Developer contact: your email
-4. Add scopes:
-   - `https://www.googleapis.com/auth/calendar.readonly`
-   - `https://www.googleapis.com/auth/calendar.events`
-   - `https://www.googleapis.com/auth/gmail.readonly`
-   - `https://www.googleapis.com/auth/gmail.compose`
-   - `https://www.googleapis.com/auth/gmail.send`
-5. Add test users (your email) while in testing mode
+4. Click **Save and Continue**
+5. **Scopes** → **Add or Remove Scopes**
+6. Add these scopes (search or paste):
+   ```
+   https://www.googleapis.com/auth/calendar.readonly
+   https://www.googleapis.com/auth/calendar.events
+   https://www.googleapis.com/auth/gmail.readonly
+   https://www.googleapis.com/auth/gmail.compose
+   https://www.googleapis.com/auth/gmail.send
+   ```
+7. Click **Update** → **Save and Continue**
+8. **Test users** → **Add Users**
+9. Add YOUR email (the one you'll use with Sonder)
+10. Click **Save and Continue**
 
-#### Step 3: Create OAuth Credentials
+#### Step 4: Create OAuth Credentials
 
 1. Go to [Credentials](https://console.cloud.google.com/apis/credentials)
-2. Click "Create Credentials" → "OAuth client ID"
-3. Choose "Web application"
-4. Add redirect URI: `http://localhost:3000/auth/google/callback`
-5. Copy Client ID and Client Secret
+2. Click **Create Credentials** → **OAuth client ID**
+3. Application type: **Web application**
+4. Name: `Sonder`
+5. **Authorized redirect URIs** → **Add URI**:
+   ```
+   http://localhost:3000/auth/google/callback
+   ```
+6. Click **Create**
+7. A popup shows your credentials - **download JSON** or copy:
+   - Client ID
+   - Client Secret
 
 ```bash
-GOOGLE_CLIENT_ID=1234567890-abc123.apps.googleusercontent.com
-GOOGLE_CLIENT_SECRET=GOCSPX-abcdefghijklmnop
+GOOGLE_CLIENT_ID=1234567890-xxxxxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxxxxx
 GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
 ```
 
-#### Step 4: First-time Authorization
+#### Step 5: First Authorization (happens when you run Sonder)
 
-When you first connect, Sonder will:
-1. Open a browser to Google's consent screen
-2. You grant permissions
-3. Google redirects back with a code
-4. Sonder exchanges the code for tokens
-5. Tokens are stored locally (encrypted)
+When Sonder first connects:
+1. It opens a browser to Google
+2. Sign in with YOUR account
+3. Grant permissions
+4. Google redirects back
+5. Sonder stores tokens locally (encrypted)
 
 ---
 
-### Todoist
+### 3.2 Todoist (Your Tasks)
 
-Simple API key authentication.
+Simple API key - no OAuth needed.
 
-#### Get API Token
-
-1. Go to [Todoist Settings](https://todoist.com/prefs/integrations)
-2. Scroll to "API token"
-3. Copy the token
+1. Go to [todoist.com/prefs/integrations](https://todoist.com/prefs/integrations)
+2. Scroll down to **Developer** section
+3. Find **API token**
+4. Copy the token
 
 ```bash
 TODOIST_API_KEY=0123456789abcdef0123456789abcdef01234567
@@ -144,232 +348,228 @@ TODOIST_API_KEY=0123456789abcdef0123456789abcdef01234567
 
 ---
 
-### WhatsApp (Twilio)
-
-Twilio provides WhatsApp Business API access.
-
-#### Step 1: Create Twilio Account
-
-1. Sign up at [Twilio](https://www.twilio.com/try-twilio)
-2. Verify your phone number
-3. Get free trial credits ($15)
-
-#### Step 2: Get WhatsApp Sandbox (Development)
-
-1. Go to [Twilio Console](https://console.twilio.com/)
-2. Navigate to Messaging → Try it out → Send a WhatsApp message
-3. Follow instructions to join the sandbox:
-   - Send "join <sandbox-code>" to the Twilio number
-4. Note the sandbox number (e.g., +14155238886)
-
-#### Step 3: Get Account Credentials
-
-1. Go to [Account Dashboard](https://console.twilio.com/)
-2. Find "Account SID" and "Auth Token"
+### 3.3 Your Contact Info (Where angels reach you)
 
 ```bash
+# Your phone (for WhatsApp messages from angels)
+USER_WHATSAPP=+15551234567
+
+# Your email (for calendar invites, email drafts)
+USER_EMAIL=you@gmail.com
+
+# Your Telegram (automatically from chat)
+# No config needed - determined by who messages the bot
+```
+
+---
+
+## Part 4: How It All Works Together
+
+### Calendar Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Menaka (Strategist) decides you need a focus block             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Sonder creates calendar event:                                  │
+│                                                                 │
+│   Organizer: angels@sonder.app (SONDER'S email)                │
+│   Attendee: you@gmail.com (YOUR email)                         │
+│   Title: "🎯 Focus: Proposal Draft"                            │
+│   Description: "Menaka scheduled this for you..."              │
+│                                                                 │
+│ Uses: Sonder's Google OAuth credentials                        │
+│ Calendar: Sonder's calendar (creates event)                    │
+│ You receive: Invite in YOUR inbox                              │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ You get email invite:                                           │
+│                                                                 │
+│   From: Sonder Angels <angels@sonder.app>                      │
+│   To: you@gmail.com                                             │
+│                                                                 │
+│   🎯 Focus: Proposal Draft                                     │
+│   When: Tuesday 2-4pm                                          │
+│                                                                 │
+│   [Accept] [Decline] [Maybe]                                   │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### WhatsApp Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Urvashi (Spark) wants to nudge you about that task             │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Sonder sends WhatsApp via Twilio:                              │
+│                                                                 │
+│   From: +1-415-555-0123 (SONDER'S Twilio number)              │
+│   To: +1-555-123-4567 (YOUR phone)                            │
+│                                                                 │
+│   ⚡ *Urvashi*                                                 │
+│                                                                 │
+│   That proposal has been waiting for 3 days.                   │
+│   What if we just wrote the first sentence?                    │
+│                                                                 │
+│   _The Spark_                                                  │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Email Draft Flow
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Chitralekha notices you haven't replied to Sarah               │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│ Sonder creates draft in YOUR Gmail:                            │
+│                                                                 │
+│   Uses: YOUR Google OAuth credentials                          │
+│   Creates draft in: YOUR drafts folder                         │
+│                                                                 │
+│   Draft:                                                        │
+│   To: sarah@company.com                                         │
+│   Subject: Re: Project Update                                   │
+│   Body: "Hey Sarah, thanks for the update..."                  │
+│                                                                 │
+│ Angels then message you:                                        │
+│   "I drafted a reply to Sarah. Check your drafts?"             │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+---
+
+## Complete .env Example
+
+```bash
+# =============================================================================
+# LLM PROVIDER (Required - pick one)
+# =============================================================================
+LLM_PROVIDER=kimi
+KIMI_API_KEY=sk-xxxxxxxxxxxxxxxx
+# OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
+# ANTHROPIC_API_KEY=sk-ant-xxxxxxxxxxxxxxxx
+# OLLAMA_ENDPOINT=http://localhost:11434
+
+# =============================================================================
+# TELEGRAM BOT (Required)
+# =============================================================================
+TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
+
+# =============================================================================
+# SONDER'S IDENTITY (System accounts - sends FROM these)
+# =============================================================================
+
+# Sonder's Email (for sending calendar invites)
+SONDER_EMAIL=sonder.angels.yourname@gmail.com
+
+# Sonder's Google OAuth (for Sonder's own calendar)
+SONDER_GOOGLE_CLIENT_ID=1234567890-xxxxx.apps.googleusercontent.com
+SONDER_GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxx
+SONDER_GOOGLE_REDIRECT_URI=http://localhost:3000/auth/sonder/callback
+
+# Sonder's WhatsApp (Twilio)
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_WHATSAPP_NUMBER=+14155238886
-```
-
-#### Step 4: Production Setup (Optional)
-
-For production, you'll need a WhatsApp Business number:
-
-1. Go to [Twilio WhatsApp Senders](https://console.twilio.com/us1/develop/sms/senders/whatsapp-senders)
-2. Click "Request to enable your number"
-3. Complete Facebook Business verification
-4. Wait for approval (24-48 hours)
-5. Update `TWILIO_WHATSAPP_NUMBER` with your number
-
-**Costs:**
-- Twilio: ~$0.005 per message (US)
-- WhatsApp: ~$0.005-0.05 per conversation (varies by country)
-
----
-
-## Sonder's Own Identity
-
-For angels to message users, Sonder needs its own phone number and email.
-
-### Option A: Development (Free)
-
-Use Twilio Sandbox for WhatsApp + your personal Gmail:
-
-```bash
-# WhatsApp: Twilio Sandbox
-TWILIO_WHATSAPP_NUMBER=+14155238886  # Sandbox number
-
-# Email: Your Gmail (messages show "via Gmail")
-# Use Gmail API with your account
-GOOGLE_CLIENT_ID=...  # Same as above
-```
-
-### Option B: Production (Recommended)
-
-**WhatsApp:**
-- Get a Twilio number (~$1/month + per-message)
-- Or use WhatsApp Business API directly
-
-**Email:**
-- Option 1: Custom domain with SendGrid
-  - `angels@yourdomain.com`
-  - Free tier: 100 emails/day
-- Option 2: Google Workspace
-  - `chitralekha@yourdomain.com` (alias)
-  - All aliases route to one inbox
-
-**Example production setup:**
-```bash
-# WhatsApp
-TWILIO_ACCOUNT_SID=ACxxxxxxxx
-TWILIO_AUTH_TOKEN=xxxxxxxx
-TWILIO_WHATSAPP_NUMBER=+1234567890  # Your dedicated number
-
-# Email (SendGrid)
-SENDGRID_API_KEY=SG.xxxxxxxx
-SONDER_EMAIL=angels@yourdomain.com
-SONDER_EMAIL_FROM_NAME=Sonder Angels
-```
-
----
-
-## Multi-Agent Messaging
-
-All angels use the same phone number and email, but messages are personalized:
-
-### WhatsApp Example
-
-```
-📜 *Chitralekha*
-
-You mentioned wanting to call your mom this week.
-Today might be a good day - your calendar looks light after 3pm.
-
-_The Rememberer_
-```
-
-### Email Example
-
-```
-From: Urvashi (via Sonder) <angels@sonder.app>
-Subject: ⚡ Ready to tackle that proposal?
-
-Hey!
-
-I noticed you've been circling that proposal for a few days.
-What if we just started with the first paragraph?
-
-Sometimes getting one sentence down breaks the whole thing open.
-
-—
-⚡ Urvashi
-The Spark
-```
-
-### How it Works
-
-1. User has ONE conversation with Sonder
-2. Different angels "speak" via message formatting
-3. Angels know who spoke last (context preserved)
-4. User can reply naturally; system routes to appropriate angel
-
----
-
-## Environment Variables Reference
-
-```bash
-# =============================================================================
-# LLM Provider (Required)
-# =============================================================================
-LLM_PROVIDER=kimi                    # ollama | openai | anthropic | kimi
-KIMI_API_KEY=sk-...                  # If using Kimi
-OPENAI_API_KEY=sk-...                # If using OpenAI
-ANTHROPIC_API_KEY=sk-ant-...         # If using Anthropic
-OLLAMA_ENDPOINT=http://localhost:11434  # If using Ollama
 
 # =============================================================================
-# Chat Platform (Required)
+# USER'S IDENTITY (Your accounts - angels help WITH these)
 # =============================================================================
-TELEGRAM_BOT_TOKEN=...               # From @BotFather
+
+# Your Email
+USER_EMAIL=you@gmail.com
+
+# Your Phone (for WhatsApp)
+USER_WHATSAPP=+15551234567
+
+# Your Google OAuth (for YOUR calendar and gmail)
+USER_GOOGLE_CLIENT_ID=1234567890-xxxxx.apps.googleusercontent.com
+USER_GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxx
+USER_GOOGLE_REDIRECT_URI=http://localhost:3000/auth/user/callback
+
+# Your Todoist
+TODOIST_API_KEY=0123456789abcdef01234567
 
 # =============================================================================
-# Google (Calendar + Gmail)
+# SETTINGS
 # =============================================================================
-GOOGLE_CLIENT_ID=...
-GOOGLE_CLIENT_SECRET=...
-GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
-
-# =============================================================================
-# Todoist
-# =============================================================================
-TODOIST_API_KEY=...
-
-# =============================================================================
-# WhatsApp (Twilio)
-# =============================================================================
-TWILIO_ACCOUNT_SID=AC...
-TWILIO_AUTH_TOKEN=...
-TWILIO_WHATSAPP_NUMBER=+1...
-
-# =============================================================================
-# Email (SendGrid) - Optional, for production
-# =============================================================================
-SENDGRID_API_KEY=SG....
-SONDER_EMAIL=angels@yourdomain.com
-
-# =============================================================================
-# Settings
-# =============================================================================
-SOUL=wanderers-rest                  # Or: swargaloka
+SOUL=swargaloka
 SAVE_PATH=~/.sonder/saves
 LOG_LEVEL=info
 DEV_MODE=true
+
+# Quiet hours (angels won't message during these times)
+QUIET_HOURS_START=22
+QUIET_HOURS_END=8
+TIMEZONE=America/Los_Angeles
 ```
 
 ---
 
 ## Troubleshooting
 
-### Google OAuth: "Access blocked: This app's request is invalid"
-- Check redirect URI matches exactly
-- Ensure you're using a test user email
-- Try clearing browser cookies
+### "Access blocked: This app's request is invalid"
+- Redirect URI must match EXACTLY (including trailing slash)
+- You must be a test user in OAuth consent screen
+- Clear browser cookies and try again
 
-### Twilio: "Unable to create record"
-- For sandbox: make sure you joined with "join <code>"
-- Check phone number format includes country code
-- Verify account has credits
+### "Insufficient Permission" from Gmail/Calendar
+- Re-authorize and make sure you check all the permission boxes
+- Scopes may have changed - check OAuth consent screen
 
-### Telegram: "Conflict: terminated by other getUpdates request"
+### Twilio "Unable to create record"
+- For sandbox: you must join first with "join xxx-xxx"
+- Phone number must include country code: `+1` not just `1`
+- Check Twilio console for error details
+
+### "Conflict: terminated by other getUpdates request" (Telegram)
 - Another bot instance is running
-- Kill it: `pkill -f "tsx src/telegram-bot.ts"`
+- Kill it: `pkill -f "tsx src/telegram-bot"`
 
-### Gmail: "Insufficient Permission"
-- Re-authorize with all required scopes
-- Check OAuth consent screen has the scopes listed
+### WhatsApp messages not delivering
+- Sandbox only works with numbers that joined
+- Check Twilio logs for delivery status
+- WhatsApp has 24-hour session windows
 
 ---
 
-## Security Notes
+## Cost Summary
 
-1. **Never commit `.env`** — It's in `.gitignore`
-2. **Tokens are stored locally** — In `~/.sonder/` (encrypted)
-3. **OAuth tokens expire** — Auto-refresh is implemented
-4. **Twilio is metered** — Set up billing alerts
-5. **Google has quotas** — Free tier is generous but limited
+| Service | Free Tier | Paid |
+|---------|-----------|------|
+| Kimi LLM | - | ~$0.01/session |
+| OpenAI | $5 credit | ~$0.01/session |
+| Telegram | ✅ Free | - |
+| Google APIs | ✅ Free (quotas) | - |
+| Todoist | ✅ Free | - |
+| Twilio WhatsApp | $15 credit | ~$0.01/msg |
+
+**Typical monthly cost:** $0-5 for personal use
 
 ---
 
 ## Next Steps
 
-1. Set up core requirements (LLM + Telegram)
-2. Add integrations as needed
-3. Run `pnpm telegram` to start
-4. Message your bot on Telegram
+1. ✅ Set up LLM + Telegram (required)
+2. Set up Sonder's email (for calendar invites)
+3. Set up Twilio (for WhatsApp proactive messages)
+4. Connect your Google (calendar + gmail access)
+5. Connect Todoist (task tracking)
 
-For the Angels experience (Swargaloka), you'll also want:
-- WhatsApp (for proactive messages)
-- Google Calendar (so angels know your schedule)
-- Todoist (so angels can track tasks with you)
+Run:
+```bash
+pnpm telegram
+```
+
+Message your bot on Telegram to start!
