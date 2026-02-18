@@ -1158,4 +1158,241 @@ Watch them. Or join them. Your choice.
 
 ---
 
+## GAMIFYING THE WATCHING (Passive → Interactive)
+
+### The Problem
+
+Watching isn't playing. How do we make observation feel like participation?
+
+---
+
+### Models From Other Media
+
+| Medium | How They Gamify Watching |
+|--------|--------------------------|
+| **Bandersnatch** | Key decision points, binary choices |
+| **Twitch Plays** | Crowd votes, aggregate control |
+| **Reality TV** | Vote to eliminate, affect outcomes |
+| **Reigns** | Swipe left/right on proposals |
+| **Betting** | Predict outcomes, stake something |
+| **Stock Market** | Invest attention in what you think matters |
+
+---
+
+### Possible Mechanics for Wanderer's Rest
+
+**1. INTERVENTION MOMENTS**
+```
+Simulation runs...
+Then: "Aldric is about to confront Thom."
+
+[LET IT HAPPEN]  or  [INTERVENE]
+
+Your choice affects outcome.
+```
+- Not constant control
+- Key dramatic moments
+- Player shapes TURNING POINTS
+
+---
+
+**2. SIDE-TAKING**
+```
+Maren and Aldric are arguing about the debt.
+
+Who do you support?
+[MAREN]  [ALDRIC]  [STAY NEUTRAL]
+
+Your support → Their confidence increases
+Your opposition → They become defensive/hostile to you
+Neutral → Drama continues, you stay observer
+```
+- You don't control, you INFLUENCE
+- NPCs know whose side you're on
+- Creates relationship consequences
+
+---
+
+**3. INFORMATION BROKERING**
+```
+You know: Kira saw the forge was cold.
+Aldric doesn't know you know.
+
+[TELL ALDRIC] → He knows you're onto him
+[TELL MAREN] → She investigates
+[TELL THOM] → Official pressure
+[KEEP SECRET] → Leverage for later
+```
+- You control INFORMATION FLOW
+- Knowledge is power
+- Creates strategic gameplay
+
+---
+
+**4. SIMPLE RULINGS**
+```
+Elena asks: "Should I tell the guards what I saw?"
+
+[YES, TELL THEM]
+[NO, STAY QUIET]
+[TELL ME FIRST]
+
+Your advice affects her action.
+Her action affects the simulation.
+```
+- NPCs consult you (you're the owner)
+- Binary choices with consequences
+- Makes you feel important without controlling everything
+
+---
+
+**5. RESOURCE ALLOCATION**
+```
+End of day. As tavern owner:
+
+Who gets a free drink tonight?
+[ ] Maren (she looks tired)
+[ ] Aldric (he's stressed)
+[ ] Thom (keep him happy)
+[ ] Nobody (save money)
+
+→ Your choice affects mood, willingness to talk
+```
+- Tavern owner role = resource control
+- Simple decisions with subtle effects
+- Integrates with simulation naturally
+
+---
+
+**6. ATTENTION = INVESTMENT**
+```
+Two things are happening:
+A) Kira is meeting someone outside
+B) Maren is reading an old letter
+
+You can only watch one. Which?
+
+[WATCH KIRA]  [WATCH MAREN]
+
+→ You see one scene, miss the other
+→ Creates FOMO, replayability
+→ Your attention shapes YOUR story
+```
+- Not controlling outcomes
+- Controlling your PERSPECTIVE
+- Different players see different narratives
+
+---
+
+**7. PREDICTION BETTING**
+```
+The week ahead:
+
+Who do you think killed Harren?
+[ ] Aldric
+[ ] Thom
+[ ] Elena
+[ ] The stranger
+[ ] Someone else
+
+Lock in your theory. See if you're right.
+→ Correct = bonus insight/scene
+→ Wrong = dramatic irony (you were fooled)
+```
+- Engages analytical thinking
+- Stakes without punishment
+- Rewards paying attention
+
+---
+
+**8. CONFLICT RESOLUTION (Judge Role)**
+```
+Aldric and Maren are in a dispute.
+Both turn to you.
+
+"You're the owner now. What do you think?"
+
+[ALDRIC IS RIGHT]
+[MAREN IS RIGHT]
+[BOTH HAVE A POINT]
+[NONE OF MY BUSINESS]
+
+Your judgment = reputation effect with both
+```
+- You're pulled INTO drama
+- Not causing it, RESOLVING it
+- Power without control
+
+---
+
+### Recommended Combination
+
+**Light Touch Model:**
+```
+80% WATCHING
+├── Simulation runs
+├── Events unfold
+├── You observe summaries
+└── Drama happens
+
+20% INTERACTING
+├── Intervention moments (1-2 per day)
+├── Simple rulings when asked
+├── Information broker choices
+└── Attention allocation
+```
+
+**The Feel:**
+- You're the new owner
+- People come to you with problems
+- You give quick opinions
+- Then watch what happens
+- Your nudges ripple through the simulation
+
+---
+
+### UX Pattern
+
+```
+MORNING:
+"Last night, Aldric and Thom argued.
+Aldric stormed out.
+Today, Aldric hasn't come to the tavern."
+
+→ [CHECK ON ALDRIC] or [ASK MAREN] or [WAIT AND SEE]
+
+AFTERNOON:
+You chose to wait.
+Maren: "Aldric came back. He's in the corner. Won't talk to anyone."
+
+→ [APPROACH HIM] or [GIVE HIM SPACE] or [SEND HIM A DRINK]
+
+EVENING:
+You sent a drink.
+Aldric: "...thanks. You're not like Harren."
+He seems more willing to talk tomorrow.
+
+[END OF DAY SUMMARY]
+```
+
+Small choices. Big ripples. Mostly watching.
+
+---
+
+### Key Insight
+
+**You're not the protagonist. You're the OWNER.**
+
+Owners don't fight battles. They:
+- Observe their domain
+- Make judgment calls
+- Allocate resources
+- Support or oppose
+- Shape the environment
+
+The DRAMA is between NPCs.
+You STEER it with light touches.
+
+---
+
 *This is a living document. Update as decisions are made.*
