@@ -1,5 +1,41 @@
 # Wanderer's Rest - Game Design Overhaul
 
+---
+
+## The Thesis
+
+**Local-first AI game engine where players own their data.**
+
+### Core Principles:
+
+1. **Local-first** - Runs on player's machine, their data, their world
+2. **AI-native** - Maximize AI in all aspects (generation, NPCs, events, adaptation)
+3. **Game design still matters** - AI doesn't excuse bad loops. Structure must be solid.
+
+### What This Means:
+
+```
+AI handles: Content, dialogue, adaptation, surprise
+Design handles: Stakes, loops, progression, goals
+
+AI without design = Interesting but aimless
+Design without AI = Structured but lifeless
+Both together = Addictive + Alive
+```
+
+### The Balance:
+
+| Aspect | AI's Job | Design's Job |
+|--------|----------|--------------|
+| NPCs | Generate personality, dialogue | Define goals, secrets, relationships |
+| Mystery | Generate clues, red herrings | Define structure, solution, timeline |
+| Events | Generate daily happenings | Define triggers, consequences, pacing |
+| Player | Adapt to player's style | Define stakes, rewards, fail states |
+
+**AI is the content engine. Design is the game engine.**
+
+---
+
 ## The Question
 
 **How do we make this addictive?**
