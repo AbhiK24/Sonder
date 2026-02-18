@@ -892,9 +892,12 @@ async function main() {
     const now = new Date();
     const hoursAway = (now.getTime() - state.lastSeen.getTime()) / (1000 * 60 * 60);
 
-    if (hoursAway >= 1) {
+    // World tick threshold: 5 minutes for testing (change to 1 hour for production)
+    const WORLD_TICK_HOURS = 5 / 60; // 5 minutes = 0.083 hours
+
+    if (hoursAway >= WORLD_TICK_HOURS) {
       // Simulate what happened
-      console.log(`[${chatId}] Away for ${hoursAway.toFixed(1)} hours, triggering world tick`);
+      console.log(`[${chatId}] Away for ${(hoursAway * 60).toFixed(1)} minutes, triggering world tick`);
       const newEvents = await simulateTimeAway(provider, state, hoursAway);
       state.events.push(...newEvents);
 
@@ -1012,7 +1015,7 @@ async function main() {
         `Unseen events: ${getUnseenEvents(state).length}\n` +
         `Player name: ${state.playerName || 'not set'}\n` +
         `Current NPC: ${state.currentNPC}\n` +
-        `World tick triggers at: 60+ minutes away`,
+        `World tick triggers at: 5+ minutes away (testing mode)`,
         { parse_mode: 'Markdown' }
       );
       return;
