@@ -250,14 +250,17 @@ Format as JSON array:
 Keep descriptions to one sentence. Make them feel natural, not dramatic.`;
 
   try {
+    console.log(`[World Tick] Simulating ${Math.floor(hoursAway)} hours away...`);
     const result = await provider.generateJSON<Array<{description: string; participants: string[]}>>(prompt);
+    console.log(`[World Tick] Generated ${result.length} events`);
     return result.map(e => ({
       time: new Date(),
       description: e.description,
       participants: e.participants,
       seen: false,
     }));
-  } catch {
+  } catch (err) {
+    console.error('[World Tick] Failed to generate events:', err);
     return [];
   }
 }
@@ -884,6 +887,7 @@ async function main() {
 
     if (hoursAway >= 1) {
       // Simulate what happened
+      console.log(`[${chatId}] Away for ${hoursAway.toFixed(1)} hours, triggering world tick`);
       const newEvents = await simulateTimeAway(provider, state, hoursAway);
       state.events.push(...newEvents);
 
@@ -960,7 +964,7 @@ async function main() {
       return;
     }
 
-    // RECAP - What happened while away
+    // RECAP - What happened while away (unseen only)
     if (trimmed === 'RECAP') {
       const unseen = getUnseenEvents(state);
       if (unseen.length === 0) {
@@ -973,6 +977,37 @@ async function main() {
           { parse_mode: 'Markdown' }
         );
       }
+      return;
+    }
+
+    // HISTORY - All past events
+    if (trimmed === 'HISTORY') {
+      if (state.events.length === 0) {
+        await ctx.reply('_No events have occurred yet. The tavern has been quiet._', { parse_mode: 'Markdown' });
+      } else {
+        const history = state.events.slice(-10).map(e => `• ${e.description}`).join('\n');
+        await ctx.reply(
+          `*Tavern History (last ${Math.min(10, state.events.length)} events)*\n\n${history}`,
+          { parse_mode: 'Markdown' }
+        );
+      }
+      return;
+    }
+
+    // DEBUG - Show state info for troubleshooting
+    if (trimmed === 'DEBUG') {
+      const minutesAgo = (now.getTime() - state.lastSeen.getTime()) / (1000 * 60);
+      await ctx.reply(
+        `*Debug Info*\n\n` +
+        `Day: ${state.day}\n` +
+        `Last seen: ${minutesAgo.toFixed(1)} minutes ago\n` +
+        `Events stored: ${state.events.length}\n` +
+        `Unseen events: ${getUnseenEvents(state).length}\n` +
+        `Player name: ${state.playerName || 'not set'}\n` +
+        `Current NPC: ${state.currentNPC}\n` +
+        `World tick triggers at: 60+ minutes away`,
+        { parse_mode: 'Markdown' }
+      );
       return;
     }
 
