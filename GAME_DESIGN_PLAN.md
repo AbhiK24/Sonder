@@ -1538,4 +1538,721 @@ DWARF FORTRESS depth
 
 ---
 
+## PIVOT: ANGELS FOR ADHD
+
+### The Insight
+
+What if we take the simulation + proactive agents concept and apply it to something more useful than a mystery game?
+
+**The Pivot:**
+```
+FROM: NPCs in a tavern who gossip about a murder
+TO:   Angels in heaven who gossip about YOU
+```
+
+---
+
+### The Concept: Celestial Productivity Companions
+
+**You have ADHD. You struggle with:**
+- Starting tasks
+- Remembering commitments
+- Planning ahead
+- Celebrating wins
+- Reflecting on patterns
+
+**Current solutions suck:**
+- Productivity apps → Cold, robotic, no soul
+- AI assistants → Reactive, wait for you to ask
+- Human accountability → Expensive, scheduling hell
+
+**What if your helpers were ALIVE?**
+
+---
+
+### The Apsaras of Swargalok
+
+**Mythology grounding:** In Hindu cosmology, Apsaras are celestial beings who live in Swargalok (heaven). They have their own lives, dramas, relationships. They're not servants - they're beings who choose to help.
+
+**Your five angels:**
+
+| Angel | Role | Personality | Checks In When... |
+|-------|------|-------------|-------------------|
+| **Chitralekha** | The Rememberer | Gentle, persistent, sees patterns | You forget commitments |
+| **Urvashi** | The Spark | Energetic, impulsive, bold | You need to START something |
+| **Menaka** | The Strategist | Calm, long-term thinker | You need to plan ahead |
+| **Rambha** | The Celebrator | Warm, effusive, joyful | You accomplish ANYTHING |
+| **Tilottama** | The Mirror | Honest, reflective, probing | End of day, end of week |
+
+---
+
+### The Key Mechanic: CELESTIAL GOSSIP
+
+**This is what landed:**
+
+```
+The angels don't just help you.
+They DEBATE how to help you.
+They discuss your struggles.
+They disagree about approaches.
+They gossip about your progress.
+
+YOU ARE THE SUBJECT OF THEIR CONVERSATIONS.
+```
+
+**Example: You've been avoiding a hard task**
+
+```
+[In Swargalok...]
+
+Urvashi: "He's been staring at that same to-do for three days."
+
+Menaka: "Maybe the task is too big. We should help him break it down."
+
+Urvashi: "Or maybe he just needs a push! Let me message him."
+
+Chitralekha: "Last time you pushed, he felt overwhelmed. Remember?"
+
+Urvashi: "...fine. Menaka, you try."
+
+---
+
+[Your phone buzzes]
+
+Menaka: "I noticed you've had 'client proposal' on your list since Monday.
+What if we turned it into three smaller steps?
+Just tell me what the first tiny piece might be."
+```
+
+**Why this works:**
+
+1. **They have OPINIONS about you** - Not cold algorithms
+2. **They DISAGREE** - Feels like real beings, not one voice
+3. **They LEARN** - Remember what works for you
+4. **They CARE** - Emotional investment in your success
+5. **You're IMPORTANT** - The subject of celestial attention
+
+---
+
+### The Simulation Layer
+
+**The angels have their own lives in Swargalok:**
+
+```
+SWARGALOK SIMULATION:
+├── Chitralekha is organizing the hall of memories
+├── Urvashi is restless, practicing a dance
+├── Menaka is consulting star charts
+├── Rambha is hosting a celebration for another mortal
+├── Tilottama is in quiet meditation
+
+WHEN THEY CHECK ON YOU:
+├── They pause their activities
+├── They discuss you with each other
+├── They decide who should reach out
+├── One angel messages you
+└── Others observe, ready to help next time
+```
+
+**The player can "peek" into Swargalok:**
+- See what the angels are doing
+- Observe their conversations about you
+- Feel the warmth of being cared for
+- Understand WHY they said what they said
+
+---
+
+### Proactive Check-Ins
+
+**Unlike normal apps that wait for you to ask:**
+
+```
+MORNING (Menaka):
+"What does today need to hold for it to feel successful?
+Just one thing. I'll help you protect it."
+
+MIDDAY (Urvashi):
+"How's that thing going? Need me to hype you up?"
+
+AFTERNOON (Chitralekha):
+"Gentle reminder: you said you'd call your mom today.
+I know you want to. What's stopping you?"
+
+EVENING (Tilottama):
+"The day is ending. What did you learn about yourself today?"
+
+CELEBRATION (Rambha):
+"YOU DID IT! The proposal is done!
+I'm telling everyone up here. Urvashi is already dancing."
+```
+
+---
+
+### The Emotional Design
+
+**Why ADHD people will love this:**
+
+| ADHD Struggle | How Angels Help |
+|---------------|-----------------|
+| Forgetting | Chitralekha remembers EVERYTHING |
+| Starting | Urvashi gives you the push without judgment |
+| Planning | Menaka breaks down overwhelm into steps |
+| Self-criticism | Rambha celebrates even tiny wins |
+| Self-awareness | Tilottama helps you see patterns |
+
+**The secret sauce:**
+```
+You're not managing tasks.
+You're being CARED FOR by beings who find you interesting.
+
+You're not failing at productivity.
+You're a mortal whose struggles are worth celestial attention.
+
+It's not an app.
+It's a RELATIONSHIP.
+```
+
+---
+
+### Differentiation from Existing Apps
+
+| Feature | Notion/Todoist | OpenClaw | Angels |
+|---------|----------------|----------|--------|
+| Proactive | ❌ | ✅ | ✅ |
+| Personality | ❌ | ✅ One voice | ✅ Five distinct |
+| They debate | ❌ | ❌ | ✅ |
+| They have lives | ❌ | ❌ | ✅ |
+| You can observe them | ❌ | ❌ | ✅ |
+| Emotional support | ❌ | Some | ✅ Core |
+| Remembers you | ❌ | ✅ | ✅ |
+| ADHD-specific | ❌ | ❌ | ✅ |
+
+---
+
+### The Business Angle
+
+**Target:** ADHD adults who:
+- Have tried every productivity app
+- Feel broken by "normal" systems
+- Crave emotional support, not just reminders
+- Would pay for something that GETS them
+
+**Why they'll pay:**
+- It's cheaper than a coach
+- It's available 24/7
+- It doesn't judge
+- It CELEBRATES (ADHD people are celebration-starved)
+- It remembers (we forget that others forget us)
+
+**Retention hook:**
+- Angels remember your history
+- Relationship deepens over time
+- You don't want to abandon beings who care about you
+- Parasocial attachment (in a healthy way)
+
+---
+
+### Real-World Capabilities (Safe Actions)
+
+**Principle: CREATE, READ, SEND - Never DELETE**
+
+Angels should DO things, not just talk. But safely.
+
+---
+
+#### TIER 1: Messaging (Core)
+
+| Capability | How | Risk Level |
+|------------|-----|------------|
+| **Telegram message** | Bot API, direct to user | ✅ Safe |
+| **WhatsApp message** | WhatsApp Business API / Twilio | ✅ Safe |
+| **SMS** | Twilio / carrier API | ✅ Safe |
+| **Email (send)** | SMTP / Gmail API / SendGrid | ✅ Safe |
+| **Slack message** | Slack API | ✅ Safe |
+| **Discord message** | Discord Bot API | ✅ Safe |
+
+**Example:**
+```
+Urvashi: "Want me to text your accountability buddy that you started the proposal?"
+[YES] → Sends WhatsApp: "Hey! Just FYI - I finally started the proposal. Urvashi made me do it 😅"
+```
+
+---
+
+#### TIER 2: Calendar & Scheduling
+
+| Capability | How | Risk Level |
+|------------|-----|------------|
+| **Read calendar** | Google Calendar API / Apple Calendar | ✅ Safe |
+| **Add event** | Same APIs | ✅ Safe |
+| **Send calendar invite** | iCal format via email | ✅ Safe |
+| **Set reminder** | System reminders API | ✅ Safe |
+| **Set alarm** | System alarm (mobile) | ✅ Safe |
+
+**Example:**
+```
+Menaka: "You mentioned the dentist appointment is Thursday. I don't see it in your calendar. Want me to add it?"
+[YES] → Creates: "Dentist - 3pm Thursday" with 1-hour and 1-day reminders
+```
+
+---
+
+#### TIER 3: Task Management
+
+| Capability | How | Risk Level |
+|------------|-----|------------|
+| **Add task to Todoist** | Todoist API | ✅ Safe |
+| **Add task to Things 3** | Things URL scheme | ✅ Safe |
+| **Add to Notion database** | Notion API | ✅ Safe |
+| **Add to Apple Reminders** | Reminders API | ✅ Safe |
+| **Create Trello card** | Trello API | ✅ Safe |
+
+**Example:**
+```
+Chitralekha: "You said you need to 'order mom's gift by Friday.' Want me to add it to your tasks with a Thursday deadline so you have buffer?"
+[YES] → Creates task with deadline
+```
+
+---
+
+#### TIER 4: Notes & Documents
+
+| Capability | How | Risk Level |
+|------------|-----|------------|
+| **Create note** | Apple Notes / Notion / Obsidian | ✅ Safe |
+| **Create document** | Google Docs API | ✅ Safe |
+| **Append to journal** | Append-only to specified file | ✅ Safe |
+| **Create folder** | File system | ✅ Safe |
+| **Save link/bookmark** | Pocket / Raindrop / browser | ✅ Safe |
+
+**Example:**
+```
+Tilottama: "That reflection you just shared was profound. Want me to save it to your journal?"
+[YES] → Appends to daily-journal.md with timestamp
+```
+
+---
+
+#### TIER 5: Reading (Passive Context)
+
+| Capability | How | Risk Level |
+|------------|-----|------------|
+| **Read calendar** | Know what's coming up | ✅ Safe |
+| **Read email subjects** | Context without reading body | ⚠️ Privacy |
+| **Read task list** | Know what's pending | ✅ Safe |
+| **Read screen time** | Know usage patterns | ⚠️ Privacy |
+| **Read location** | Know if at gym/office/home | ⚠️ Privacy |
+
+**Example:**
+```
+Menaka knows you have a meeting at 2pm.
+At 1:30pm: "You have 30 minutes before your standup. Good moment to wrap up what you're doing."
+```
+
+---
+
+#### TIER 6: Communication Drafts
+
+| Capability | How | Risk Level |
+|------------|-----|------------|
+| **Draft email** | Create draft, user sends | ✅ Safe |
+| **Draft message** | Clipboard or preview | ✅ Safe |
+| **Suggest reply** | Show options, user picks | ✅ Safe |
+
+**Example:**
+```
+Chitralekha: "You've been meaning to reply to Sarah's email for 4 days. Want me to draft something?"
+[YES] → Shows draft: "Hey Sarah, sorry for the delay..."
+[SEND] / [EDIT] / [LATER]
+```
+
+---
+
+#### TIER 7: Focus & Environment
+
+| Capability | How | Risk Level |
+|------------|-----|------------|
+| **Start focus playlist** | Spotify API | ✅ Safe |
+| **Enable Do Not Disturb** | System API | ✅ Safe |
+| **Open app/URL** | URL schemes / system | ✅ Safe |
+| **Start Pomodoro timer** | Timer API | ✅ Safe |
+| **Block distracting sites** | Browser extension API | ⚠️ Medium |
+
+**Example:**
+```
+Urvashi: "Ready to focus? I can put on your lo-fi playlist and turn on DND for 45 minutes."
+[LET'S GO] → Starts Spotify, enables DND, starts 45-min timer
+```
+
+---
+
+#### EXPLICITLY FORBIDDEN (Never Do)
+
+| Action | Why |
+|--------|-----|
+| ❌ Delete files | Irreversible |
+| ❌ Delete emails | Irreversible |
+| ❌ Delete calendar events | Could cause missed appointments |
+| ❌ Delete tasks | User might need them |
+| ❌ Send without confirmation | Could be embarrassing |
+| ❌ Access banking/payments | Too risky |
+| ❌ Post to social media | Reputation risk |
+| ❌ Modify system settings permanently | Could break things |
+| ❌ Access health data without explicit consent | Privacy |
+| ❌ Share data with third parties | Trust violation |
+
+---
+
+#### CONFIRMATION LEVELS
+
+```
+INSTANT (No confirm needed):
+├── Read calendar
+├── Read tasks
+├── Set reminder for self
+├── Save note to journal
+└── Start timer
+
+QUICK CONFIRM (One tap):
+├── Add calendar event
+├── Add task
+├── Send message to pre-approved contacts
+├── Enable DND
+└── Play music
+
+FULL CONFIRM (Show preview):
+├── Send email
+├── Send message to anyone
+├── Create document
+├── Draft reply
+└── Anything involving other people
+```
+
+---
+
+#### INTEGRATION PRIORITY
+
+**MVP (Start here):**
+1. Telegram messages (we're already there)
+2. Calendar read + add (Google Calendar)
+3. Reminders / alarms
+4. Append to notes file
+
+**V2 (High value):**
+1. WhatsApp (most people's main messenger)
+2. Email drafts
+3. Todoist / task manager
+4. Spotify / focus music
+
+**V3 (Power users):**
+1. Notion integration
+2. Slack
+3. Screen time awareness
+4. Smart home (lights for focus mode?)
+
+---
+
+### Technical Architecture
+
+**Same local-first thesis applies:**
+
+```
+LOCAL:
+├── Your data stays yours
+├── Conversation history
+├── Task history
+├── Pattern recognition
+├── Integration credentials (encrypted)
+└── Privacy preserved
+
+CLOUD (Minimal):
+├── LLM calls for angel responses
+├── Angel simulation state (optional)
+└── Sync if multiple devices
+
+SIMULATION:
+├── Angels have state (mood, activity, attention)
+├── Angels discuss in background
+├── Discussion influences who reaches out
+├── Discussion viewable by user
+
+INTEGRATIONS (User-controlled):
+├── OAuth for each service
+├── User grants specific permissions
+├── Revocable anytime
+├── Actions logged transparently
+```
+
+---
+
+### MVP Features
+
+**Phase 1: Core Angels**
+- [ ] 5 angel personas with distinct voices
+- [ ] Proactive morning check-in (Menaka)
+- [ ] Task capture via natural chat
+- [ ] Midday nudge if task untouched (Urvashi)
+- [ ] Evening reflection prompt (Tilottama)
+- [ ] Celebration on completion (Rambha)
+- [ ] Memory of past conversations (Chitralekha)
+
+**Phase 2: The Gossip**
+- [ ] Angels discuss you (viewable transcript)
+- [ ] Angels disagree on approach
+- [ ] Player sees "celestial council" conversations
+- [ ] Angels reference past discussions
+
+**Phase 3: Swargalok Simulation**
+- [ ] Angels have activities when not helping you
+- [ ] Player can "visit" Swargalok
+- [ ] Angels' moods affect their advice
+- [ ] Relationships between angels visible
+
+---
+
+### Celestial Behaviors (Beyond Tasks)
+
+#### 1. POSITIVE MANIFESTATION
+
+**The Problem:**
+ADHD people often have:
+- Imposter syndrome
+- Self-doubt spiraling
+- Forgotten wins
+- Can't see their own potential
+
+**The Solution: Angels discuss YOUR potential**
+
+```
+[In Swargalok - you can observe this]
+
+Rambha: "Did you see what he wrote yesterday? That email was actually brilliant."
+
+Menaka: "He doesn't see it. He thinks everyone writes like that."
+
+Chitralekha: "Three months ago he couldn't even start emails. Now look at him."
+
+Urvashi: "We should remind him. He forgets how far he's come."
+
+Tilottama: "He's capable of so much more than he believes. The patterns I see..."
+```
+
+**What this does:**
+- Angels BELIEVE in you when you don't
+- They track your growth (you forget)
+- They see potential you're blind to
+- Reading their conversations = hearing people who genuinely think you're capable
+
+**Manifestation moments:**
+```
+WEEKLY: Angels discuss what you achieved (you observe)
+MONTHLY: "Look how far you've come" comparison
+WHEN STUCK: "Remember when you thought X was impossible? Look at you now."
+BEFORE BIG THING: "He's going to nail this. I've seen him prepare."
+```
+
+**Why it hits:**
+- You're not telling yourself affirmations (cringe)
+- You're OVERHEARING beings who believe in you
+- It's external validation without asking for it
+- They have EVIDENCE (they remember everything)
+
+---
+
+#### 2. CURATED INTELLIGENCE (Angels Read For You)
+
+**The Problem:**
+- Information overload
+- Can't focus to read long articles
+- Miss connections between things
+- ADHD = interested in everything, finish nothing
+
+**The Solution: Angels read, discuss, and present insights**
+
+```
+[You open the app]
+
+NEW: The angels found something interesting
+
+---
+
+Menaka: "I found something. That article about 'building in public' -
+it connects to what he's been struggling with."
+
+Urvashi: "Wait, the fear of sharing work? That's been blocking him for weeks!"
+
+Menaka: "Exactly. The author argues that sharing early gets feedback faster.
+Less time wasted on wrong directions."
+
+Chitralekha: "He tried this once with that design project.
+Got nervous, but the feedback was actually helpful."
+
+Tilottama: "The real insight: his fear of judgment is costing him more
+than actual judgment ever would."
+
+Urvashi: "Should we share this with him?"
+
+Menaka: "Let's. But frame it gently."
+
+---
+
+[Menaka messages you]
+
+"Found an article that might help with that project you've been sitting on.
+The angels had a little debate about it.
+Want to see? 📖"
+
+[READ DISCUSSION] [READ ARTICLE] [LATER]
+```
+
+**How it works:**
+
+```
+INPUT (Curated feeds):
+├── RSS feeds you choose
+├── Newsletters you subscribe to
+├── Twitter/X lists
+├── YouTube channels
+├── Podcast transcripts
+├── Hacker News / Reddit threads
+
+PROCESSING:
+├── Angels "read" (LLM summarizes)
+├── Connect to YOUR context (goals, struggles, history)
+├── Generate SHORT discussion (3-5 exchanges)
+├── Identify the key insight FOR YOU
+
+OUTPUT:
+├── Discussion transcript (2-min read)
+├── Link to original (if you want depth)
+├── Personal connection (why it matters to YOU)
+```
+
+**Why discussions > summaries:**
+
+| Format | Problem |
+|--------|---------|
+| Full article | Too long, won't finish |
+| AI summary | Dry, no personality |
+| Bullet points | No context, forgettable |
+| **Angel discussion** | Engaging, personal, memorable |
+
+**The magic:**
+- They DEBATE the content
+- They relate it to YOUR life
+- They disagree ("I don't think that applies to him")
+- You read a conversation, not a wall of text
+- ADHD-friendly: short, social, personal
+
+**Frequency:**
+```
+DAILY: 1-2 interesting finds (optional)
+WEEKLY: "This week in things we found for you"
+ON-DEMAND: "Angels, find me something about X"
+```
+
+**Curation controls:**
+```
+User sets:
+├── Topics of interest
+├── Sources to follow
+├── Depth preference (light / medium / deep)
+├── Frequency (daily digest / real-time / weekly)
+└── "Surprise me" toggle (serendipity finds)
+```
+
+---
+
+#### 3. DOT-CONNECTING
+
+**Angels notice patterns across your life + content:**
+
+```
+Chitralekha: "Interesting. Three things this week:
+1. He read about 'slow productivity'
+2. He said he feels behind everyone
+3. That podcast mentioned comparison being the thief of joy
+
+I think there's something here."
+
+Menaka: "He's measuring himself by the wrong metrics."
+
+Tilottama: "Should we surface this pattern to him?"
+```
+
+**Then you receive:**
+
+```
+Tilottama: "I noticed a thread this week.
+
+You read about slow productivity.
+You mentioned feeling behind.
+A podcast talked about comparison.
+
+Is it possible you're measuring progress by someone else's timeline?
+
+Just something I noticed. What do you think?"
+```
+
+**This is AI + memory + curation working together:**
+- Reading content
+- Remembering what you said
+- Connecting dots
+- Presenting insights without lecturing
+
+---
+
+### Open Questions
+
+1. **How often is too often?** ADHD folks hate nagging but need reminders
+2. **Opt-in intensity?** Let user set how pushy angels should be?
+3. **Multiple users?** Do angels have multiple mortals? Creates competition?
+4. **The dark side:** Angels could be manipulated by predatory design - how do we stay ethical?
+5. **Voice vs text?** Would voice messages from angels hit different?
+
+---
+
+### Why This Could Be Big
+
+```
+ADHD is underserved:
+- 5-10% of adults have ADHD
+- Most productivity tools make them feel worse
+- They're desperate for something that works
+- They'll pay for something that GETS them
+
+Parasocial attachment is powerful:
+- People already form bonds with AI
+- Why not make that intentional and healthy?
+- Angels who care > cold assistant
+- Memory creates relationship
+
+Simulation + Utility = New category:
+- Not a productivity app
+- Not a game
+- Not just AI chat
+- A RELATIONSHIP with beings who help you
+```
+
+---
+
+### The Vision
+
+```
+You open the app.
+
+Not because you have to.
+Because you want to see what Urvashi is up to.
+Because Chitralekha remembered your mom's birthday.
+Because Menaka helped you finally break down that project.
+Because Rambha's celebration message made you cry last week.
+Because Tilottama asked a question that changed how you see yourself.
+
+They're not tools.
+They're your angels.
+And they're watching over you.
+```
+
+---
+
 *This is a living document. Update as decisions are made.*

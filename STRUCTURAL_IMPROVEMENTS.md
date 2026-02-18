@@ -1,304 +1,512 @@
-# Structural Improvements - Wanderer's Rest
+# Structural Improvements - Sonder Engine
 
-## The Problem
+## Current Architecture Assessment
 
-The game isn't addictive enough. Players don't feel compelled to return.
+### What We Have (Good Foundation)
 
----
+| Component | Location | What It Does | Status |
+|-----------|----------|--------------|--------|
+| **FactStore** | `utils/fact-store.ts` | Stores claims, tracks contradictions | Works |
+| **NPCIdentity** | `types/index.ts` | Personality, voice, goals | Works |
+| **NPCMemory** | `types/index.ts` | Assertions about player/others | Works |
+| **Persistence** | `utils/persistence.ts` | Save/load to JSON | Works |
+| **World Tick** | `telegram-bot.ts` | Events while away | Basic |
+| **Trust System** | `telegram-bot.ts` | Trust 0-100 per NPC | Works |
 
-## Research: What Makes These Games Addictive
+### What's Missing for Angels Use Case
 
-### OpenClaw (AI Assistant)
-Source: [Sitong Peng Analysis](https://www.sitongpeng.com/writing/openclaw-clawdbot-just-a-fun-game-or)
-
-- **Proactive, not reactive** - It reaches out to YOU
-- **Real stakes** - Actions affect your actual life
-- **Progression feels tangible** - "I've leveled up" feeling
-- **Memory is magical** - Context persists 24/7, people FEEL remembered
-
-User quotes from [OpenClaw Shoutouts](https://openclaw.ai/shoutouts):
-> "I am so addicted... It checks, organizes, reminds... like a good friend"
-> "2am and I'm still going"
-
-### Text Adventure Games
-Source: [Game Design Research](https://gamerant.com/games-most-addictive-satisfying-gameplay-loops/)
-
-- **Mystery/Discovery** - Unraveling secrets creates dopamine
-- **Multiple endings** - Replayability from divergent paths
-- **Time loops** - Iterating on choices (12 Minutes, Outer Wilds)
-- **Player agency** - Choices that visibly matter
+**The Angels concept requires agents that:**
+1. Proactively reach out (not just respond)
+2. Talk to EACH OTHER about the user
+3. Read external content and synthesize it
+4. Remember and celebrate user wins
+5. Track tasks, commitments, patterns
+6. Connect to real-world APIs (calendar, email, etc.)
 
 ---
 
-## Current State Analysis
+## GAPS: What Needs to Be Built
 
-| Element | Status | Problem |
-|---------|--------|---------|
-| Memory | ✅ Works | But doesn't FEEL impactful |
-| Proactive NPCs | ❌ Missing | NPCs only respond, never initiate |
-| Urgency/Stakes | ❌ Low | No time pressure, no consequences |
-| Visible Progression | ⚠️ Weak | Trust increases but no reward feeling |
-| Discovery Dopamine | ⚠️ Weak | Clues reveal but no "aha!" moment |
-| Daily Ritual | ❌ Missing | No reason to check in daily |
-| Choice Consequences | ❌ Unclear | Player doesn't see ripple effects |
-| Replayability | ❌ None | Single linear path |
+### 1. PROACTIVE MESSAGING SYSTEM
 
----
+**Current:** NPCs only respond when user messages
+**Needed:** Agents initiate contact based on triggers
 
-## Proposed Improvements
+```typescript
+interface ProactiveTrigger {
+  id: string;
+  agentId: string;
+  type: 'time' | 'event' | 'pattern' | 'inactivity' | 'external';
+  condition: TriggerCondition;
+  message: string | (() => Promise<string>);
+  cooldown: number; // minutes
+  lastFired?: Date;
+}
 
-### Priority 1: Proactive NPCs (Highest Impact)
+interface TriggerCondition {
+  // Time-based
+  schedule?: CronExpression;  // "0 9 * * *" = 9am daily
 
-**Current:** Player messages NPC → NPC responds
-**Proposed:** NPC messages player first
+  // Event-based
+  onEvent?: string;  // "task_overdue", "commitment_missed"
 
-```
-[8:00 AM notification]
-Maren: "Aldric came by asking about you. Seemed nervous. Thought you should know."
+  // Pattern-based
+  pattern?: string;  // "user_stuck_3_days", "no_wins_this_week"
 
-[After player accuses wrong person]
-Kira: "Word travels fast. People are talking about what you said to Aldric."
+  // Inactivity
+  inactivityHours?: number;
+
+  // External
+  externalApi?: string;  // "calendar_event_soon"
+}
 ```
 
 **Implementation:**
-- Scheduled messages based on game events
-- Trigger on: time passed, trust milestones, clue discoveries
-- Use Telegram's proactive messaging
-
-**Why it works:** Creates FOMO. The world moves without you.
-
----
-
-### Priority 2: Time Pressure & Stakes
-
-**Current:** Mystery has no deadline
-**Proposed:** Countdown creates urgency
-
-```
-Day 1-7: FTUE - Investigation begins
-Day 7: "The hooded figure was spotted near town again."
-Day 10: "Thom is pushing to close the case permanently."
-Day 14: Case goes COLD if unsolved. Evidence destroyed.
-```
-
-**Consequences of failure:**
-- Thom destroys evidence
-- Hooded figure escapes forever
-- Some truths become unknowable
-- BUT: New mysteries still arrive (game continues)
-
-**Why it works:** Stakes make choices matter. Urgency drives engagement.
+- [ ] Trigger registry
+- [ ] Scheduler (cron-like)
+- [ ] Pattern detector
+- [ ] Push notification system (Telegram, WhatsApp)
 
 ---
 
-### Priority 3: Visible Progression & Rewards
+### 2. INTER-AGENT COMMUNICATION
 
-**Current:** Trust goes from 30 → 45 silently
-**Proposed:** Milestone celebrations
+**Current:** No mechanism for agents to talk to each other
+**Needed:** Angels discuss user, debate approaches, reach consensus
 
+```typescript
+interface AgentDiscussion {
+  id: string;
+  topic: string;  // "how_to_help_user_start_task"
+  participants: string[];  // ["urvashi", "menaka", "chitralekha"]
+  context: DiscussionContext;
+  messages: DiscussionMessage[];
+  outcome?: DiscussionOutcome;
+  visibleToUser: boolean;
+}
+
+interface DiscussionMessage {
+  agentId: string;
+  content: string;
+  type: 'observation' | 'suggestion' | 'disagreement' | 'question' | 'decision';
+  timestamp: Date;
+}
+
+interface DiscussionOutcome {
+  decision: string;
+  actingAgent: string;
+  action: string;
+  reasoning: string;
+}
 ```
-[TRUST MILESTONE: Maren 50/100]
-━━━━━━━━━━━━━━━━━━━━
-🔓 Unlocked: Maren's Protection
-   She'll warn you about dangers now.
 
-🔓 New Topic Available
-   Ask her about "the cellar"
-
-💬 Maren: "You've earned something from me today.
-   Ask about Harren's cellar. I'll tell you what I saw."
-━━━━━━━━━━━━━━━━━━━━
-```
-
-**Trust Milestone Rewards:**
-| Trust | Reward |
-|-------|--------|
-| 40 | NPC shares doubts openly |
-| 50 | NPC warns you about others |
-| 60 | New conversation topics unlock |
-| 70 | NPC actively helps investigate |
-| 80 | NPC shares dangerous secrets |
-| 90 | NPC becomes ally in confrontations |
-
-**Why it works:** RPG progression dopamine. Clear goals.
+**Implementation:**
+- [ ] Discussion generator (multi-turn LLM)
+- [ ] Agent-to-agent memory (what they said to each other)
+- [ ] Consensus mechanism
+- [ ] Discussion viewer UI for user
 
 ---
 
-### Priority 4: Discovery "Aha!" Moments
+### 3. AGENT STATE & ACTIVITIES
 
-**Current:** Clues reveal passively
-**Proposed:** Player connects clues actively
+**Current:** NPCs have identity but no "current state"
+**Needed:** Angels have moods, activities, attention
 
+```typescript
+interface AgentState {
+  id: string;
+  identity: AgentIdentity;
+
+  // Current state
+  mood: AgentMood;
+  currentActivity: string;  // "reviewing your week", "reading an article"
+  attentionOn: string | null;  // "user", "other_angel", null
+  energyLevel: number;  // Affects response style
+
+  // Memory
+  memoryStream: MemoryEntry[];
+  reflections: Reflection[];
+  aboutUser: UserKnowledge;
+
+  // Relationships
+  relationshipsWithOtherAgents: AgentRelationship[];
+}
+
+interface AgentMood {
+  primary: 'excited' | 'calm' | 'concerned' | 'playful' | 'thoughtful';
+  reason: string;
+  since: Date;
+}
+
+interface MemoryEntry {
+  id: string;
+  timestamp: Date;
+  type: 'observation' | 'interaction' | 'reflection' | 'external';
+  content: string;
+  importance: number;  // 1-10
+  tags: string[];
+}
 ```
-[You mentioned the cold forge to Aldric]
 
-💡 CONNECTION MADE
-━━━━━━━━━━━━━━━━━━━━
-Kira said: "The forge was cold that night"
-Aldric claims: "I was working at the forge all night"
-
-⚠️ CONTRADICTION DETECTED
-Aldric is LYING about his alibi.
-
-🔓 New dialogue unlocked:
-   → Confront Aldric about the cold forge
-━━━━━━━━━━━━━━━━━━━━
-```
-
-**Why it works:** Player feels SMART. Detective fantasy fulfilled.
+**Implementation:**
+- [ ] Agent state manager
+- [ ] Activity simulation (what are angels doing when not helping)
+- [ ] Mood effects on responses
+- [ ] Memory stream with retrieval scoring
 
 ---
 
-### Priority 5: Daily Ritual / Check-in Hook
+### 4. TASK & COMMITMENT STORE
 
-**Current:** No reason to return daily
-**Proposed:** Daily events create habit
+**Current:** FactStore tracks claims about NPCs/world
+**Needed:** Store user's tasks, commitments, patterns
 
+```typescript
+interface TaskStore {
+  tasks: Task[];
+  commitments: Commitment[];
+  patterns: UserPattern[];
+  wins: Win[];
+}
+
+interface Task {
+  id: string;
+  content: string;
+  createdAt: Date;
+  dueDate?: Date;
+  status: 'pending' | 'in_progress' | 'completed' | 'abandoned';
+  source: 'user' | 'angel_suggested';
+  mentions: TaskMention[];  // When angels referenced this
+  completedAt?: Date;
+}
+
+interface Commitment {
+  id: string;
+  content: string;  // "call mom this week"
+  madeAt: Date;
+  deadline?: Date;
+  status: 'active' | 'fulfilled' | 'missed' | 'renegotiated';
+  reminders: Date[];
+}
+
+interface UserPattern {
+  id: string;
+  type: 'positive' | 'concerning' | 'neutral';
+  description: string;  // "tends to avoid tasks for 3+ days then panic"
+  firstObserved: Date;
+  frequency: number;
+  examples: string[];
+}
+
+interface Win {
+  id: string;
+  description: string;  // "completed proposal after 4 days of avoidance"
+  celebratedAt: Date;
+  celebratedBy: string[];  // Which angels celebrated
+  magnitude: 'small' | 'medium' | 'big' | 'huge';
+  context: string;  // Why this mattered
+}
 ```
-DAILY MECHANICS:
-- Each real day = 1 game day
-- Morning: New rumor arrives
-- Afternoon: Visitor passes through
-- Evening: NPCs share what they noticed
-- Night: Something happens (world tick)
 
-MISS A DAY:
-- Events happen without you
-- NPCs reference things you weren't there for
-- "Where were you yesterday? You missed quite a scene."
-```
-
-**Daily Content Examples:**
-```
-Day 2: A merchant mentions seeing the hooded figure on the road
-Day 3: Aldric and Thom have a public argument
-Day 4: Elena asks to meet privately
-Day 5: Anonymous note slipped under tavern door
-Day 6: Kira offers to sell you "information"
-Day 7: The hooded figure is spotted again
-```
-
-**Why it works:** Wordle effect. Daily habit. FOMO.
+**Implementation:**
+- [ ] Task CRUD operations
+- [ ] Commitment tracking with reminders
+- [ ] Pattern detector (runs on tick)
+- [ ] Win recognition system
+- [ ] Persistence (local-first)
 
 ---
 
-### Priority 6: Visible Choice Consequences
+### 5. REFLECTION ENGINE
 
-**Current:** Choices feel meaningless
-**Proposed:** Show the ripple effects
+**Current:** No pattern recognition on user data
+**Needed:** Angels notice patterns, connect dots, generate insights
 
-```
-[After telling Kira about your suspicions of Aldric]
+```typescript
+interface ReflectionEngine {
+  // Runs periodically (daily? weekly?)
+  generateReflections(userHistory: UserHistory): Promise<Reflection[]>;
 
-CONSEQUENCE:
-━━━━━━━━━━━━━━━━━━━━
-📢 Word spreads...
+  // Connect content to user's life
+  connectToUser(content: ExternalContent, userContext: UserContext): Promise<Connection[]>;
 
-→ Kira told Maren (they talk at night)
-→ Maren is now WARY of Aldric
-→ Aldric heard rumors, now DEFENSIVE with you
-→ Thom noticed the tension
+  // Manifestation: track potential
+  assessGrowth(timeframe: 'week' | 'month' | 'quarter'): Promise<GrowthAssessment>;
+}
 
-Your reputation: Inquisitive → Suspicious
-━━━━━━━━━━━━━━━━━━━━
-```
+interface Reflection {
+  id: string;
+  type: 'pattern' | 'insight' | 'connection' | 'growth';
+  content: string;
+  supportingEvidence: string[];
+  generatedAt: Date;
+  sharedWithUser: boolean;
+  agentWhoGenerated: string;
+}
 
-**Reputation System:**
-- Unknown → Curious → Trusted → Investigator → Dangerous
-- NPCs react differently based on reputation
-- Some paths close, others open
-
-**Why it works:** Agency. Player sees their impact.
-
----
-
-### Priority 7: Multiple Paths & Replayability
-
-**Current:** One solution, one path
-**Proposed:** Multiple valid approaches
-
-```
-PATH A: The Truth-Seeker
-- Build trust with everyone
-- Uncover full truth about Black Sun
-- Hooded figure escapes but you know why
-
-PATH B: The Dealmaker
-- Make deals with Thom (mutual secrets)
-- Partial truth, but you gain power
-- Become complicit but protected
-
-PATH C: The Avenger
-- Accuse publicly, force confrontation
-- Some innocents hurt
-- Dramatic but messy resolution
-
-PATH D: Let It Go
-- Focus on running the tavern
-- Mystery fades, but peace achieved
-- Secrets stay buried
+interface GrowthAssessment {
+  period: string;
+  winsCount: number;
+  patterns: {
+    improving: string[];
+    stuck: string[];
+    new: string[];
+  };
+  potentialUnlocked: string[];  // "you're now comfortable starting tasks same-day"
+  nextFrontier: string;  // "the next growth edge"
+}
 ```
 
-**Why it works:** Replayability. "What if I had..."
+**Implementation:**
+- [ ] Reflection scheduler
+- [ ] Pattern matching on task history
+- [ ] Growth tracking over time
+- [ ] LLM-powered insight generation
+- [ ] Manifestation prompts (positive belief generation)
 
 ---
 
-## Implementation Roadmap
+### 6. CONTENT CURATION LAYER
 
-### Phase 1: Quick Wins (1-2 days)
-- [ ] Trust milestone notifications
-- [ ] Clue connection alerts ("💡 Contradiction detected!")
-- [ ] Day countdown display ("Day 5 of 14")
-- [ ] Consequence notifications
+**Current:** No ability to read external content
+**Needed:** Angels read feeds, discuss content, present to user
 
-### Phase 2: Core Loop (3-5 days)
-- [ ] Proactive NPC messages (scheduled)
-- [ ] Daily events system
-- [ ] Case deadline with consequences
-- [ ] Reputation system basics
+```typescript
+interface ContentCurator {
+  sources: ContentSource[];
+  fetchAndProcess(): Promise<CuratedContent[]>;
+  generateDiscussion(content: CuratedContent): Promise<AgentDiscussion>;
+}
 
-### Phase 3: Depth (1 week+)
-- [ ] Multiple solution paths
-- [ ] NPC relationship web (gossip spreads)
-- [ ] Branching consequences
-- [ ] New mysteries after FTUE
+interface ContentSource {
+  id: string;
+  type: 'rss' | 'newsletter' | 'twitter' | 'youtube' | 'podcast';
+  url: string;
+  userInterest: string[];  // Tags user cares about
+  frequency: 'realtime' | 'daily' | 'weekly';
+}
 
----
+interface CuratedContent {
+  id: string;
+  source: string;
+  title: string;
+  summary: string;
+  fullText?: string;
+  relevanceToUser: number;  // 0-1
+  connectionToUserLife?: string;  // How it relates to their situation
+  angelDiscussion?: AgentDiscussion;  // Angels' take on it
+}
+```
 
-## Metrics to Track
-
-**Engagement:**
-- Messages per session
-- Sessions per day
-- Days retained
-- Time between sessions
-
-**Progression:**
-- Average trust levels
-- Clues discovered per day
-- Case completion rate
-- Time to solve mystery
-
-**Satisfaction:**
-- Do players reach endings?
-- Do they replay?
-- What do they ask NPCs about?
+**Implementation:**
+- [ ] RSS/feed fetcher
+- [ ] Content summarizer
+- [ ] Relevance scorer (based on user context)
+- [ ] Discussion generator for content
+- [ ] User preference learning
 
 ---
 
-## Open Questions
+### 7. INTEGRATION ADAPTERS
 
-1. **How proactive is too proactive?** Don't want to spam.
-2. **What if player ignores deadline?** Grace period? Hard fail?
-3. **Balance mystery difficulty?** Too easy = boring. Too hard = frustrating.
-4. **Telegram limitations?** Can we schedule messages reliably?
+**Current:** Only Telegram bot
+**Needed:** Connect to user's real tools
+
+```typescript
+interface IntegrationAdapter {
+  id: string;
+  type: IntegrationType;
+  connected: boolean;
+  credentials: EncryptedCredentials;
+
+  // Capabilities
+  canRead: boolean;
+  canWrite: boolean;
+  canDelete: boolean;  // Always false for safe integrations
+}
+
+type IntegrationType =
+  | 'google_calendar'
+  | 'apple_calendar'
+  | 'todoist'
+  | 'notion'
+  | 'gmail'
+  | 'whatsapp'
+  | 'telegram'
+  | 'slack'
+  | 'spotify';
+
+// Safe actions only
+interface IntegrationActions {
+  calendar: {
+    read: () => Promise<CalendarEvent[]>;
+    add: (event: CalendarEvent) => Promise<void>;
+    // NO delete
+  };
+  email: {
+    read: (filter: EmailFilter) => Promise<EmailSummary[]>;
+    draft: (email: EmailDraft) => Promise<void>;
+    send: (email: EmailDraft, requireConfirm: true) => Promise<void>;
+    // NO delete
+  };
+  tasks: {
+    read: () => Promise<Task[]>;
+    add: (task: Task) => Promise<void>;
+    complete: (taskId: string) => Promise<void>;
+    // NO delete
+  };
+  messaging: {
+    send: (to: string, message: string, requireConfirm: boolean) => Promise<void>;
+  };
+}
+```
+
+**Implementation:**
+- [ ] OAuth flow for each service
+- [ ] Credential encryption (local)
+- [ ] Rate limiting
+- [ ] Action logging (transparency)
+- [ ] Confirmation UI for sensitive actions
 
 ---
 
-## References
+### 8. DISCUSSION GENERATOR
 
-- [OpenClaw Analysis](https://www.sitongpeng.com/writing/openclaw-clawdbot-just-a-fun-game-or)
-- [OpenClaw Shoutouts](https://openclaw.ai/shoutouts)
-- [Addictive Gameplay Loops](https://gamerant.com/games-most-addictive-satisfying-gameplay-loops/)
-- [Text Adventure Design](https://sublimeconfusionblog.wordpress.com/2018/03/08/adventure-games-the-text-years/)
-- [Open NPC AI Design](https://huggingface.co/blog/MAYA-AI/openclaw-moltbot)
+**Current:** Single-agent responses only
+**Needed:** Multi-agent conversations about user
+
+```typescript
+interface DiscussionGenerator {
+  // Generate angels discussing the user
+  aboutUser(
+    topic: string,
+    participants: string[],
+    context: UserContext
+  ): Promise<AgentDiscussion>;
+
+  // Generate angels discussing content
+  aboutContent(
+    content: CuratedContent,
+    participants: string[]
+  ): Promise<AgentDiscussion>;
+
+  // Generate angels debating an approach
+  debateApproach(
+    situation: string,
+    participants: string[],
+    options: string[]
+  ): Promise<AgentDiscussion>;
+}
+```
+
+**Implementation:**
+- [ ] Multi-turn conversation generator
+- [ ] Agent voice consistency
+- [ ] Disagreement injection (realistic debate)
+- [ ] Outcome extraction
+- [ ] Discussion formatting for display
+
+---
+
+## ARCHITECTURAL REFACTOR NEEDED
+
+### Current: Everything in telegram-bot.ts
+
+```
+telegram-bot.ts (1400+ lines)
+├── State management
+├── NPC responses
+├── World tick
+├── Commands
+└── Everything else
+```
+
+### Proposed: Modular Engine
+
+```
+packages/engine/src/
+├── core/
+│   ├── agent.ts           # Base agent class
+│   ├── agent-state.ts     # State management
+│   ├── discussion.ts      # Inter-agent communication
+│   └── scheduler.ts       # Proactive triggers
+│
+├── stores/
+│   ├── fact-store.ts      # Existing (refactor)
+│   ├── task-store.ts      # NEW: Tasks & commitments
+│   ├── memory-store.ts    # NEW: Memory stream
+│   └── win-store.ts       # NEW: Accomplishments
+│
+├── engines/
+│   ├── reflection.ts      # Pattern recognition
+│   ├── curation.ts        # Content processing
+│   └── manifestation.ts   # Growth tracking
+│
+├── integrations/
+│   ├── adapter.ts         # Base adapter
+│   ├── calendar.ts        # Google/Apple Calendar
+│   ├── tasks.ts           # Todoist/Notion
+│   ├── email.ts           # Gmail/SMTP
+│   └── messaging.ts       # WhatsApp/Telegram/Slack
+│
+├── chat/
+│   ├── telegram.ts        # Telegram adapter
+│   ├── whatsapp.ts        # WhatsApp adapter
+│   └── web.ts             # Web interface
+│
+└── souls/
+    ├── wanderers-rest/    # Mystery game (existing)
+    └── swargaloka/        # Angels for ADHD (NEW)
+```
+
+---
+
+## PRIORITY ORDER
+
+### Phase 1: Core Agent Behaviors
+1. **Agent State** - Mood, activity, attention
+2. **Proactive Triggers** - Time-based, event-based
+3. **Task Store** - Basic task tracking
+
+### Phase 2: Inter-Agent Magic
+4. **Discussion Generator** - Angels talk to each other
+5. **Memory Stream** - Stanford-style memory
+6. **Reflection Engine** - Pattern recognition
+
+### Phase 3: Real-World Utility
+7. **Integration Adapters** - Calendar, tasks, messaging
+8. **Content Curation** - RSS, newsletters
+9. **Win Tracking** - Celebrations, growth
+
+### Phase 4: Polish
+10. **Manifestation Engine** - Positive beliefs, potential
+11. **User Preferences** - Intensity, frequency
+12. **Multi-platform** - WhatsApp, web, mobile
+
+---
+
+## WHAT CAN BE REUSED
+
+| Existing | Reusable For Angels? | Notes |
+|----------|---------------------|-------|
+| FactStore | Partially | Refactor for tasks/commitments |
+| NPCIdentity | Yes | Rename to AgentIdentity |
+| Persistence | Yes | Extend for new stores |
+| LLM Providers | Yes | No changes needed |
+| Telegram Bot | Yes | Add proactive messaging |
+| World Tick | Refactor | Become agent scheduler |
+
+---
+
+## OPEN DECISIONS
+
+1. **Storage:** SQLite vs JSON files for task history?
+2. **Scheduling:** In-process cron vs external scheduler?
+3. **Multi-device:** How to sync if user has phone + desktop?
+4. **Offline:** What happens when user is offline?
+5. **Migration:** How to migrate Wanderer's Rest users to new architecture?
+
+---
+
+*This document tracks what needs to change in the Sonder engine to support both the mystery game AND the Angels use case.*

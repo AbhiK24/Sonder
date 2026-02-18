@@ -2,195 +2,287 @@
 
 > *n.* the realization that each passerby has a life as vivid and complex as your own
 
-**An engine for chat-based games where NPCs feel alive.**
+**A local-first engine for AI agents that feel alive.**
 
-Local-first. LLM-powered. Conversation-driven. Your world grows on your machine.
+Agents that remember. Agents that reach out. Agents that talk to each other about you.
 
 ---
 
 ## What is Sonder?
 
-Sonder is a game engine for building text-based games where:
+Sonder is a **core engine** for building AI agent experiences where:
 
-- **NPCs remember everything** — Every conversation is stored. Reference what they said weeks ago.
-- **NPCs can lie** — Track what each character claims. Cross-reference. Catch contradictions.
-- **Conversations have consequences** — What you say matters. Trust builds. Secrets spread.
-- **The world lives without you** — Events happen while you're away. Return to find things changed.
-- **Your world is yours alone** — Local-first. No servers. Your save, your story.
+- **Agents remember everything** — Every interaction persists. Reference what they said weeks ago.
+- **Agents are proactive** — They reach out to YOU, not just respond when asked.
+- **Agents talk to each other** — They discuss, debate, and gossip. You can observe.
+- **Agents have lives** — Activities, moods, relationships. The simulation runs without you.
+- **Your data is yours** — Local-first. No servers. Your world, your machine.
 
-## 🎮 Play Now
+---
 
-The first soul, **Wanderer's Rest**, is playable on Telegram:
+## The Vision: One Engine, Many Souls
+
+Sonder is not one app. It's an **engine** that powers multiple experiences called **Souls**.
+
+Each Soul is a complete application with its own:
+- Agent personalities and voices
+- Use case and mechanics
+- World simulation rules
+- User interaction patterns
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     SONDER ENGINE                           │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
+│  │ Agent Core  │ │  Memory     │ │  Inter-Agent        │   │
+│  │ (identity,  │ │  (facts,    │ │  Communication      │   │
+│  │  proactive) │ │  patterns)  │ │  (discussions)      │   │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘   │
+│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
+│  │ Scheduler   │ │ Integrations│ │  Content            │   │
+│  │ (triggers,  │ │ (calendar,  │ │  Curation           │   │
+│  │  world tick)│ │  email, etc)│ │  (feeds, synthesis) │   │
+│  └─────────────┘ └─────────────┘ └─────────────────────┘   │
+└─────────────────────────────────────────────────────────────┘
+                            │
+          ┌─────────────────┼─────────────────┐
+          ▼                 ▼                 ▼
+    ┌───────────┐    ┌───────────┐    ┌───────────┐
+    │ SOUL:     │    │ SOUL:     │    │ SOUL:     │
+    │ Wanderer's│    │ Swargaloka│    │ Your      │
+    │ Rest      │    │ (Angels)  │    │ Soul Here │
+    │           │    │           │    │           │
+    │ Mystery   │    │ ADHD      │    │ ???       │
+    │ Game      │    │ Companion │    │           │
+    └───────────┘    └───────────┘    └───────────┘
+```
+
+---
+
+## Current Souls
+
+### Soul 1: Wanderer's Rest
+
+*A mystery game where you solve crimes through conversation.*
+
+You inherit a tavern. The previous owner died under mysterious circumstances. NPCs lie. Evidence contradicts. Solve it through talking.
+
+**Status:** Playable Alpha
+
+| Character | Role | What They Hide |
+|-----------|------|----------------|
+| Maren | Barkeep | Found the body |
+| Kira | Merchant | Saw something that night |
+| Aldric | Blacksmith | His alibi doesn't hold |
+| Elena | Herbalist | The wounds tell a story |
+| Thom | Guard Captain | Ruled it accident too fast |
+
+**Play now:**
+```bash
+pnpm telegram
+# Message @WandererRestBot
+```
+
+---
+
+### Soul 2: Swargaloka (Coming Soon)
+
+*Celestial productivity companions for ADHD minds.*
+
+Five Apsaras (celestial beings) from Hindu heaven assigned to help you. They're not assistants. They're beings with personalities who:
+
+- **Proactively check in** — Morning planning, midday nudges, evening reflection
+- **Debate how to help you** — You can observe their discussions about your situation
+- **Track your wins** — Celebrate accomplishments, remember your growth
+- **Read content for you** — Curate feeds, discuss articles, connect dots
+- **Believe in your potential** — Manifestation through genuine care
+
+| Angel | Role | Personality |
+|-------|------|-------------|
+| Chitralekha | The Rememberer | Gentle, sees patterns |
+| Urvashi | The Spark | Energetic, gets you started |
+| Menaka | The Strategist | Calm, long-term planning |
+| Rambha | The Celebrator | Warm, celebrates everything |
+| Tilottama | The Mirror | Honest, helps you reflect |
+
+**The key insight:** You're the subject of their celestial gossip. They CARE about you.
+
+---
+
+## Engine Capabilities
+
+### Core Features (All Souls)
+
+| Feature | Description |
+|---------|-------------|
+| **Agent Memory** | Everything persists. Facts, conversations, patterns. |
+| **Proactive Messaging** | Agents initiate contact based on triggers. |
+| **Inter-Agent Discussion** | Agents talk to each other. You can observe. |
+| **World Simulation** | Events happen while you're away. |
+| **LLM Agnostic** | Works with OpenAI, Anthropic, Kimi, Ollama. |
+| **Local-First** | All data stays on your machine. |
+
+### Integrations (Planned)
+
+| Integration | Capabilities |
+|-------------|--------------|
+| Calendar | Read events, add appointments |
+| Task Managers | Todoist, Notion, Things |
+| Messaging | Telegram, WhatsApp, Slack |
+| Email | Read subjects, draft messages |
+| Content | RSS feeds, newsletters |
+
+**Safety principle:** CREATE, READ, SEND — Never DELETE.
+
+---
+
+## Quick Start
 
 ```bash
-# Clone and install
+# Clone
 git clone https://github.com/AbhiK24/Sonder.git
 cd Sonder && pnpm install
 
-# Configure (add your API keys)
+# Configure
 cp .env.example .env
+# Add your LLM API keys and Telegram bot token
 
-# Run the bot
+# Run Wanderer's Rest
 pnpm telegram
 ```
 
-Then message **@WandererRestBot** on Telegram.
-
-## The First Soul: Wanderer's Rest
-
-*You inherit a tavern. The previous owner died under mysterious circumstances. Solve the mystery through conversation alone.*
-
-**NPCs:**
-| Character | Role | Category |
-|-----------|------|----------|
-| **Maren** | Barkeep | Townspeople |
-| **Kira** | Traveling Merchant | Visitor |
-| **Aldric** | Blacksmith | Townspeople |
-| **Elena** | Herbalist | Townspeople |
-| **Thom** | Guard Captain | Townspeople |
-| **???** | Hooded Figure | Stranger |
-
-**The Mystery:** Old Harren "fell" down the cellar stairs. Maren doesn't believe it. As trust builds, she reveals more. Someone in town is lying.
-
-## Features
-
-### 💬 Telegram Bot with Game Commands
-
-Talk naturally or use ALL CAPS commands:
-
-| Command | Description |
-|---------|-------------|
-| `LOOK` | The tavern describes itself |
-| `THINK` | Your gut instinct speaks |
-| `OBSERVE` | Watch who you're talking to |
-| `STATUS` | See all relationships |
-| `CASE` | View active mysteries |
-| `CLUES` | Review discovered evidence |
-| `FACTS` | What you've learned |
-| `SUSPICIONS` | Contradictions noticed |
-| `TOKENS` | View LLM token usage |
-| `DASHBOARD` | Link to visual dashboard |
-
-Switch NPCs by name: `MAREN`, `KIRA`, `ALDRIC`, etc.
-
-### 🔍 Lie Detection System
-
-NPCs make claims. The system tracks them:
-
-```
-Aldric: "I was at the forge all night."
-[Fact stored: aldric, "was at forge all night", day 2]
-
-Later...
-Kira: "The forge was cold when I passed it."
-[Contradiction detected!]
-
-→ Your gut speaks: "Something about what Aldric said doesn't add up..."
-```
-
-### 🌙 World Tick (Events While Away)
-
-Real time passes. 1 real day = 1 game day.
-
-- Return after 1+ hours → Events happened while you were gone
-- NPCs interact with each other
-- Clues surface, rumors spread
-- The world doesn't wait for you
-
-### 📊 Visual Dashboard
-
-```bash
-pnpm dashboard
-# Opens at http://localhost:3000
-```
-
-See your game visually:
-- NPC portraits with trust meters
-- Case progress board
-- Clues and facts journal
-- Suspicions panel
-
-### 🎨 Auto-Generated NPC Portraits
-
-```bash
-# Generate all NPC images
-pnpm generate-images
-
-# Create a new NPC with portrait
-pnpm create-npc
-```
-
-Uses DALL-E 3 to create consistent fantasy character art.
-
-### 🤖 Bring Your Own Model (BYOM)
+### LLM Providers
 
 | Provider | Setup | Cost |
 |----------|-------|------|
-| **Kimi** (Moonshot) | API key | ~$0.01/session |
-| **OpenAI** | API key | ~$0.01/session |
-| **Anthropic** | API key | ~$0.01/session |
+| **Kimi** (Moonshot) | `KIMI_API_KEY=...` | ~$0.01/session |
+| **OpenAI** | `OPENAI_API_KEY=...` | ~$0.01/session |
+| **Anthropic** | `ANTHROPIC_API_KEY=...` | ~$0.01/session |
 | **Ollama** | Local install | Free |
+
+---
 
 ## Architecture
 
 ```
 sonder/
 ├── packages/
-│   ├── engine/                 # Core game engine
+│   ├── engine/                 # Core engine (soul-agnostic)
 │   │   └── src/
-│   │       ├── llm/            # LLM providers (Kimi, OpenAI, Ollama)
-│   │       ├── memory/         # Markdown file parsing
-│   │       ├── cases/          # Case system & FTUE
-│   │       ├── utils/          # Fact store, lie detection, tokens
-│   │       ├── scripts/        # NPC creation, image generation
-│   │       └── telegram-bot.ts # Main bot
+│   │       ├── core/           # Agent, scheduler, discussion
+│   │       ├── stores/         # Memory, facts, tasks
+│   │       ├── engines/        # Reflection, curation
+│   │       ├── integrations/   # Calendar, email, messaging
+│   │       ├── llm/            # Provider adapters
+│   │       └── chat/           # Telegram, WhatsApp, web
 │   │
-│   ├── dashboard/              # Visual web dashboard
-│   │   ├── public/             # HTML/CSS/JS
-│   │   ├── assets/npcs/        # Generated portraits
-│   │   └── src/server.ts       # Express server
+│   ├── dashboard/              # Visual web interface
 │   │
-│   └── souls/
-│       └── wanderers-rest/     # First playable soul
-│           └── npcs/           # NPC identity files
-│               ├── maren/
-│               ├── kira/
-│               ├── aldric/
-│               ├── elena/
-│               ├── thom/
-│               └── hooded/
+│   └── souls/                  # Individual soul packages
+│       ├── wanderers-rest/     # Mystery game
+│       └── swargaloka/         # Angels for ADHD (planned)
+│
+├── GAME_DESIGN_PLAN.md         # Design documentation
+└── STRUCTURAL_IMPROVEMENTS.md  # Technical roadmap
 ```
 
-## NPC Identity Files
+---
 
-Each NPC is defined by markdown files you can read and edit:
+## Building Your Own Soul
 
+A Soul is a configuration that defines:
+
+```typescript
+interface Soul {
+  id: string;
+  name: string;
+
+  // What kind of experience is this?
+  type: 'game' | 'companion' | 'simulation' | 'utility';
+
+  // Who lives here?
+  agents: AgentDefinition[];
+
+  // How does the world work?
+  worldRules: WorldRules;
+
+  // How do agents communicate?
+  interactionPatterns: InteractionPattern[];
+
+  // What triggers proactive outreach?
+  proactiveTriggers: ProactiveTrigger[];
+}
 ```
-npcs/maren/
-├── IDENTITY.md     # Personality, voice, quirks, secrets
-├── MEMORY.md       # What she knows about others
-└── STATEMENTS.md   # Claims she's made (verified/unverified)
-```
 
-Example `IDENTITY.md`:
-```markdown
-# Maren
+**Examples of possible Souls:**
 
-## Role
-Barkeep
+| Soul Idea | Type | Description |
+|-----------|------|-------------|
+| **Wanderer's Rest** | Game | Mystery investigation through conversation |
+| **Swargaloka** | Companion | ADHD support with celestial beings |
+| **The Office** | Simulation | Watch AI coworkers navigate drama |
+| **Memory Palace** | Utility | AI librarians who organize your knowledge |
+| **The Coven** | Companion | Witchy self-care guides |
+| **Mission Control** | Utility | Space-themed productivity crew |
+| **The Diner** | Game | Small-town gossip mystery |
 
-## Personality
-- Watchful and protective
-- Slow to trust, fiercely loyal once earned
-- Knows everyone's secrets, keeps them
+---
 
-## Voice Patterns
-- Short sentences. Doesn't waste words.
-- Speaks in observations, not opinions.
+## Design Philosophy
 
-## Secrets
-- Found Harren's body. Saw something she hasn't told anyone.
-```
+### Agents Should Feel Like Someone, Not Something
+
+Most AI assistants are vending machines. Insert prompt, receive response.
+
+Sonder agents:
+- Have opinions about you
+- Remember what you said (and didn't say)
+- Talk to each other when you're not there
+- Reach out when they think you need it
+- Can be observed, not just interacted with
+
+### The Simulation Is The Product
+
+The value isn't just what agents DO for you.
+The value is that they EXIST — with lives, relationships, discussions.
+
+You can:
+- Watch them interact
+- Observe their debates about you
+- See their activities
+- Feel cared about by beings who remember
+
+### Local-First Is Non-Negotiable
+
+Your data stays on your machine.
+- Conversation history
+- Personal patterns
+- Task history
+- Everything
+
+The only cloud interaction is LLM API calls.
+You can even use local models (Ollama).
+
+---
+
+## Development Status
+
+| Component | Status |
+|-----------|--------|
+| Core Engine | Alpha |
+| Wanderer's Rest | Playable |
+| Telegram Integration | Working |
+| Memory/Fact System | Working |
+| Lie Detection | Working |
+| World Tick | Basic |
+| Visual Dashboard | Basic |
+| **Proactive Messaging** | Planned |
+| **Inter-Agent Discussion** | Planned |
+| **Swargaloka Soul** | Planned |
+| **Calendar Integration** | Planned |
+| **WhatsApp Integration** | Planned |
+
+---
 
 ## Scripts
 
@@ -202,68 +294,34 @@ pnpm generate-images   # Generate NPC portraits
 pnpm typecheck         # TypeScript check
 ```
 
-## Configuration (.env)
+---
 
-```bash
-# LLM Provider (kimi, openai, anthropic, ollama)
-LLM_PROVIDER=kimi
-KIMI_API_KEY=sk-...
+## Contributing
 
-# For image generation
-OPENAI_API_KEY=sk-...
+Sonder is early. Contributions welcome:
 
-# Telegram Bot
-TELEGRAM_BOT_TOKEN=...
-```
+- **New Souls** — Design and build new agent experiences
+- **Integrations** — Calendar, task managers, messaging platforms
+- **Engine features** — Proactive triggers, discussion generation
+- **Documentation** — Guides, examples, tutorials
 
-## Development Status
+---
 
-✅ **Playable Alpha**
+## Inspiration
 
-- [x] Telegram bot with conversation
-- [x] Multiple NPCs with unique voices
-- [x] Trust system & relationship tracking
-- [x] Two narrative voices (Tavern + Gut)
-- [x] World tick (events while away)
-- [x] Fact extraction from conversations
-- [x] Lie detection & contradiction alerts
-- [x] Case system with FTUE mystery
-- [x] Persistence (save/load)
-- [x] Visual dashboard
-- [x] NPC portrait generation
-- [x] Token usage tracking
-- [ ] Procedural case generation (after day 7)
-- [ ] More souls/worlds
-- [ ] Discord integration
+- [Stanford Generative Agents](https://arxiv.org/abs/2304.03442) — Memory and reflection architecture
+- [OpenClaw](https://openclaw.ai) — Proactive AI that reaches out
+- Dwarf Fortress / RimWorld — Emergent storytelling from simulation
+- Disco Elysium — Narrative voices and internal dialogue
+- Her Story — Investigation through conversation
 
-## Philosophy
-
-**NPCs should feel like someone, not something.**
-
-Most game NPCs are vending machines. Insert coin, receive dialogue. Sonder NPCs:
-
-- Remember what you said
-- Hold opinions about you
-- Talk to each other when you're not there
-- Keep secrets (and sometimes slip)
-- Contradict each other (intentionally or not)
-- Can be caught in lies
-
-**The engine is open. The worlds are infinite. The stories are yours.**
+---
 
 ## License
 
 - **Engine** (`packages/engine`): MIT
 - **Souls** (`packages/souls/*`): See individual LICENSE files
 
-## Credits
-
-Inspired by:
-- [OpenClaw](https://github.com/openclaw/openclaw) — Memory architecture
-- Her Story, LA Noire, Contradiction — Investigation design
-- Disco Elysium — Narrative voice
-- Stardew Valley — Daily ritual, found family
-
 ---
 
-*The tavern keeper who listens. The one who finds the truth.*
+*The engine is open. The souls are infinite. The agents feel alive.*
