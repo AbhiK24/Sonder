@@ -16,12 +16,14 @@ import {
   TaskAdapter,
   EmailAdapter,
   ContentAdapter,
+  MessagingAdapter,
 } from './types.js';
 
 import { createCalendarAdapter } from './calendar.js';
 import { createTaskAdapter } from './tasks.js';
 import { createEmailAdapter } from './email.js';
 import { createContentAdapter } from './content.js';
+import { createWhatsAppAdapter, WhatsAppAdapter } from './whatsapp.js';
 
 // =============================================================================
 // Action Logger Implementation
@@ -186,6 +188,13 @@ export class IntegrationHub {
   }
 
   /**
+   * Get WhatsApp adapter
+   */
+  whatsapp(): WhatsAppAdapter | undefined {
+    return this.get<WhatsAppAdapter>('whatsapp');
+  }
+
+  /**
    * Get all registered adapters
    */
   getAll(): BaseIntegrationAdapter[] {
@@ -240,6 +249,8 @@ export class IntegrationHub {
         return createEmailAdapter(type);
       case 'rss':
         return createContentAdapter(type);
+      case 'whatsapp':
+        return createWhatsAppAdapter();
       default:
         throw new Error(`Unknown integration type: ${type}`);
     }

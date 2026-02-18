@@ -13,6 +13,11 @@ export { GoogleCalendarAdapter, createCalendarAdapter } from './calendar.js';
 export { TodoistAdapter, createTaskAdapter } from './tasks.js';
 export { GmailAdapter, createEmailAdapter } from './email.js';
 export { RSSAdapter, createContentAdapter, POPULAR_FEEDS } from './content.js';
+export { WhatsAppAdapter, createWhatsAppAdapter, ANGEL_PERSONAS } from './whatsapp.js';
+export type { AgentPersona, PersonalizedMessage } from './whatsapp.js';
+
+// Outbound (multi-agent messaging)
+export * from './outbound.js';
 
 // Manager
-export { IntegrationHub } from './hub.js';
+export { IntegrationHub, getIntegrationHub } from './hub.js';
