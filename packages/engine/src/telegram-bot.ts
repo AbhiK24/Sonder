@@ -223,6 +223,11 @@ async function simulateTimeAway(
 ): Promise<WorldEvent[]> {
   if (hoursAway < 1) return [];
 
+  // Scale events based on time away
+  // 1-2 hours: 1-2 events, 3-5 hours: 2-3 events, 6+ hours: 3-5 events
+  const minEvents = hoursAway < 3 ? 1 : hoursAway < 6 ? 2 : 3;
+  const maxEvents = hoursAway < 3 ? 2 : hoursAway < 6 ? 3 : 5;
+
   // Build NPC context
   const npcContext = Array.from(state.npcs.values())
     .map(npc => `${npc.identity.name} (${npc.identity.role}): trust ${npc.trust}/100`)
@@ -236,18 +241,20 @@ Day: ${state.day}
 NPCs present:
 ${npcContext}
 
-Generate 1-3 small events that happened. These should be:
-- Mundane tavern life (customers coming/going, conversations)
-- Occasionally interesting (a dispute, a revelation, something noticed)
-- Character-building moments between NPCs
+Generate ${minEvents}-${maxEvents} events that happened over these ${Math.floor(hoursAway)} hours:
+- Mix of mundane tavern life and occasional intrigue
+- Space them out over the time period (morning, afternoon, evening)
+- Character moments between NPCs
+- Maybe a hint about the mystery, a visitor, a rumor
 
 Format as JSON array:
 [
-  {"description": "Kira and Maren shared a quiet drink after closing.", "participants": ["kira", "maren"]},
-  {"description": "A merchant passed through asking about the old owner.", "participants": ["maren"]}
+  {"description": "Morning: Aldric stopped by for breakfast, grumbling about a late payment.", "participants": ["aldric", "maren"]},
+  {"description": "Afternoon: A stranger asked about rooms, then left without booking.", "participants": ["maren"]},
+  {"description": "Evening: Kira and Maren shared a quiet drink after closing.", "participants": ["kira", "maren"]}
 ]
 
-Keep descriptions to one sentence. Make them feel natural, not dramatic.`;
+One sentence each. Natural, not dramatic.`;
 
   try {
     console.log(`[World Tick] Simulating ${Math.floor(hoursAway)} hours away...`);
