@@ -12,6 +12,7 @@
 import {
   EmailAdapter,
   SimpleEmailAdapter,
+  InboundEmailAdapter,
   EmailMessage,
   EmailSummary,
   EmailFilter,
@@ -653,17 +654,294 @@ export class ResendAdapter implements SimpleEmailAdapter {
 }
 
 // =============================================================================
+// Mailgun Inbox Adapter (Inbound - queryable inbox)
+// =============================================================================
+
+/**
+ * Mailgun adapter for agent inboxes.
+ *
+ * Setup:
+ * 1. Sign up at mailgun.com
+ * 2. Add your domain
+ * 3. Set up inbound routing (Routes → store())
+ * 4. Get API key
+ *
+ * Agents can then receive and browse emails sent to their address.
+ */
+export class MailgunInboxAdapter implements InboundEmailAdapter {
+  type = 'mailgun' as const;
+  status: IntegrationStatus = 'disconnected';
+
+  private apiKey: string | null = null;
+  private domain: string | null = null;
+  private inboxAddress: string | null = null;
+
+  // Track read status locally (Mailgun doesn't have native read tracking)
+  private readMessages: Set<string> = new Set();
+
+  private static readonly API_BASE = 'https://api.mailgun.net/v3';
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
+  async connect(credentials: IntegrationCredentials): Promise<IntegrationResult<void>> {
+    try {
+      this.status = 'connecting';
+
+      if (!credentials.apiKey) {
+        this.status = 'error';
+        return {
+          success: false,
+          error: 'No API key provided. Get one from mailgun.com'
+        };
+      }
+
+      this.apiKey = credentials.apiKey;
+      this.domain = credentials.metadata?.domain as string;
+      this.inboxAddress = credentials.metadata?.inboxAddress as string;
+
+      if (!this.domain) {
+        this.status = 'error';
+        return {
+          success: false,
+          error: 'No domain provided in metadata.domain'
+        };
+      }
+
+      // Verify API key works
+      const check = await this.healthCheck();
+      if (!check.success) {
+        this.status = 'error';
+        return check;
+      }
+
+      this.status = 'connected';
+      return { success: true };
+    } catch (error) {
+      this.status = 'error';
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Connection failed'
+      };
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    this.apiKey = null;
+    this.domain = null;
+    this.inboxAddress = null;
+    this.readMessages.clear();
+    this.status = 'disconnected';
+  }
+
+  isConnected(): boolean {
+    return this.status === 'connected' && this.apiKey !== null;
+  }
+
+  async healthCheck(): Promise<IntegrationResult<void>> {
+    if (!this.apiKey || !this.domain) {
+      return { success: false, error: 'Not connected' };
+    }
+
+    try {
+      const response = await fetch(
+        `${MailgunInboxAdapter.API_BASE}/domains/${this.domain}`,
+        {
+          headers: {
+            Authorization: `Basic ${Buffer.from(`api:${this.apiKey}`).toString('base64')}`
+          }
+        }
+      );
+
+      if (response.status === 401) {
+        return { success: false, error: 'Invalid API key' };
+      }
+
+      if (response.status === 404) {
+        return { success: false, error: 'Domain not found' };
+      }
+
+      if (!response.ok) {
+        return { success: false, error: `API error: ${response.status}` };
+      }
+
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Health check failed'
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Inbox Operations
+  // ---------------------------------------------------------------------------
+
+  async getMessages(filter?: EmailFilter): Promise<IntegrationResult<EmailSummary[]>> {
+    if (!this.isConnected()) {
+      return { success: false, error: 'Not connected' };
+    }
+
+    try {
+      // Query stored events (received emails)
+      const params = new URLSearchParams({
+        event: 'stored',
+        limit: String(filter?.maxResults || 50),
+      });
+
+      // Filter by recipient if we have an inbox address
+      if (this.inboxAddress) {
+        params.set('recipient', this.inboxAddress);
+      }
+
+      if (filter?.after) {
+        params.set('begin', filter.after.toISOString());
+      }
+
+      const response = await fetch(
+        `${MailgunInboxAdapter.API_BASE}/${this.domain}/events?${params}`,
+        {
+          headers: {
+            Authorization: `Basic ${Buffer.from(`api:${this.apiKey}`).toString('base64')}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        return { success: false, error: `API error: ${response.status}` };
+      }
+
+      const data = await response.json();
+      const summaries: EmailSummary[] = [];
+
+      for (const event of data.items || []) {
+        // Get the storage URL to fetch message details
+        const storageUrl = event.storage?.url;
+        if (!storageUrl) continue;
+
+        summaries.push({
+          id: event.storage?.key || event.id,
+          from: event.message?.headers?.from || '',
+          subject: event.message?.headers?.subject || '(no subject)',
+          snippet: '', // Mailgun events don't include snippet, need to fetch full message
+          receivedAt: new Date(event.timestamp * 1000),
+          isUnread: !this.readMessages.has(event.storage?.key || event.id),
+        });
+      }
+
+      return { success: true, data: summaries };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch messages'
+      };
+    }
+  }
+
+  async getMessage(messageId: string): Promise<IntegrationResult<EmailMessage>> {
+    if (!this.isConnected()) {
+      return { success: false, error: 'Not connected' };
+    }
+
+    try {
+      // Fetch stored message by key
+      const response = await fetch(
+        `${MailgunInboxAdapter.API_BASE}/domains/${this.domain}/messages/${messageId}`,
+        {
+          headers: {
+            Authorization: `Basic ${Buffer.from(`api:${this.apiKey}`).toString('base64')}`
+          }
+        }
+      );
+
+      if (!response.ok) {
+        // Try the storage URL format
+        const altResponse = await fetch(
+          `https://storage.mailgun.net/v3/domains/${this.domain}/messages/${messageId}`,
+          {
+            headers: {
+              Authorization: `Basic ${Buffer.from(`api:${this.apiKey}`).toString('base64')}`
+            }
+          }
+        );
+
+        if (!altResponse.ok) {
+          return { success: false, error: `Message not found: ${messageId}` };
+        }
+
+        const data = await altResponse.json();
+        return { success: true, data: this.parseMailgunMessage(data, messageId) };
+      }
+
+      const data = await response.json();
+      return { success: true, data: this.parseMailgunMessage(data, messageId) };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch message'
+      };
+    }
+  }
+
+  async getUnreadCount(): Promise<IntegrationResult<number>> {
+    const result = await this.getMessages({ maxResults: 100 });
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error };
+    }
+
+    const unread = result.data.filter(m => m.isUnread).length;
+    return { success: true, data: unread };
+  }
+
+  async markAsRead(messageId: string): Promise<IntegrationResult<void>> {
+    // Mailgun doesn't have native read tracking, so we track locally
+    this.readMessages.add(messageId);
+    return { success: true };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  private parseMailgunMessage(data: any, messageId: string): EmailMessage {
+    return {
+      id: messageId,
+      from: data.From || data.from || data.sender,
+      to: this.parseRecipients(data.To || data.to || data.recipients),
+      cc: data.Cc ? this.parseRecipients(data.Cc) : undefined,
+      subject: data.Subject || data.subject || '(no subject)',
+      body: data['body-plain'] || data['stripped-text'] || '',
+      bodyHtml: data['body-html'] || data['stripped-html'],
+      receivedAt: data.Date ? new Date(data.Date) : new Date(),
+    };
+  }
+
+  private parseRecipients(recipients: string | string[]): string[] {
+    if (Array.isArray(recipients)) return recipients;
+    if (typeof recipients === 'string') {
+      return recipients.split(',').map(r => r.trim());
+    }
+    return [];
+  }
+}
+
+// =============================================================================
 // Factory
 // =============================================================================
 
 export function createEmailAdapter(type: 'gmail'): EmailAdapter;
 export function createEmailAdapter(type: 'resend'): SimpleEmailAdapter;
-export function createEmailAdapter(type: 'gmail' | 'resend'): EmailAdapter | SimpleEmailAdapter {
+export function createEmailAdapter(type: 'mailgun'): InboundEmailAdapter;
+export function createEmailAdapter(type: 'gmail' | 'resend' | 'mailgun'): EmailAdapter | SimpleEmailAdapter | InboundEmailAdapter {
   switch (type) {
     case 'gmail':
       return new GmailAdapter();
     case 'resend':
       return new ResendAdapter();
+    case 'mailgun':
+      return new MailgunInboxAdapter();
     default:
       throw new Error(`Unknown email adapter type: ${type}`);
   }

@@ -16,6 +16,7 @@ export type IntegrationType =
   | 'notion'
   | 'gmail'
   | 'resend'
+  | 'mailgun'
   | 'whatsapp'
   | 'telegram'
   | 'slack'
@@ -206,6 +207,24 @@ export interface SimpleEmailAdapter extends BaseIntegrationAdapter {
 
   // Send only - no inbox access
   sendEmail(email: EmailMessage, confirmed: boolean): Promise<IntegrationResult<{ messageId: string }>>;
+}
+
+/**
+ * Inbound email adapter (for Mailgun, etc.)
+ * Receives and stores emails that can be queried
+ */
+export interface InboundEmailAdapter extends BaseIntegrationAdapter {
+  type: 'mailgun';
+
+  // Query inbox
+  getMessages(filter?: EmailFilter): Promise<IntegrationResult<EmailSummary[]>>;
+  getMessage(messageId: string): Promise<IntegrationResult<EmailMessage>>;
+
+  // Get unread count
+  getUnreadCount(): Promise<IntegrationResult<number>>;
+
+  // Mark as read
+  markAsRead(messageId: string): Promise<IntegrationResult<void>>;
 }
 
 // =============================================================================
