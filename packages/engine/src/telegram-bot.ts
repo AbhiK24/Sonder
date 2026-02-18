@@ -796,13 +796,13 @@ async function main() {
   caseGenerator = new CaseGenerator(provider);
 
   // Load all NPCs
-  const soulPath = resolve(__dirname, '../../../packages/souls/wanderers-rest/npcs');
+  const playPath = resolve(__dirname, '../../../packages/plays/wanderers-rest/npcs');
 
   // Townspeople + Visitors (always try to load, some may not exist yet)
   const npcIds = ['maren', 'kira', 'aldric', 'elena', 'thom'];
   for (const npcId of npcIds) {
     try {
-      const npcPath = resolve(soulPath, npcId);
+      const npcPath = resolve(playPath, npcId);
       const identity = await loadIdentity(resolve(npcPath, 'IDENTITY.md'));
       const memory = await loadMemory(resolve(npcPath, 'MEMORY.md'));
       loadedNPCs.set(npcId, { identity, memory });

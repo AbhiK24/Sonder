@@ -18,9 +18,9 @@ export class NPCManager {
   }
 
   /**
-   * Load an NPC from soul files
+   * Load an NPC from play files
    */
-  async loadNPC(npcId: string, soulPath: string): Promise<NPC> {
+  async loadNPC(npcId: string, playPath: string): Promise<NPC> {
     const memory = await this.memoryManager.loadNPCMemory(npcId);
 
     const npc: NPC = {

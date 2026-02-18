@@ -524,7 +524,7 @@ Tomorrow, expect:
 1. New mysteries
 2. New NPCs
 3. Procedural generation
-4. Other "souls" (new settings)
+4. Other "plays" (new settings)
 
 ---
 

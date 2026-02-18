@@ -20,11 +20,11 @@ Sonder is a **core engine** for building AI agent experiences where:
 
 ---
 
-## The Vision: One Engine, Many Souls
+## The Vision: One Engine, Many Plays
 
-Sonder is not one app. It's an **engine** that powers multiple experiences called **Souls**.
+Sonder is not one app. It's an **engine** that powers multiple experiences called **Plays**.
 
-Each Soul is a complete application with its own:
+Each Play is a complete application with its own:
 - Agent personalities and voices
 - Use case and mechanics
 - World simulation rules
@@ -48,9 +48,9 @@ Each Soul is a complete application with its own:
           ┌─────────────────┼─────────────────┐
           ▼                 ▼                 ▼
     ┌───────────┐    ┌───────────┐    ┌───────────┐
-    │ SOUL:     │    │ SOUL:     │    │ SOUL:     │
+    │ PLAY:     │    │ PLAY:     │    │ PLAY:     │
     │ Wanderer's│    │ Swargaloka│    │ Your      │
-    │ Rest      │    │ (Angels)  │    │ Soul Here │
+    │ Rest      │    │ (Angels)  │    │ Play Here │
     │           │    │           │    │           │
     │ Mystery   │    │ ADHD      │    │ ???       │
     │ Game      │    │ Companion │    │           │
@@ -59,9 +59,9 @@ Each Soul is a complete application with its own:
 
 ---
 
-## Current Souls
+## Current Plays
 
-### Soul 1: Wanderer's Rest
+### Play 1: Wanderer's Rest
 
 *A mystery game where you solve crimes through conversation.*
 
@@ -85,7 +85,7 @@ pnpm telegram
 
 ---
 
-### Soul 2: Swargaloka (Coming Soon)
+### Play 2: Swargaloka (Coming Soon)
 
 *Celestial productivity companions for ADHD minds.*
 
@@ -111,7 +111,7 @@ Five Apsaras (celestial beings) from Hindu heaven assigned to help you. They're 
 
 ## Engine Capabilities
 
-### Core Features (All Souls)
+### Core Features (All Plays)
 
 | Feature | Description |
 |---------|-------------|
@@ -178,7 +178,7 @@ sonder/
 │   │
 │   ├── dashboard/              # Visual web interface
 │   │
-│   └── souls/                  # Individual soul packages
+│   └── plays/                  # Individual play packages
 │       ├── wanderers-rest/     # Mystery game
 │       └── swargaloka/         # Angels for ADHD (planned)
 │
@@ -188,12 +188,12 @@ sonder/
 
 ---
 
-## Building Your Own Soul
+## Building Your Own Play
 
-A Soul is a configuration that defines:
+A Play is a configuration that defines:
 
 ```typescript
-interface Soul {
+interface Play {
   id: string;
   name: string;
 
@@ -214,9 +214,9 @@ interface Soul {
 }
 ```
 
-**Examples of possible Souls:**
+**Examples of possible Plays:**
 
-| Soul Idea | Type | Description |
+| Play Idea | Type | Description |
 |-----------|------|-------------|
 | **Wanderer's Rest** | Game | Mystery investigation through conversation |
 | **Swargaloka** | Companion | ADHD support with celestial beings |
@@ -300,7 +300,7 @@ pnpm typecheck         # TypeScript check
 
 Sonder is early. Contributions welcome:
 
-- **New Souls** — Design and build new agent experiences
+- **New Plays** — Design and build new agent experiences
 - **Integrations** — Calendar, task managers, messaging platforms
 - **Engine features** — Proactive triggers, discussion generation
 - **Documentation** — Guides, examples, tutorials
@@ -320,8 +320,8 @@ Sonder is early. Contributions welcome:
 ## License
 
 - **Engine** (`packages/engine`): MIT
-- **Souls** (`packages/souls/*`): See individual LICENSE files
+- **Plays** (`packages/plays/*`): See individual LICENSE files
 
 ---
 
-*The engine is open. The souls are infinite. The agents feel alive.*
+*The engine is open. The plays are infinite. The agents feel alive.*

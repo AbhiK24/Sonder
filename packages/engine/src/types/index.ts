@@ -454,10 +454,10 @@ export interface ModelConfig {
 }
 
 // =============================================================================
-// Soul Types
+// Play Types
 // =============================================================================
 
-export interface Soul {
+export interface Play {
   id: string;
   name: string;
   version: string;

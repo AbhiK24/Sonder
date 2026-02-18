@@ -12,7 +12,7 @@ import type {
   RouterResult,
   LLMProvider,
   ModelConfig,
-  Soul,
+  Play,
 } from '../types/index.js';
 import { Router } from './router.js';
 import { WorldEngine } from './world-engine.js';
@@ -23,7 +23,7 @@ import { createProvider } from '../llm/providers.js';
 
 export interface GameControllerOptions {
   modelConfig: ModelConfig;
-  soul: Soul;
+  play: Play;
   savePath: string;
 }
 
@@ -36,11 +36,11 @@ export class GameController {
   private memoryManager: MemoryManager;
 
   private worldState: WorldState;
-  private soul: Soul;
+  private play: Play;
   private savePath: string;
 
   constructor(options: GameControllerOptions) {
-    this.soul = options.soul;
+    this.play = options.play;
     this.savePath = options.savePath;
 
     // Initialize LLM provider
@@ -249,10 +249,10 @@ export class GameController {
   }
 
   /**
-   * Load existing world or initialize from soul
+   * Load existing world or initialize from play
    */
   private loadOrInitializeWorld(): WorldState {
-    // Would load from save file or initialize from soul
+    // Would load from save file or initialize from play
     return {
       currentDay: 1,
       currentTime: 'morning',

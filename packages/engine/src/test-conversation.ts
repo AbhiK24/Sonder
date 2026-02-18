@@ -58,8 +58,8 @@ async function main() {
   console.log('\n=== Sonder Conversation Test ===\n');
 
   const provider = createProvider(getModelConfig());
-  const soulPath = resolve(__dirname, '../../../packages/souls/wanderers-rest');
-  const marenPath = resolve(soulPath, 'npcs/maren');
+  const playPath = resolve(__dirname, '../../../packages/plays/wanderers-rest');
+  const marenPath = resolve(playPath, 'npcs/maren');
 
   const identity = await loadIdentity(resolve(marenPath, 'IDENTITY.md'));
   const memory = await loadMemory(resolve(marenPath, 'MEMORY.md'));

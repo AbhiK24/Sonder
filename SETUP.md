@@ -504,7 +504,7 @@ TODOIST_API_KEY=0123456789abcdef01234567
 # =============================================================================
 # SETTINGS
 # =============================================================================
-SOUL=swargaloka
+PLAY=swargaloka
 SAVE_PATH=~/.sonder/saves
 LOG_LEVEL=info
 DEV_MODE=true

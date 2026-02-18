@@ -455,7 +455,7 @@ packages/engine/src/
 │   ├── whatsapp.ts        # WhatsApp adapter
 │   └── web.ts             # Web interface
 │
-└── souls/
+└── plays/
     ├── wanderers-rest/    # Mystery game (existing)
     └── swargaloka/        # Angels for ADHD (NEW)
 ```

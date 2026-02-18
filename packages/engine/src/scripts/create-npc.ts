@@ -32,7 +32,7 @@ for (const envPath of envPaths) {
 
 // Paths - resolve from project root
 const projectRoot = resolve(__dirname, '../../../..');
-const npcsDir = resolve(projectRoot, 'packages/souls/wanderers-rest/npcs');
+const npcsDir = resolve(projectRoot, 'packages/plays/wanderers-rest/npcs');
 const imagesDir = resolve(projectRoot, 'packages/dashboard/assets/npcs');
 
 // readline interface

@@ -114,8 +114,8 @@ async function main() {
   console.log('Provider initialized.\n');
 
   // Load Maren's identity
-  const soulPath = resolve(__dirname, '../../../packages/souls/wanderers-rest');
-  const marenPath = resolve(soulPath, 'npcs/maren');
+  const playPath = resolve(__dirname, '../../../packages/plays/wanderers-rest');
+  const marenPath = resolve(playPath, 'npcs/maren');
 
   let identity: NPCIdentity;
   let memory: NPCMemory;
