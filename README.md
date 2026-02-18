@@ -122,15 +122,19 @@ Five Apsaras (celestial beings) from Hindu heaven assigned to help you. They're 
 | **LLM Agnostic** | Works with OpenAI, Anthropic, Kimi, Ollama. |
 | **Local-First** | All data stays on your machine. |
 
-### Integrations (Planned)
+### Integrations
 
-| Integration | Capabilities |
-|-------------|--------------|
-| Calendar | Read events, add appointments |
-| Task Managers | Todoist, Notion, Things |
-| Messaging | Telegram, WhatsApp, Slack |
-| Email | Read subjects, draft messages |
-| Content | RSS feeds, newsletters |
+| Integration | Status | Capabilities |
+|-------------|--------|--------------|
+| Telegram | ✅ Working | Chat with agents |
+| WhatsApp | ✅ Working | Proactive messages (Twilio) |
+| Email (Agent) | ✅ Working | Send & receive (Resend + Mailgun) |
+| Calendar | Planned | Read events, add appointments |
+| Task Managers | ✅ Working | Todoist |
+| Email (User) | Planned | Read your inbox, draft messages (Gmail) |
+| Content | Planned | RSS feeds, newsletters |
+
+**Agent Email:** Each agent gets their own address (`luna+wanderers-rest@sonder.ai`). Simple API key setup — no OAuth.
 
 **Safety principle:** CREATE, READ, SEND — Never DELETE.
 
@@ -272,15 +276,16 @@ You can even use local models (Ollama).
 | Core Engine | Alpha |
 | Wanderer's Rest | Playable |
 | Telegram Integration | Working |
+| WhatsApp Integration | Working |
+| Agent Email (Resend/Mailgun) | Working |
 | Memory/Fact System | Working |
 | Lie Detection | Working |
+| Idle Engine | Working |
+| Insight Engine | Working |
 | World Tick | Basic |
 | Visual Dashboard | Basic |
-| **Proactive Messaging** | Planned |
-| **Inter-Agent Discussion** | Planned |
-| **Swargaloka Soul** | Planned |
 | **Calendar Integration** | Planned |
-| **WhatsApp Integration** | Planned |
+| **User Gmail Integration** | Planned |
 
 ---
 

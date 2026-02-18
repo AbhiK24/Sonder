@@ -158,40 +158,81 @@ pnpm telegram
 
 Sonder needs its own accounts to send FROM.
 
-### 2.1 Sonder's Email (For sending invites/messages)
+### 2.1 Agent Email (Resend + Mailgun)
 
-#### Option A: Free Gmail Account (Easiest)
+Agents need to send and receive email. We use:
+- **Resend** — Outbound (agent sends proactive messages)
+- **Mailgun** — Inbound (agent's queryable inbox)
 
-1. Create a new Gmail: `sonder.angels.yourname@gmail.com`
-2. This is Sonder's email - angels send FROM here
-3. See Section 3.1 for OAuth setup
+Both are simple API key setup. No OAuth nightmare.
 
-```bash
-SONDER_EMAIL=sonder.angels.yourname@gmail.com
+#### Email Format
+
+Each agent gets their own address: `agent+play@yourdomain.com`
+
+```
+luna+wanderers-rest@sonder.ai    ← Luna in Wanderer's Rest
+kavi+swargaloka@sonder.ai        ← Kavi in Swargaloka
+menaka+swargaloka@sonder.ai      ← Menaka in Swargaloka
 ```
 
-#### Option B: Custom Domain (Professional)
+One API key per service handles ALL agents.
 
-1. Get a domain (e.g., `yourdomain.com`)
-2. Set up email with:
-   - Google Workspace ($6/mo)
-   - Zoho Mail (free tier)
-   - Fastmail
-3. Create: `angels@yourdomain.com`
+#### Step 1: Resend (Outbound)
+
+1. Sign up at [resend.com](https://resend.com)
+2. Add your domain (Settings → Domains → Add Domain)
+3. Add DNS records they provide
+4. Get API key (API Keys → Create)
 
 ```bash
-SONDER_EMAIL=angels@yourdomain.com
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
+EMAIL_DOMAIN=sonder.ai
 ```
 
-#### Option C: SendGrid (For high volume)
+That's it. Agents can now send emails.
 
-1. Sign up at [sendgrid.com](https://sendgrid.com)
-2. Verify a sender email or domain
-3. Create API key
+#### Step 2: Mailgun (Inbound Inbox)
+
+1. Sign up at [mailgun.com](https://mailgun.com)
+2. Add your domain (Sending → Domains → Add New Domain)
+3. Add DNS records they provide
+4. Set up inbound route:
+   - Go to **Receiving** → **Create Route**
+   - Match: `catch_all()` (or `match_recipient(".*@sonder.ai")`)
+   - Action: `store()`
+   - Click **Create Route**
+5. Get API key (API Security → Add new key)
 
 ```bash
-SENDGRID_API_KEY=SG.xxxxxxxxxxxxxxxx
-SONDER_EMAIL=angels@yourdomain.com
+MAILGUN_API_KEY=key-xxxxxxxxxxxxxxxxxxxxxxxx
+MAILGUN_DOMAIN=sonder.ai
+```
+
+Now agents can receive and browse their inbox.
+
+#### How It Works
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│ Agent sends proactive message                                    │
+│                                                                 │
+│   From: luna+wanderers-rest@sonder.ai                           │
+│   To: user@gmail.com                                             │
+│   Subject: "Thinking of you"                                     │
+│                                                                 │
+│   → Resend API (one key, any agent address)                     │
+└─────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────┐
+│ User replies                                                     │
+│                                                                 │
+│   From: user@gmail.com                                           │
+│   To: luna+wanderers-rest@sonder.ai                             │
+│                                                                 │
+│   → Mailgun receives, stores                                     │
+│   → Agent queries inbox filtered by their address               │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
 ---
@@ -253,15 +294,19 @@ TWILIO_WHATSAPP_NUMBER=+1234567890  # Your purchased number
 
 ## Part 3: User's Integrations (Your Accounts)
 
-These connect to YOUR accounts so angels can help you.
+These connect to YOUR accounts so agents can help you.
 
-### 3.1 Google Calendar + Gmail (Your Account)
+### 3.1 Google Calendar + Gmail (Your Account) — Optional
 
-Angels need to:
+**Note:** This is for reading YOUR inbox and calendar. Agent emails use Resend/Mailgun (Section 2.1).
+
+If you want agents to:
 - READ your calendar (know when you're busy)
-- CREATE events (schedule focus blocks, send invites)
-- READ email subjects (know what needs attention)
-- DRAFT emails (help you write responses)
+- CREATE events (schedule focus blocks)
+- READ your email subjects (know what needs attention)
+- DRAFT emails in your account (help you write responses)
+
+Then set up Google OAuth. Otherwise, skip this section.
 
 #### Step 1: Create Google Cloud Project
 
@@ -467,39 +512,46 @@ KIMI_API_KEY=sk-xxxxxxxxxxxxxxxx
 TELEGRAM_BOT_TOKEN=1234567890:ABCdefGHIjklMNOpqrsTUVwxyz
 
 # =============================================================================
-# SONDER'S IDENTITY (System accounts - sends FROM these)
+# AGENT EMAIL (Resend + Mailgun)
 # =============================================================================
 
-# Sonder's Email (for sending calendar invites)
-SONDER_EMAIL=sonder.angels.yourname@gmail.com
+# Your domain for agent emails (e.g., sonder.ai)
+EMAIL_DOMAIN=sonder.ai
 
-# Sonder's Google OAuth (for Sonder's own calendar)
-SONDER_GOOGLE_CLIENT_ID=1234567890-xxxxx.apps.googleusercontent.com
-SONDER_GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxx
-SONDER_GOOGLE_REDIRECT_URI=http://localhost:3000/auth/sonder/callback
+# Resend - Outbound (agents send from agent+play@domain)
+RESEND_API_KEY=re_xxxxxxxxxxxxxxxxxxxxxxxx
 
-# Sonder's WhatsApp (Twilio)
+# Mailgun - Inbound (agents receive and browse inbox)
+MAILGUN_API_KEY=key-xxxxxxxxxxxxxxxxxxxxxxxx
+MAILGUN_DOMAIN=sonder.ai
+
+# =============================================================================
+# WHATSAPP (Twilio) - Optional
+# =============================================================================
 TWILIO_ACCOUNT_SID=ACxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_AUTH_TOKEN=xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 TWILIO_WHATSAPP_NUMBER=+14155238886
 
 # =============================================================================
-# USER'S IDENTITY (Your accounts - angels help WITH these)
+# USER'S IDENTITY (Your accounts - agents help WITH these)
 # =============================================================================
 
-# Your Email
+# Your Email (where agents reach you)
 USER_EMAIL=you@gmail.com
 
 # Your Phone (for WhatsApp)
 USER_WHATSAPP=+15551234567
 
-# Your Google OAuth (for YOUR calendar and gmail)
-USER_GOOGLE_CLIENT_ID=1234567890-xxxxx.apps.googleusercontent.com
-USER_GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxx
-USER_GOOGLE_REDIRECT_URI=http://localhost:3000/auth/user/callback
-
-# Your Todoist
+# Your Todoist (optional)
 TODOIST_API_KEY=0123456789abcdef01234567
+
+# =============================================================================
+# USER'S GOOGLE (Optional - for reading YOUR calendar/inbox)
+# =============================================================================
+# Only needed if you want agents to read your calendar or draft in your Gmail
+# USER_GOOGLE_CLIENT_ID=1234567890-xxxxx.apps.googleusercontent.com
+# USER_GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxx
+# USER_GOOGLE_REDIRECT_URI=http://localhost:3000/auth/user/callback
 
 # =============================================================================
 # SETTINGS
@@ -509,7 +561,7 @@ SAVE_PATH=~/.sonder/saves
 LOG_LEVEL=info
 DEV_MODE=true
 
-# Quiet hours (angels won't message during these times)
+# Quiet hours (agents won't message during these times)
 QUIET_HOURS_START=22
 QUIET_HOURS_END=8
 TIMEZONE=America/Los_Angeles
@@ -551,21 +603,23 @@ TIMEZONE=America/Los_Angeles
 | Kimi LLM | - | ~$0.01/session |
 | OpenAI | $5 credit | ~$0.01/session |
 | Telegram | ✅ Free | - |
-| Google APIs | ✅ Free (quotas) | - |
+| Resend | 3,000 emails/mo | $20/mo for 50k |
+| Mailgun | 5,000 emails/mo | $35/mo for 50k |
 | Todoist | ✅ Free | - |
 | Twilio WhatsApp | $15 credit | ~$0.01/msg |
+| Google APIs | ✅ Free (quotas) | - |
 
-**Typical monthly cost:** $0-5 for personal use
+**Typical monthly cost:** $0-10 for personal use (free tiers cover most usage)
 
 ---
 
 ## Next Steps
 
 1. ✅ Set up LLM + Telegram (required)
-2. Set up Sonder's email (for calendar invites)
+2. Set up Resend + Mailgun (agent emails)
 3. Set up Twilio (for WhatsApp proactive messages)
-4. Connect your Google (calendar + gmail access)
-5. Connect Todoist (task tracking)
+4. Connect Todoist (task tracking)
+5. Optionally: Connect your Google (calendar + gmail access)
 
 Run:
 ```bash
