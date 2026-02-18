@@ -496,10 +496,63 @@ Tomorrow, expect:
 
 | Question | Decision | Rationale | Date |
 |----------|----------|-----------|------|
-| Core loop? | TBD | | |
+| Core loop? | **Mystery + Daily Ritual** | Chat exploration doesn't work. Need tangible goals. | 2024-02-18 |
+| Game Type? | **NOT a chat toy** | Endless conversation gets old. Need stakes. | 2024-02-18 |
 | Fail state? | TBD | | |
 | Message frequency? | TBD | | |
 | Timeline? | TBD | | |
+
+---
+
+## CONFIRMED DIRECTION
+
+### What This Game IS:
+- **Mystery Game** - Tangible case to solve, real answer, player feels smart
+- **Daily Ritual** - New info each day, reason to return, FOMO if you miss
+
+### What This Game is NOT:
+- ~~Chat Toy~~ - Endless NPC conversation with no goal
+- ~~Life Sim~~ - Too much content needed, not our strength
+- ~~Open World~~ - Unfocused, no stakes
+
+### The Loop We're Building:
+
+```
+DAILY HOOK
+   ↓
+New clue/event arrives (morning message)
+   ↓
+INVESTIGATION
+   ↓
+Talk to NPCs, connect dots
+   ↓
+STAKES
+   ↓
+Can accuse anytime - wrong = consequences
+   ↓
+CONSEQUENCE
+   ↓
+Your words spread, world reacts (evening)
+   ↓
+PROGRESS
+   ↓
+Day advances, deadline approaches
+   ↓
+Repeat until solved or Day 14
+```
+
+### Core Mechanics Confirmed:
+1. **14-day mystery** with real deadline
+2. **Daily new information** (hook to return)
+3. **Accusation system** with stakes
+4. **Consequences visible** (your words spread)
+5. **"Aha!" moments** when player connects clues
+
+### What We're Killing:
+- Aimless chatting with no purpose
+- Hidden progression (trust goes up invisibly)
+- Passive player (NPCs only respond)
+- No-stakes conversation (nothing to lose)
 
 ---
 
