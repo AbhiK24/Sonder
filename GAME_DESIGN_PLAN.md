@@ -1395,4 +1395,147 @@ You STEER it with light touches.
 
 ---
 
+## RESEARCH: Simulation as Entertainment
+
+### Games Where Simulation IS The Entertainment
+
+| Game | Why It Works | Key Insight |
+|------|--------------|-------------|
+| **Dwarf Fortress** | Emergent stories from layered systems | "Losing is Fun!" - no win condition |
+| **RimWorld** | Self-described "Story Generator" | AI storyteller throws events, you react |
+| **Crusader Kings III** | Dynasty simulation, politics emerge | Your family IS the save file |
+| **The Sims** | Watch digital people live | Voyeurism + light intervention |
+| **Kenshi** | Brutal emergent narratives | You're nobody special, world doesn't care |
+
+**Common Pattern:**
+```
+Simple systems + Time + Emergence = Stories
+
+You don't write the story.
+You watch it happen.
+You occasionally nudge.
+The simulation does the work.
+```
+
+**Key Quote from Dwarf Fortress:**
+> "Emergent behaviour caused by layering simple systems on top of each other until complexity arose."
+
+**RimWorld's Secret:**
+> It's not a colony sim. It's a "Story Generator" that uses colony mechanics as the engine.
+
+**Apophenia Effect:**
+> Both Dwarf Fortress and RimWorld use "apophenia—the tendency to perceive connections between unrelated things" to let the player's brain do the heavy lifting of story generation.
+
+**The "Losing is Fun" Philosophy:**
+> No win condition. Every fortress falls. The journey IS the point.
+
+Sources:
+- [Dwarf Fortress Wikipedia](https://en.wikipedia.org/wiki/Dwarf_Fortress)
+- [Emergent Gameplay Design](https://blog.truegeometry.com/api/exploreHTML/46ed4f4ff3641c2f6a1b4adf78de18b5.exploreHTML)
+- [Games Like RimWorld](https://www.eneba.com/hub/games/games-like-dwarf-fortress/)
+
+---
+
+### Latest AI + Simulation Research (2024-2025)
+
+**The Stanford Simulacra Legacy:**
+> The 2023 Stanford study "catalyzed rapid growth in the field of generative ABMs (Agent-Based Models)" - now called Generative Agent-Based Models (GABMs).
+
+**Key 2024-2025 Developments:**
+
+| Research | What It Does |
+|----------|--------------|
+| **MetaGPT** | Multi-agent collaboration with human workflows |
+| **AgentVerse** | Framework for multi-agent collaboration + emergent behavior |
+| **CoMAS (2025)** | Agents co-evolve via interaction rewards, no external supervision |
+| **MIT Media Lab** | Scaling LLM-guided simulations to MILLIONS of agents |
+
+**Core Capabilities of LLM Agents:**
+```
+- Natural language decision-making
+- Memory and reflection
+- Communication between agents
+- Adaptation to environment
+- Emergent social dynamics
+```
+
+**The Validation Problem:**
+> "Validation is the central challenge for generative social simulation" - how do we know the simulation is "realistic"?
+
+**Scaling Direction:**
+> MIT is pushing toward millions of agents. The question: what emerges at scale that doesn't at small scale?
+
+Sources:
+- [LLM Multi-Agent Survey (IJCAI 2024)](https://arxiv.org/abs/2402.01680)
+- [Nature: LLM Agent-Based Modeling](https://www.nature.com/articles/s41599-024-03611-3)
+- [MIT Media Lab: Scaling Simulations](https://www.media.mit.edu/posts/new-paper-on-limits-of-agency-at-aamas-2025/)
+- [Springer: Validation Challenges](https://link.springer.com/article/10.1007/s10462-025-11412-6)
+
+---
+
+### AI Games/Entertainment (Current Landscape)
+
+| Product | Model | What Works |
+|---------|-------|------------|
+| **AI Dungeon** | Text adventure, infinite possibility | Freedom, but aimless |
+| **Hidden Door** | Social AI storytelling, group chat | Real-time adaptation |
+| **Character.ai** | Chat with AI personas | Parasocial attachment |
+| **Neuro-sama** | Autonomous VTuber | First "digital entertainer" |
+
+**What's Missing:**
+> Most AI entertainment is either:
+> - Chat toy (no stakes)
+> - Text adventure (no simulation)
+> - One-on-one (no emergent social dynamics)
+
+**The Gap:**
+```
+Nobody has combined:
+✓ Multi-agent simulation (Stanford)
+✓ Emergent storytelling (Dwarf Fortress)
+✓ Light player interaction (Reigns)
+✓ Daily ritual (Wordle)
+✓ AI-native content (AI Dungeon)
+
+INTO ONE THING.
+```
+
+Sources:
+- [Best AI NPC Games 2025](https://blog.player2.game/p/best-ai-npc-games-in-2025)
+- [Inworld: Best AI Games](https://inworld.ai/blog/best-ai-games-2023)
+
+---
+
+### Key Insight: What's MOST Entertaining?
+
+**From the research, entertainment comes from:**
+
+1. **Emergence** - Unexpected but logical events
+2. **Stakes** - Something to lose
+3. **Agency** - Your choices matter (even small ones)
+4. **Narrative** - It feels like a story
+5. **Voyeurism** - Watching lives unfold
+6. **Surprise** - You can't predict what happens
+
+**The Sweet Spot:**
+```
+DWARF FORTRESS depth
++ SIMS voyeurism
++ REIGNS simplicity
++ WORDLE daily ritual
++ AI-NATIVE content generation
+= ???
+```
+
+**Unanswered Question:**
+> Can we make watching a simulation as compelling as playing a game?
+>
+> TV does it (soap operas, reality TV).
+> Games haven't cracked it yet.
+> Maybe because games assume PLAYER IS PROTAGONIST.
+>
+> What if player is AUDIENCE + occasional DIRECTOR?
+
+---
+
 *This is a living document. Update as decisions are made.*
