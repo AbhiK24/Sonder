@@ -493,17 +493,26 @@ export class GmailAdapter implements EmailAdapter {
  * Setup:
  * 1. Sign up at resend.com
  * 2. Add your domain (or use their test domain)
- * 3. Get API key
+ * 3. Get API key (ONE key for all agents)
  * 4. Done. That's it. No OAuth, no consent screens.
+ *
+ * Email format: agent+play@domain.com (e.g., luna+wanderers-rest@sonder.ai)
  */
 export class ResendAdapter implements SimpleEmailAdapter {
   type = 'resend' as const;
   status: IntegrationStatus = 'disconnected';
 
   private apiKey: string | null = null;
-  private fromAddress: string | null = null;
+  private domain: string | null = null;
 
   private static readonly API_BASE = 'https://api.resend.com';
+
+  /**
+   * Build agent+play email address
+   */
+  static buildAddress(agentId: string, playId: string, domain: string): string {
+    return `${agentId}+${playId}@${domain}`;
+  }
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -522,7 +531,15 @@ export class ResendAdapter implements SimpleEmailAdapter {
       }
 
       this.apiKey = credentials.apiKey;
-      this.fromAddress = credentials.metadata?.fromAddress as string || null;
+      this.domain = credentials.metadata?.domain as string || null;
+
+      if (!this.domain) {
+        this.status = 'error';
+        return {
+          success: false,
+          error: 'No domain provided in metadata.domain (e.g., "sonder.ai")'
+        };
+      }
 
       // Verify API key works
       const check = await this.healthCheck();
@@ -600,16 +617,16 @@ export class ResendAdapter implements SimpleEmailAdapter {
     }
 
     try {
-      const from = email.from || this.fromAddress;
-      if (!from) {
+      // "from" should be agent+play@domain format
+      if (!email.from) {
         return {
           success: false,
-          error: 'No "from" address. Set in email or credentials.metadata.fromAddress'
+          error: 'No "from" address. Use ResendAdapter.buildAddress(agentId, playId, domain)'
         };
       }
 
       const payload: Record<string, unknown> = {
-        from,
+        from: email.from,
         to: email.to,
         subject: email.subject,
       };
@@ -651,6 +668,28 @@ export class ResendAdapter implements SimpleEmailAdapter {
       };
     }
   }
+
+  /**
+   * Helper: Send email from specific agent+play
+   */
+  async sendAs(
+    agentId: string,
+    playId: string,
+    email: Omit<EmailMessage, 'from'>,
+    confirmed: boolean
+  ): Promise<IntegrationResult<{ messageId: string }>> {
+    if (!this.domain) {
+      return { success: false, error: 'Not connected' };
+    }
+
+    return this.sendEmail(
+      {
+        ...email,
+        from: ResendAdapter.buildAddress(agentId, playId, this.domain),
+      },
+      confirmed
+    );
+  }
 }
 
 // =============================================================================
@@ -663,10 +702,11 @@ export class ResendAdapter implements SimpleEmailAdapter {
  * Setup:
  * 1. Sign up at mailgun.com
  * 2. Add your domain
- * 3. Set up inbound routing (Routes → store())
- * 4. Get API key
+ * 3. Set up inbound routing (Routes → store()) - catches all @domain
+ * 4. Get API key (ONE key for all agents)
  *
- * Agents can then receive and browse emails sent to their address.
+ * Email format: agent+play@domain.com (e.g., luna+wanderers-rest@sonder.ai)
+ * Query by specific agent+play or get all for a play.
  */
 export class MailgunInboxAdapter implements InboundEmailAdapter {
   type = 'mailgun' as const;
@@ -674,12 +714,27 @@ export class MailgunInboxAdapter implements InboundEmailAdapter {
 
   private apiKey: string | null = null;
   private domain: string | null = null;
-  private inboxAddress: string | null = null;
 
   // Track read status locally (Mailgun doesn't have native read tracking)
   private readMessages: Set<string> = new Set();
 
   private static readonly API_BASE = 'https://api.mailgun.net/v3';
+
+  /**
+   * Build agent+play email address
+   */
+  static buildAddress(agentId: string, playId: string, domain: string): string {
+    return `${agentId}+${playId}@${domain}`;
+  }
+
+  /**
+   * Parse agent+play from email address
+   */
+  static parseAddress(email: string): { agentId: string; playId: string; domain: string } | null {
+    const match = email.match(/^([^+@]+)\+([^@]+)@(.+)$/);
+    if (!match) return null;
+    return { agentId: match[1], playId: match[2], domain: match[3] };
+  }
 
   // ---------------------------------------------------------------------------
   // Lifecycle
@@ -699,13 +754,12 @@ export class MailgunInboxAdapter implements InboundEmailAdapter {
 
       this.apiKey = credentials.apiKey;
       this.domain = credentials.metadata?.domain as string;
-      this.inboxAddress = credentials.metadata?.inboxAddress as string;
 
       if (!this.domain) {
         this.status = 'error';
         return {
           success: false,
-          error: 'No domain provided in metadata.domain'
+          error: 'No domain provided in metadata.domain (e.g., "sonder.ai")'
         };
       }
 
@@ -725,6 +779,13 @@ export class MailgunInboxAdapter implements InboundEmailAdapter {
         error: error instanceof Error ? error.message : 'Connection failed'
       };
     }
+  }
+
+  /**
+   * Get the domain
+   */
+  getDomain(): string | null {
+    return this.domain;
   }
 
   async disconnect(): Promise<void> {
@@ -791,11 +852,6 @@ export class MailgunInboxAdapter implements InboundEmailAdapter {
         limit: String(filter?.maxResults || 50),
       });
 
-      // Filter by recipient if we have an inbox address
-      if (this.inboxAddress) {
-        params.set('recipient', this.inboxAddress);
-      }
-
       if (filter?.after) {
         params.set('begin', filter.after.toISOString());
       }
@@ -828,6 +884,8 @@ export class MailgunInboxAdapter implements InboundEmailAdapter {
           snippet: '', // Mailgun events don't include snippet, need to fetch full message
           receivedAt: new Date(event.timestamp * 1000),
           isUnread: !this.readMessages.has(event.storage?.key || event.id),
+          // Store the recipient for filtering
+          labels: [event.message?.headers?.to || ''],
         });
       }
 
@@ -838,6 +896,34 @@ export class MailgunInboxAdapter implements InboundEmailAdapter {
         error: error instanceof Error ? error.message : 'Failed to fetch messages'
       };
     }
+  }
+
+  /**
+   * Get messages for a specific agent+play inbox
+   */
+  async getMessagesFor(
+    agentId: string,
+    playId: string,
+    filter?: EmailFilter
+  ): Promise<IntegrationResult<EmailSummary[]>> {
+    if (!this.domain) {
+      return { success: false, error: 'Not connected' };
+    }
+
+    const inboxAddress = MailgunInboxAdapter.buildAddress(agentId, playId, this.domain);
+    const result = await this.getMessages(filter);
+
+    if (!result.success || !result.data) {
+      return result;
+    }
+
+    // Filter by recipient (the agent+play address)
+    const filtered = result.data.filter(msg => {
+      const recipient = msg.labels?.[0] || '';
+      return recipient.toLowerCase().includes(inboxAddress.toLowerCase());
+    });
+
+    return { success: true, data: filtered };
   }
 
   async getMessage(messageId: string): Promise<IntegrationResult<EmailMessage>> {
@@ -887,6 +973,19 @@ export class MailgunInboxAdapter implements InboundEmailAdapter {
 
   async getUnreadCount(): Promise<IntegrationResult<number>> {
     const result = await this.getMessages({ maxResults: 100 });
+    if (!result.success || !result.data) {
+      return { success: false, error: result.error };
+    }
+
+    const unread = result.data.filter(m => m.isUnread).length;
+    return { success: true, data: unread };
+  }
+
+  /**
+   * Get unread count for a specific agent+play inbox
+   */
+  async getUnreadCountFor(agentId: string, playId: string): Promise<IntegrationResult<number>> {
+    const result = await this.getMessagesFor(agentId, playId, { maxResults: 100 });
     if (!result.success || !result.data) {
       return { success: false, error: result.error };
     }
