@@ -9,6 +9,7 @@
     "dashboard": "pnpm --filter @sonder/dashboard dev",
     "telegram": "pnpm --filter @sonder/engine telegram",
     "chorus": "pnpm --filter @sonder/engine chorus",
+    "onboard": "pnpm --filter @sonder/onboarding dev",
     "create-npc": "pnpm --filter @sonder/engine create-npc",
     "generate-images": "pnpm --filter @sonder/engine generate-images",
     "build": "pnpm -r build",
