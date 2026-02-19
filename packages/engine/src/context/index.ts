@@ -276,20 +276,20 @@ export class EngineContext {
     });
     parts.push(`## Current Time\n${timeStr} (${timezone})`);
 
-    // Calendar summary - ALWAYS include to prevent hallucination
-    const upcomingEvents = this.getUpcomingEvents(48); // Next 48 hours
+    // Calendar summary - show full 2-week view
+    const allEvents = this.getCalendarEvents(); // Full 2 weeks
     const hasCalendar = this.config.calendarAdapter?.isConnected();
 
-    if (upcomingEvents.length > 0) {
-      const eventLines = upcomingEvents.slice(0, 10).map(e => {
+    if (allEvents.length > 0) {
+      const eventLines = allEvents.map(e => {
         const dateStr = e.startTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
         const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         const calName = e.calendarName ? ` [${e.calendarName}]` : '';
         return `- ${dateStr} ${timeStr}: ${e.title}${calName}`;
       });
-      parts.push(`## Calendar (next 48h)\n${eventLines.join('\n')}`);
+      parts.push(`## Calendar (next 2 weeks)\n${eventLines.join('\n')}`);
     } else if (hasCalendar) {
-      parts.push(`## Calendar\nNo events in the next 48 hours. Calendar is connected but empty for this period.\n\nIMPORTANT: You can ONLY see the next 48 hours. If user asks about dates beyond that, say "I can only see your calendar for the next 48 hours. I don't have visibility into [date they asked about]."`);
+      parts.push(`## Calendar\nNo events in the next 2 weeks. Calendar is connected but empty.`);
     } else {
       parts.push(`## Calendar\nNo calendar connected. If user asks about calendar/meetings, tell them to connect one in settings.`);
     }
