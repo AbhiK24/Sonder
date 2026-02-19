@@ -9,7 +9,7 @@ import QRCode from 'qrcode';
 import { createBaileysWhatsApp } from './integrations/whatsapp-baileys.js';
 
 const storageDir = process.env.HOME + '/.sonder';
-const userPhone = '+918379931905';
+const userPhone = '+919209872088';
 const qrPath = '/tmp/whatsapp-qr.png';
 
 async function main() {
@@ -29,7 +29,7 @@ async function main() {
 
       const result = await adapter.sendMessage(
         userPhone,
-        `🎵 *Chorus Test*\n\nHey! This is a test message from Sonder via Baileys.\n\nIf you see this, WhatsApp integration is working! 🎉`,
+        `Hey! How's your day going? 😊`,
       );
 
       if (result.success) {

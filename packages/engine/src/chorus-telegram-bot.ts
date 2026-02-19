@@ -1077,8 +1077,34 @@ async function setupIntegrations(): Promise<void> {
         console.log(`[WhatsApp] BLOCKED: ${to} - ${reason}`);
       },
       onMessage: async (msg) => {
-        console.log(`[WhatsApp] Message from ${msg.fromFormatted}: ${msg.text?.slice(0, 50)}...`);
-        // TODO: Route incoming WhatsApp messages to conversation
+        // Auto-reply to incoming WhatsApp messages
+        if (!msg.text || msg.isGroup) return; // Skip media-only or group messages
+
+        console.log(`[WhatsApp] Message from ${msg.fromFormatted}: ${msg.text}`);
+
+        // Generate response using Luna (or could select agent based on content)
+        const agent = chorusAgents.luna;
+
+        try {
+          const response = await provider.generate(
+            `You are having a casual WhatsApp conversation with a friend. Reply naturally like a real person would - short, casual, no emojis. Don't sound like a chatbot or assistant. Just be a normal human texting back.
+
+Their message: "${msg.text}"
+
+Your reply (keep it brief and human):`,
+            { temperature: 0.9, maxTokens: 100 }
+          );
+
+          const reply = response.trim();
+          if (reply && whatsappAdapter) {
+            // Extract phone number from JID (remove @s.whatsapp.net)
+            const phone = msg.from.split('@')[0];
+            await whatsappAdapter.sendMessage(phone, reply);
+            console.log(`[WhatsApp] Replied to ${msg.fromFormatted}: ${reply}`);
+          }
+        } catch (error) {
+          console.error('[WhatsApp] Auto-reply failed:', error);
+        }
       },
     });
 

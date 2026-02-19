@@ -500,10 +500,11 @@ export class UnifiedWhatsApp implements UnifiedWhatsAppAdapter {
   }
 
   /**
-   * Normalize phone number for comparison
+   * Normalize phone number for comparison (strips to digits only)
    */
   private normalizeNumber(number: string): string {
-    return number.replace(/[\s\-\(\)]/g, '').replace(/^whatsapp:/i, '');
+    // Strip everything except digits
+    return number.replace(/\D/g, '');
   }
 
   /**
