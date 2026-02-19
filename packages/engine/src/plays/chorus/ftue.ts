@@ -58,8 +58,7 @@ Before we dive in... can I ask you something?`,
       type: 'message',
       agent: 'joy',
       content: (context) => {
-        const win = context.responses['recent_win'];
-        return `Wait—I have to jump in. ${win}? That's not nothing. That's YOU making something happen.
+        return `Wait—I have to jump in. That? That's not nothing. That's YOU making something happen.
 
 I'm Joy, by the way. I notice the good stuff. Someone has to, right?
 
@@ -89,10 +88,9 @@ Luna, keep going. I'll be here.`;
       type: 'message',
       agent: 'sage',
       content: (context) => {
-        const struggle = context.responses['recent_struggle'];
         return `I'm Sage. I tend to see the longer view.
 
-What you're describing—${struggle.slice(0, 50)}...—it sounds like you're in the middle of something. Not at the end, not stuck forever. In the middle.
+What you're describing—it sounds like you're in the middle of something. Not at the end, not stuck forever. In the middle.
 
 That's actually important to know. You're not failing. You're navigating.`;
       },
