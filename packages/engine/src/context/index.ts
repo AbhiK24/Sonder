@@ -261,6 +261,21 @@ export class EngineContext {
   getContextSummary(): string {
     const parts: string[] = [];
 
+    // Current time - always include so agents know the time
+    const timezone = process.env.TIMEZONE || 'UTC';
+    const now = new Date();
+    const timeStr = now.toLocaleString('en-US', {
+      timeZone: timezone,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    parts.push(`## Current Time\n${timeStr} (${timezone})`);
+
     // Calendar summary
     const todayEvents = this.getTodayEvents();
     const upcomingEvents = this.getUpcomingEvents(48); // Next 48 hours
