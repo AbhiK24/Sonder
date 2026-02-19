@@ -25,6 +25,10 @@ export { loadIdentity, loadMemory, loadStatements } from './memory/files.js';
 // Context (calendar, tasks, etc.)
 export { EngineContext, getEngineContext, initEngineContext } from './context/index.js';
 
+// Action logging (transparency)
+export { actionLog, ActionLogger } from './action-log.js';
+export type { ActionLogEntry, ActionType } from './action-log.js';
+
 // NPCs
 export { NPCManager } from './npcs/manager.js';
 

@@ -32,6 +32,9 @@ import { createUserProfile } from './user/types.js';
 // Memory (local embeddings + vector store)
 import { createMemory, Memory } from './memory/index.js';
 
+// Action logging for transparency
+import { actionLog } from './action-log.js';
+
 // Chorus play imports
 import {
   agents as chorusAgents,
@@ -463,6 +466,16 @@ Or just talk to us. We're here. 💫`;
       }, true);
 
       if (result.success) {
+        // Log the email action
+        actionLog.emailSent({
+          userId: String(chatId),
+          agent: agent.name,
+          to: [userEmail],
+          subject: `${agent.emoji} ${agent.name} checking in`,
+          messageId: result.data?.messageId,
+          userRequested: true,
+          userConfirmed: true,
+        });
         return `✅ Test email sent to ${userEmail} from ${fromAddress}!\n\nCheck your inbox.`;
       } else {
         return `❌ Failed to send: ${result.error}`;
@@ -751,6 +764,13 @@ async function processMessage(
     agentId: agent.id,
     role: 'agent',
   }).catch(() => {});
+
+  // Log the action for transparency
+  actionLog.agentResponse({
+    userId: String(chatId),
+    agent: agent.name,
+    messagePreview: response,
+  });
 
   // Save state
   saveState(chatId);

@@ -9,6 +9,7 @@
  * For reading user's inbox, use Gmail (if they want that feature).
  */
 
+import { actionLog } from '../action-log.js';
 import {
   EmailAdapter,
   SimpleEmailAdapter,
@@ -659,7 +660,8 @@ export class ResendAdapter implements SimpleEmailAdapter {
         };
       }
 
-      const result = await response.json();
+      const result = await response.json() as { id: string };
+      console.log(`[Email] ✓ Sent to ${email.to.join(', ')} | Subject: "${email.subject}" | ID: ${result.id}`);
       return { success: true, data: { messageId: result.id } };
     } catch (error) {
       return {
