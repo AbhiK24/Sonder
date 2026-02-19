@@ -952,13 +952,42 @@ async function main() {
   console.log('✓ Bot starting...');
 
   bot.start({
-    onStart: (botInfo) => {
+    onStart: async (botInfo) => {
       console.log(`✓ @${botInfo.username} is running!`);
       console.log('');
       console.log('The Chorus is ready:');
       agentList.forEach(a => console.log(`  ${a.emoji} ${a.name} - ${a.role}`));
       console.log('');
-      console.log('Message the bot to start chatting.');
+
+      // Send welcome message to existing users
+      const existingChats = persistence.listSaves();
+      if (existingChats.length > 0) {
+        console.log(`Waking up for ${existingChats.length} user(s)...`);
+        for (const chatId of existingChats) {
+          try {
+            const state = getState(chatId);
+            const lead = agents.luna; // Luna as the greeter
+
+            // Different message based on FTUE status
+            let message: string;
+            if (!state.profile.ftueCompleted) {
+              message = `${lead.emoji} *${lead.name}:* Hey! The Chorus just woke up. ✨\n\nI'm Luna, and I keep track of things. We're five companions here to support you — each with our own way of helping.\n\nWant to tell me a bit about yourself so we can get started?`;
+            } else {
+              // Returning user
+              const name = state.profile.name || 'friend';
+              message = `${lead.emoji} *${lead.name}:* Hey ${name}! The Chorus is awake. ✨\n\nWe're here when you need us. How are you doing?`;
+            }
+
+            await bot.api.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+            console.log(`  ✓ Sent wake-up to ${chatId}`);
+          } catch (error) {
+            console.log(`  ✗ Could not reach ${chatId}`);
+          }
+        }
+        console.log('');
+      } else {
+        console.log('Waiting for first user to message the bot...');
+      }
     },
   });
 
