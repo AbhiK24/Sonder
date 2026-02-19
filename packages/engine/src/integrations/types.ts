@@ -74,6 +74,19 @@ export interface BaseIntegrationAdapter {
 // Calendar Types
 // =============================================================================
 
+export interface CalendarAttendee {
+  email: string;
+  name?: string;
+  status: 'accepted' | 'declined' | 'tentative' | 'needs-action' | 'unknown';
+  role?: 'required' | 'optional' | 'chair';
+  isOrganizer?: boolean;
+}
+
+export interface CalendarOrganizer {
+  email: string;
+  name?: string;
+}
+
 export interface CalendarEvent {
   id?: string;
   title: string;
@@ -81,12 +94,23 @@ export interface CalendarEvent {
   startTime: Date;
   endTime: Date;
   location?: string;
-  attendees?: string[];
+  // Rich attendee info
+  organizer?: CalendarOrganizer;
+  attendees?: CalendarAttendee[];
+  // Legacy simple list (for backward compat)
+  attendeeEmails?: string[];
   isAllDay?: boolean;
   reminders?: CalendarReminder[];
   // For multi-calendar support
   calendarId?: string;
   calendarName?: string;
+  // Meeting link (Zoom, Meet, etc.)
+  conferenceUrl?: string;
+  // Event status
+  status?: 'confirmed' | 'tentative' | 'cancelled';
+  // Recurrence info
+  isRecurring?: boolean;
+  recurrenceRule?: string;
 }
 
 export interface CalendarReminder {

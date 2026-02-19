@@ -405,6 +405,13 @@ interface CachedFeed {
   fetchedAt: Date;
 }
 
+interface RawAttendee {
+  email: string;
+  name?: string;
+  status: 'accepted' | 'declined' | 'tentative' | 'needs-action' | 'unknown';
+  role?: 'required' | 'optional' | 'chair';
+}
+
 interface RawICSEvent {
   uid: string;
   summary: string;
@@ -417,6 +424,11 @@ interface RawICSEvent {
   exdate?: Date[]; // Excluded dates
   feedId: string;
   feedName: string;
+  // Rich metadata
+  organizer?: { email: string; name?: string };
+  attendees?: RawAttendee[];
+  conferenceUrl?: string;
+  status?: 'confirmed' | 'tentative' | 'cancelled';
 }
 
 export class ICSFeedAdapter implements CalendarAdapter {
@@ -639,17 +651,10 @@ export class ICSFeedAdapter implements CalendarAdapter {
             if (seenKeys.has(key)) continue;
             seenKeys.add(key);
 
-            results.push({
-              id: `${raw.uid}-${occurrence.getTime()}`,
-              title: raw.summary,
-              description: raw.description,
-              startTime: occurrence,
-              endTime: new Date(occurrence.getTime() + duration),
-              location: raw.location,
-              isAllDay: raw.isAllDay,
-              calendarId: raw.feedId,
-              calendarName: raw.feedName,
-            });
+            const endTime = new Date(occurrence.getTime() + duration);
+            const event = this.rawToCalendarEvent(raw, occurrence, endTime);
+            event.id = `${raw.uid}-${occurrence.getTime()}`;
+            results.push(event);
           }
         } catch (error) {
           console.warn(`[ICS] Failed to expand RRULE for "${raw.summary}":`, error);
@@ -681,17 +686,29 @@ export class ICSFeedAdapter implements CalendarAdapter {
     return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
   }
 
-  private rawToCalendarEvent(raw: RawICSEvent): CalendarEvent {
+  private rawToCalendarEvent(raw: RawICSEvent, overrideStart?: Date, overrideEnd?: Date): CalendarEvent {
     return {
       id: raw.uid,
       title: raw.summary,
       description: raw.description,
-      startTime: raw.startTime,
-      endTime: raw.endTime,
+      startTime: overrideStart || raw.startTime,
+      endTime: overrideEnd || raw.endTime,
       location: raw.location,
       isAllDay: raw.isAllDay,
       calendarId: raw.feedId,
       calendarName: raw.feedName,
+      organizer: raw.organizer,
+      attendees: raw.attendees?.map(a => ({
+        email: a.email,
+        name: a.name,
+        status: a.status,
+        role: a.role,
+      })),
+      attendeeEmails: raw.attendees?.map(a => a.email),
+      conferenceUrl: raw.conferenceUrl,
+      status: raw.status,
+      isRecurring: !!raw.rrule,
+      recurrenceRule: raw.rrule,
     };
   }
 
@@ -791,6 +808,60 @@ export class ICSFeedAdapter implements CalendarAdapter {
         }
       }
 
+      // Extract organizer
+      let organizer: { email: string; name?: string } | undefined;
+      const organizerRaw = (item as any).organizer;
+      if (organizerRaw) {
+        const email = this.extractEmail(organizerRaw);
+        const name = this.extractName(organizerRaw);
+        if (email) {
+          organizer = { email, name };
+        }
+      }
+
+      // Extract attendees
+      let attendees: RawAttendee[] | undefined;
+      const attendeesRaw = (item as any).attendee;
+      if (attendeesRaw) {
+        attendees = [];
+        const attendeeList = Array.isArray(attendeesRaw) ? attendeesRaw : [attendeesRaw];
+        for (const att of attendeeList) {
+          const email = this.extractEmail(att);
+          if (email) {
+            attendees.push({
+              email,
+              name: this.extractName(att),
+              status: this.extractPartStat(att),
+              role: this.extractRole(att),
+            });
+          }
+        }
+      }
+
+      // Extract conference URL (Zoom, Meet, etc.)
+      let conferenceUrl: string | undefined;
+      // Check location for URL
+      if (location && (location.includes('zoom.us') || location.includes('meet.google.com') || location.includes('teams.microsoft.com'))) {
+        conferenceUrl = location;
+      }
+      // Check description for URL
+      if (!conferenceUrl && description) {
+        const urlMatch = description.match(/https?:\/\/[^\s<>"]+(?:zoom\.us|meet\.google\.com|teams\.microsoft\.com)[^\s<>"]*/i);
+        if (urlMatch) {
+          conferenceUrl = urlMatch[0];
+        }
+      }
+
+      // Extract status
+      let status: 'confirmed' | 'tentative' | 'cancelled' | undefined;
+      const statusRaw = (item as any).status;
+      if (statusRaw) {
+        const statusStr = String(statusRaw).toLowerCase();
+        if (statusStr === 'confirmed') status = 'confirmed';
+        else if (statusStr === 'tentative') status = 'tentative';
+        else if (statusStr === 'cancelled') status = 'cancelled';
+      }
+
       const raw: RawICSEvent = {
         uid,
         summary,
@@ -803,6 +874,10 @@ export class ICSFeedAdapter implements CalendarAdapter {
         exdate,
         feedId: feed.id,
         feedName: feed.name,
+        organizer,
+        attendees,
+        conferenceUrl,
+        status,
       };
 
       const event: CalendarEvent = {
@@ -815,6 +890,18 @@ export class ICSFeedAdapter implements CalendarAdapter {
         isAllDay,
         calendarId: feed.id,
         calendarName: feed.name,
+        organizer,
+        attendees: attendees?.map(a => ({
+          email: a.email,
+          name: a.name,
+          status: a.status,
+          role: a.role,
+        })),
+        attendeeEmails: attendees?.map(a => a.email),
+        conferenceUrl,
+        status,
+        isRecurring: !!rrule,
+        recurrenceRule: rrule,
       };
 
       return { event, raw };
@@ -834,6 +921,77 @@ export class ICSFeedAdapter implements CalendarAdapter {
       return (value as { val: string }).val;
     }
     return String(value);
+  }
+
+  /**
+   * Extract email from ICS organizer/attendee field
+   */
+  private extractEmail(value: unknown): string | undefined {
+    if (!value) return undefined;
+
+    // Handle object with val property (mailto:email)
+    if (typeof value === 'object' && 'val' in (value as object)) {
+      const val = (value as { val: string }).val;
+      if (val.startsWith('mailto:')) {
+        return val.substring(7);
+      }
+      return val;
+    }
+
+    // Handle string directly
+    if (typeof value === 'string') {
+      if (value.startsWith('mailto:')) {
+        return value.substring(7);
+      }
+      return value;
+    }
+
+    return undefined;
+  }
+
+  /**
+   * Extract name (CN) from ICS organizer/attendee field
+   */
+  private extractName(value: unknown): string | undefined {
+    if (!value || typeof value !== 'object') return undefined;
+
+    const obj = value as { params?: { CN?: string } };
+    return obj.params?.CN;
+  }
+
+  /**
+   * Extract participation status from ICS attendee field
+   */
+  private extractPartStat(value: unknown): 'accepted' | 'declined' | 'tentative' | 'needs-action' | 'unknown' {
+    if (!value || typeof value !== 'object') return 'unknown';
+
+    const obj = value as { params?: { PARTSTAT?: string } };
+    const status = obj.params?.PARTSTAT?.toLowerCase();
+
+    switch (status) {
+      case 'accepted': return 'accepted';
+      case 'declined': return 'declined';
+      case 'tentative': return 'tentative';
+      case 'needs-action': return 'needs-action';
+      default: return 'unknown';
+    }
+  }
+
+  /**
+   * Extract role from ICS attendee field
+   */
+  private extractRole(value: unknown): 'required' | 'optional' | 'chair' | undefined {
+    if (!value || typeof value !== 'object') return undefined;
+
+    const obj = value as { params?: { ROLE?: string } };
+    const role = obj.params?.ROLE?.toLowerCase();
+
+    switch (role) {
+      case 'req-participant': return 'required';
+      case 'opt-participant': return 'optional';
+      case 'chair': return 'chair';
+      default: return undefined;
+    }
   }
 
 }

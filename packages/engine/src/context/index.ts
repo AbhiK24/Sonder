@@ -284,8 +284,35 @@ export class EngineContext {
       const eventLines = allEvents.map(e => {
         const dateStr = e.startTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
         const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-        const calName = e.calendarName ? ` [${e.calendarName}]` : '';
-        return `- ${dateStr} ${timeStr}: ${e.title}${calName}`;
+
+        // Build rich event info
+        const parts: string[] = [`- ${dateStr} ${timeStr}: ${e.title}`];
+
+        // Organizer
+        if (e.organizer) {
+          const orgName = e.organizer.name || e.organizer.email;
+          parts.push(`  Organizer: ${orgName}${e.organizer.name ? ` (${e.organizer.email})` : ''}`);
+        }
+
+        // Attendees (show names/emails and status)
+        if (e.attendees && e.attendees.length > 0) {
+          const attendeeStrs = e.attendees.slice(0, 8).map(a => {
+            const name = a.name || a.email.split('@')[0];
+            const statusIcon = a.status === 'accepted' ? '✓' : a.status === 'declined' ? '✗' : a.status === 'tentative' ? '?' : '·';
+            return `${statusIcon}${name}`;
+          });
+          const more = e.attendees.length > 8 ? ` +${e.attendees.length - 8} more` : '';
+          parts.push(`  Attendees: ${attendeeStrs.join(', ')}${more}`);
+        }
+
+        // Location or conference URL
+        if (e.conferenceUrl) {
+          parts.push(`  Meeting: ${e.conferenceUrl.includes('zoom') ? 'Zoom' : e.conferenceUrl.includes('meet.google') ? 'Google Meet' : 'Online'}`);
+        } else if (e.location && !e.location.includes('http')) {
+          parts.push(`  Location: ${e.location}`);
+        }
+
+        return parts.join('\n');
       });
       parts.push(`## Calendar (next 2 weeks)\n${eventLines.join('\n')}`);
     } else if (hasCalendar) {
