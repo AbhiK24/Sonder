@@ -307,50 +307,54 @@ Respond as ${agent.name}. Be warm, supportive, and true to your role. Keep respo
 }
 
 // =============================================================================
-// Quick Questions (answered during FTUE without breaking flow)
+// Off-topic Detection (during FTUE)
 // =============================================================================
 
 /**
- * Handle common utility questions that should be answered quickly
- * even during FTUE, without breaking the flow.
+ * Check if a message looks like an off-topic question rather than an FTUE answer.
+ * Questions typically: end with ?, start with question words, or are common queries.
  */
-function handleQuickQuestion(message: string): string | null {
-  const lower = message.toLowerCase();
+function looksLikeQuestion(message: string): boolean {
+  const lower = message.toLowerCase().trim();
 
-  // Time questions
-  if (lower.includes('time') && (lower.includes('what') || lower.includes('current'))) {
-    const timezone = process.env.TIMEZONE || 'UTC';
-    const now = new Date();
-    const timeStr = now.toLocaleString('en-US', {
-      timeZone: timezone,
-      hour: '2-digit',
-      minute: '2-digit',
-      hour12: true,
-    });
-    const dateStr = now.toLocaleDateString('en-US', {
-      timeZone: timezone,
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-    });
-    return `🌙 **Luna:** It's ${timeStr} on ${dateStr} (${timezone}).\n\nNow, back to getting to know you...`;
+  // Ends with question mark
+  if (lower.endsWith('?')) return true;
+
+  // Starts with question words
+  const questionStarters = ['what', 'when', 'where', 'who', 'why', 'how', 'can you', 'could you', 'will you', 'do you', 'is there', 'are there'];
+  if (questionStarters.some(q => lower.startsWith(q))) return true;
+
+  // Common off-topic queries
+  const offTopicPatterns = ['tell me', 'help me', 'show me', 'give me'];
+  if (offTopicPatterns.some(p => lower.startsWith(p))) return true;
+
+  return false;
+}
+
+/**
+ * Answer an off-topic question during FTUE using the LLM, then nudge back to flow.
+ */
+async function answerOffTopicDuringFTUE(
+  chatId: number,
+  state: UserState,
+  question: string
+): Promise<string> {
+  const luna = chorusAgents.luna;
+
+  // Generate answer using LLM with context
+  const response = await generateAgentResponse(luna, question, state, undefined, {
+    checkInType: undefined,
+    reunionContext: undefined,
+  });
+
+  // Get the current FTUE step to remind them
+  const runner = state.ftueRunner;
+  let nudge = '';
+  if (runner && runner.isWaitingForResponse()) {
+    nudge = '\n\n_(Back to getting to know you...)_';
   }
 
-  // Date questions
-  if (lower.includes('date') && (lower.includes('what') || lower.includes('today'))) {
-    const timezone = process.env.TIMEZONE || 'UTC';
-    const now = new Date();
-    const dateStr = now.toLocaleDateString('en-US', {
-      timeZone: timezone,
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-    });
-    return `🌙 **Luna:** Today is ${dateStr}.\n\nNow, where were we...`;
-  }
-
-  return null; // Not a quick question
+  return `${luna.emoji} **${luna.name}:** ${response}${nudge}`;
 }
 
 // =============================================================================
@@ -589,10 +593,9 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
       return ''; // Messages sent by FTUE runner
     }
 
-    // Handle common utility questions during FTUE without breaking flow
-    const quickAnswer = handleQuickQuestion(trimmed);
-    if (quickAnswer) {
-      return quickAnswer;
+    // If it looks like an off-topic question, answer it without breaking FTUE
+    if (looksLikeQuestion(trimmed)) {
+      return answerOffTopicDuringFTUE(chatId, state, trimmed);
     }
 
     // Process FTUE response
