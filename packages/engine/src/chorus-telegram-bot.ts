@@ -29,6 +29,9 @@ import { chorusFTUE } from './plays/chorus/ftue.js';
 import type { UserProfile, Goal } from './user/types.js';
 import { createUserProfile } from './user/types.js';
 
+// Memory (local embeddings + vector store)
+import { createMemory, Memory } from './memory/index.js';
+
 // Chorus play imports
 import {
   agents as chorusAgents,
@@ -93,6 +96,7 @@ let taskAdapter: TodoistAdapter | null = null;
 let whatsappAdapter: WhatsAppAdapter | null = null;
 let calendarAdapter: ICSFeedAdapter | null = null;
 let engineContext: EngineContext;
+let memory: Memory;
 let bot: Bot;
 
 // Persistence
@@ -226,7 +230,8 @@ async function generateAgentResponse(
   agent: ChorusAgent,
   userMessage: string,
   state: UserState,
-  context?: { checkInType?: string; reunionContext?: string }
+  memoryContext?: string,
+  extraContext?: { checkInType?: string; reunionContext?: string }
 ): Promise<string> {
   // Build context from history
   const recentHistory = state.history.slice(-10)
@@ -249,19 +254,26 @@ ${agentList.map(a => `- ${a.emoji} ${a.name} (${a.role}): ${a.description}`).joi
 
 You discuss the user with each other. You're all rooting for them.`;
 
+  // Add semantic memory context (relevant past conversations)
+  if (memoryContext) {
+    systemPrompt += `\n\n## Relevant Past Context
+Things you remember that might be relevant:
+${memoryContext}`;
+  }
+
   // Add check-in context if applicable
-  if (context?.checkInType) {
-    const template = checkInTemplates[context.checkInType as keyof typeof checkInTemplates];
+  if (extraContext?.checkInType) {
+    const template = checkInTemplates[extraContext.checkInType as keyof typeof checkInTemplates];
     if (template) {
-      systemPrompt += `\n\n## This is a ${context.checkInType} check-in
+      systemPrompt += `\n\n## This is a ${extraContext.checkInType} check-in
 Prompt hints: ${template.promptHints.join(' | ')}`;
     }
   }
 
   // Add reunion context if applicable
-  if (context?.reunionContext) {
+  if (extraContext?.reunionContext) {
     systemPrompt += `\n\n## The user just returned
-${context.reunionContext}`;
+${extraContext.reunionContext}`;
   }
 
   // Add engine context (calendar, tasks, etc.)
@@ -398,7 +410,7 @@ Or just talk to us. We're here. 💫`;
   // Trigger a check-in manually
   async CHECKIN(chatId, state) {
     const agent = getCheckInLead('evening');
-    const response = await generateAgentResponse(agent, `(Generate a quick check-in)`, state, { checkInType: 'evening' });
+    const response = await generateAgentResponse(agent, `(Generate a quick check-in)`, state, undefined, { checkInType: 'evening' });
     return `${agent.emoji} **${agent.name}:** ${response}`;
   },
 
@@ -601,6 +613,19 @@ async function processMessage(
     timestamp: new Date(),
   });
 
+  // Store in semantic memory (async, don't wait)
+  memory.remember(message, {
+    type: 'message',
+    userId: String(chatId),
+    role: 'user',
+  }).catch(() => {}); // Silently fail if memory unavailable
+
+  // Recall relevant memories for context
+  const relevantMemories = await memory.recall(message, {
+    userId: String(chatId),
+    limit: 3,
+  });
+
   // Detect emotional state from message (simple heuristics)
   const lower = message.toLowerCase();
   if (lower.includes('overwhelm') || lower.includes('too much') || lower.includes("can't handle")) {
@@ -613,8 +638,11 @@ async function processMessage(
     state.emotionalState = 'spiraling';
   }
 
-  // Generate response
-  const response = await generateAgentResponse(agent, message, state);
+  // Generate response (with memory context if available)
+  const memoryContext = relevantMemories.length > 0
+    ? relevantMemories.map(r => r.entry.text).join('\n')
+    : undefined;
+  const response = await generateAgentResponse(agent, message, state, memoryContext);
 
   // Add agent response to history
   state.history.push({
@@ -623,6 +651,14 @@ async function processMessage(
     content: response,
     timestamp: new Date(),
   });
+
+  // Store agent response in memory too
+  memory.remember(response, {
+    type: 'message',
+    userId: String(chatId),
+    agentId: agent.id,
+    role: 'agent',
+  }).catch(() => {});
 
   // Save state
   saveState(chatId);
@@ -651,7 +687,7 @@ async function handleCheckIn(chatId: number, type: 'morning' | 'midday' | 'eveni
 
   // Generate check-in message
   const prompt = template.promptHints[Math.floor(Math.random() * template.promptHints.length)];
-  const response = await generateAgentResponse(leadAgent, `(Generate a ${type} check-in)`, state, { checkInType: type });
+  const response = await generateAgentResponse(leadAgent, `(Generate a ${type} check-in)`, state, undefined, { checkInType: type });
 
   await sendProactiveMessage(chatId, `${leadAgent.emoji} **${leadAgent.name}:** ${response}`);
 }
@@ -664,6 +700,7 @@ async function handleReunion(chatId: number, awayMinutes: number, thoughts: stri
     leadAgent,
     `(User just returned after ${awayMinutes} minutes away)`,
     state,
+    undefined,
     { reunionContext: thoughts }
   );
 
@@ -920,6 +957,15 @@ async function main() {
   });
   await engineContext.start();
   console.log('✓ Engine context started');
+
+  // Setup memory (local embeddings + vector store)
+  memory = await createMemory(storageDir, 'chorus');
+  const memStats = memory.stats();
+  if (memStats.enabled) {
+    console.log(`✓ Memory enabled (${memStats.total} entries)`);
+  } else {
+    console.log('⚠ Memory disabled (Ollama not available)');
+  }
 
   // Setup engines
   setupIdleEngine();
