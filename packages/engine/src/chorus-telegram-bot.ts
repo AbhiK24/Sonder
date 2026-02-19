@@ -307,6 +307,53 @@ Respond as ${agent.name}. Be warm, supportive, and true to your role. Keep respo
 }
 
 // =============================================================================
+// Quick Questions (answered during FTUE without breaking flow)
+// =============================================================================
+
+/**
+ * Handle common utility questions that should be answered quickly
+ * even during FTUE, without breaking the flow.
+ */
+function handleQuickQuestion(message: string): string | null {
+  const lower = message.toLowerCase();
+
+  // Time questions
+  if (lower.includes('time') && (lower.includes('what') || lower.includes('current'))) {
+    const timezone = process.env.TIMEZONE || 'UTC';
+    const now = new Date();
+    const timeStr = now.toLocaleString('en-US', {
+      timeZone: timezone,
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    const dateStr = now.toLocaleDateString('en-US', {
+      timeZone: timezone,
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+    });
+    return `🌙 **Luna:** It's ${timeStr} on ${dateStr} (${timezone}).\n\nNow, back to getting to know you...`;
+  }
+
+  // Date questions
+  if (lower.includes('date') && (lower.includes('what') || lower.includes('today'))) {
+    const timezone = process.env.TIMEZONE || 'UTC';
+    const now = new Date();
+    const dateStr = now.toLocaleDateString('en-US', {
+      timeZone: timezone,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+    });
+    return `🌙 **Luna:** Today is ${dateStr}.\n\nNow, where were we...`;
+  }
+
+  return null; // Not a quick question
+}
+
+// =============================================================================
 // Commands
 // =============================================================================
 
@@ -540,6 +587,12 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
     if (!state.ftueRunner) {
       await startFTUE(chatId, state);
       return ''; // Messages sent by FTUE runner
+    }
+
+    // Handle common utility questions during FTUE without breaking flow
+    const quickAnswer = handleQuickQuestion(trimmed);
+    if (quickAnswer) {
+      return quickAnswer;
     }
 
     // Process FTUE response
