@@ -44,6 +44,7 @@ export interface ToolContext {
   agentId?: string;
   agentName?: string;
   timezone?: string;
+  emailDomain?: string;
   // Adapters
   emailAdapter?: {
     sendEmail: (opts: {
@@ -219,24 +220,40 @@ const toolExecutors: Record<string, ToolExecutor> = {
       return { success: false, error: 'Email not configured. Ask user to set up RESEND_API_KEY.' };
     }
 
-    if (!to.includes('@')) {
-      return { success: false, error: 'Invalid email address' };
+    // Parse multiple emails (comma or semicolon separated)
+    const toList = to.split(/[,;]/).map(e => e.trim()).filter(e => e.includes('@'));
+
+    if (toList.length === 0) {
+      return { success: false, error: 'No valid email addresses provided' };
     }
 
     try {
-      const result = await context.emailAdapter.sendEmail({ to: [to], subject, body }, true);
+      // Build from address using agent name and configured domain
+      const domain = context.emailDomain || 'resend.dev';
+      const agentName = context.agentName || 'Chorus';
+      const agentId = context.agentId || 'chorus';
+      const fromAddress = domain !== 'resend.dev'
+        ? `${agentName} <${agentId}@${domain}>`
+        : `${agentName} <onboarding@resend.dev>`;
+
+      const result = await context.emailAdapter.sendEmail({
+        from: fromAddress,
+        to: toList,
+        subject,
+        body,
+      }, true);
 
       if (result.success) {
         actionLog.emailSent({
           userId: context.userId,
           agent: context.agentName,
-          to: [to],
+          to: toList,
           subject,
           messageId: result.data?.messageId,
           userRequested: true,
           userConfirmed: true,
         });
-        return { success: true, result: `Email sent to ${to}` };
+        return { success: true, result: `Email sent to ${toList.join(', ')}` };
       }
       return { success: false, error: result.error || 'Failed to send' };
     } catch (error) {

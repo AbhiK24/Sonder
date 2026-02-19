@@ -340,6 +340,7 @@ If the user asks you to take an action (send email, etc.), use the appropriate t
         agentId: agent.id,
         agentName: agent.name,
         timezone: process.env.TIMEZONE || 'UTC',
+        emailDomain: process.env.SONDER_EMAIL_DOMAIN,
         emailAdapter: emailAdapter || undefined,
         whatsappAdapter: whatsappAdapter ? {
           sendMessage: async (to: string, message: string) => {
