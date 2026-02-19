@@ -607,8 +607,27 @@ export class ICSFeedAdapter implements CalendarAdapter {
 
   private parseICSEvent(item: ical.VEvent, feed: ICSFeedConfig): CalendarEvent | null {
     try {
-      const startTime = item.start ? new Date(item.start) : null;
-      const endTime = item.end ? new Date(item.end) : null;
+      // For recurring event instances, use recurrenceId as the actual date
+      let startTime: Date | null = null;
+      let endTime: Date | null = null;
+
+      // Check if this is a recurring event instance (has recurrenceId)
+      const recurrenceId = (item as any).recurrenceid;
+      if (recurrenceId) {
+        startTime = new Date(recurrenceId);
+        // Calculate end time based on original duration
+        const origStart = item.start ? new Date(item.start) : null;
+        const origEnd = item.end ? new Date(item.end) : null;
+        if (origStart && origEnd) {
+          const duration = origEnd.getTime() - origStart.getTime();
+          endTime = new Date(startTime.getTime() + duration);
+        } else {
+          endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // Default 1 hour
+        }
+      } else {
+        startTime = item.start ? new Date(item.start) : null;
+        endTime = item.end ? new Date(item.end) : null;
+      }
 
       if (!startTime || !endTime) return null;
 
