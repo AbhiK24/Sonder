@@ -81,15 +81,15 @@ export const WANDERERS_REST: PlayDefinition = {
   rootPath: 'packages/plays/wanderers-rest',
 };
 
-export const SWARGALOKA: PlayDefinition = {
-  id: 'swargaloka',
-  name: 'Swargaloka',
-  description: 'Celestial productivity companions for ADHD minds',
+export const CHORUS: PlayDefinition = {
+  id: 'chorus',
+  name: 'Chorus',
+  description: 'Five voices harmonizing to support your ADHD brain',
   version: '0.1.0',
   channels: {
     telegram: {
-      botTokenEnvVar: 'SWARGALOKA_TELEGRAM_BOT_TOKEN',
-      botUsername: '@SwargalokaBot',
+      botTokenEnvVar: 'CHORUS_TELEGRAM_BOT_TOKEN',
+      botUsername: '@ChorusBot',
     },
     whatsapp: {
       enabled: true,
@@ -97,17 +97,17 @@ export const SWARGALOKA: PlayDefinition = {
     },
     email: {
       enabled: true,
-      fromNamePrefix: 'Angels',
+      fromNamePrefix: 'Chorus',
     },
   },
   agents: [
-    { id: 'chitralekha', name: 'Chitralekha', emoji: '📜', role: 'The Rememberer' },
-    { id: 'urvashi', name: 'Urvashi', emoji: '⚡', role: 'The Spark' },
-    { id: 'menaka', name: 'Menaka', emoji: '🎯', role: 'The Strategist' },
-    { id: 'rambha', name: 'Rambha', emoji: '🎉', role: 'The Celebrator' },
-    { id: 'tilottama', name: 'Tilottama', emoji: '🪞', role: 'The Mirror' },
+    { id: 'luna', name: 'Luna', emoji: '🌙', role: 'The Keeper' },
+    { id: 'ember', name: 'Ember', emoji: '🔥', role: 'The Spark' },
+    { id: 'sage', name: 'Sage', emoji: '🌿', role: 'The Guide' },
+    { id: 'joy', name: 'Joy', emoji: '✨', role: 'The Light' },
+    { id: 'echo', name: 'Echo', emoji: '🪞', role: 'The Mirror' },
   ],
-  rootPath: 'packages/plays/swargaloka',
+  rootPath: 'packages/plays/chorus',
 };
 
 // =============================================================================
@@ -120,7 +120,7 @@ class PlayRegistry {
   constructor() {
     // Register built-in plays
     this.register(WANDERERS_REST);
-    this.register(SWARGALOKA);
+    this.register(CHORUS);
   }
 
   /**

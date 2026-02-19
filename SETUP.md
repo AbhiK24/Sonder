@@ -177,8 +177,8 @@ Each agent gets their own address: `agent+play@yourdomain.com`
 
 ```
 luna+wanderers-rest@sonder.ai    ← Luna in Wanderer's Rest
-kavi+swargaloka@sonder.ai        ← Kavi in Swargaloka
-menaka+swargaloka@sonder.ai      ← Menaka in Swargaloka
+ember+chorus@sonder.ai           ← Ember in Chorus
+sage+chorus@sonder.ai            ← Sage in Chorus
 ```
 
 One API key per service handles ALL agents.
@@ -561,7 +561,7 @@ GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
 # =============================================================================
 # SETTINGS
 # =============================================================================
-PLAY=swargaloka
+PLAY=chorus
 SAVE_PATH=~/.sonder/saves
 LOG_LEVEL=info
 DEV_MODE=true

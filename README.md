@@ -49,8 +49,8 @@ Each Play is a complete application with its own:
           ▼                 ▼                 ▼
     ┌───────────┐    ┌───────────┐    ┌───────────┐
     │ PLAY:     │    │ PLAY:     │    │ PLAY:     │
-    │ Wanderer's│    │ Swargaloka│    │ Your      │
-    │ Rest      │    │ (Angels)  │    │ Play Here │
+    │ Wanderer's│    │ Chorus    │    │ Your      │
+    │ Rest      │    │           │    │ Play Here │
     │           │    │           │    │           │
     │ Mystery   │    │ ADHD      │    │ ???       │
     │ Game      │    │ Companion │    │           │
@@ -85,27 +85,27 @@ pnpm telegram
 
 ---
 
-### Play 2: Swargaloka (Coming Soon)
+### Play 2: Chorus
 
-*Celestial productivity companions for ADHD minds.*
+*Five voices harmonizing to support your ADHD brain.*
 
-Five Apsaras (celestial beings) from Hindu heaven assigned to help you. They're not assistants. They're beings with personalities who:
+They're not assistants. They're not task managers. They're angels rooting for you:
 
 - **Proactively check in** — Morning planning, midday nudges, evening reflection
-- **Debate how to help you** — You can observe their discussions about your situation
-- **Track your wins** — Celebrate accomplishments, remember your growth
-- **Read content for you** — Curate feeds, discuss articles, connect dots
-- **Believe in your potential** — Manifestation through genuine care
+- **Discuss you with each other** — You can observe their conversations about your situation
+- **Remember what you forget** — External working memory that cares
+- **Celebrate your wins** — Even the ones you dismiss
+- **Help you feel your feelings** — Emotional regulation support
 
-| Angel | Role | Personality |
-|-------|------|-------------|
-| Chitralekha | The Rememberer | Gentle, sees patterns |
-| Urvashi | The Spark | Energetic, gets you started |
-| Menaka | The Strategist | Calm, long-term planning |
-| Rambha | The Celebrator | Warm, celebrates everything |
-| Tilottama | The Mirror | Honest, helps you reflect |
+| Agent | Role | What They Do |
+|-------|------|--------------|
+| Luna | The Keeper | Remembers everything so you don't have to |
+| Ember | The Spark | Gets you started when starting feels impossible |
+| Sage | The Guide | Helps you navigate when you can't see the path |
+| Joy | The Light | Sees your wins when you can't see them yourself |
+| Echo | The Mirror | Reflects what you're feeling so you can see clearly |
 
-**The key insight:** You're the subject of their celestial gossip. They CARE about you.
+**The key insight:** They're your chorus — always discussing you, always rooting for you.
 
 ---
 
@@ -223,7 +223,7 @@ interface Play {
 | Play Idea | Type | Description |
 |-----------|------|-------------|
 | **Wanderer's Rest** | Game | Mystery investigation through conversation |
-| **Swargaloka** | Companion | ADHD support with celestial beings |
+| **Chorus** | Companion | Five voices harmonizing for ADHD support |
 | **The Office** | Simulation | Watch AI coworkers navigate drama |
 | **Memory Palace** | Utility | AI librarians who organize your knowledge |
 | **The Coven** | Companion | Witchy self-care guides |
