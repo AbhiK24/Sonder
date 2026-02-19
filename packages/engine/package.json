@@ -28,6 +28,8 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@hapi/boom": "^10.0.1",
+    "@whiskeysockets/baileys": "7.0.0-rc.9",
     "dotenv": "^16.4.1",
     "grammy": "^1.21.1",
     "gray-matter": "^4.0.3",
@@ -35,10 +37,14 @@
     "node-ical": "^0.25.3",
     "ollama": "^0.5.0",
     "openai": "^4.28.0",
+    "qrcode": "^1.5.4",
+    "qrcode-terminal": "^0.12.0",
     "rrule": "^2.8.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@types/hapi__boom": "^9.0.1",
+    "@types/qrcode-terminal": "^0.12.2",
     "tsx": "^4.7.0",
     "vitest": "^1.2.2"
   },

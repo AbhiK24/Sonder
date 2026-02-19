@@ -1,7 +1,11 @@
 /**
- * WhatsApp Integration (via Twilio)
+ * WhatsApp Integration
  *
  * Send messages to users via WhatsApp.
+ * Supports two backends:
+ * - Baileys: Free, connects directly to WhatsApp Web (scan QR once)
+ * - Twilio: Paid API, more reliable for production
+ *
  * Supports multi-agent messaging (one number, many personas).
  */
 
@@ -12,6 +16,12 @@ import {
   IntegrationResult,
   IntegrationStatus
 } from './types.js';
+import {
+  BaileysWhatsAppAdapter,
+  createBaileysWhatsApp,
+  BaileysConfig,
+  IncomingMessage as BaileysIncomingMessage,
+} from './whatsapp-baileys.js';
 
 // =============================================================================
 // Agent Persona (for multi-agent messaging)
@@ -394,12 +404,318 @@ export const ANGEL_PERSONAS: AgentPersona[] = [
 ];
 
 // =============================================================================
+// Unified WhatsApp Interface
+// =============================================================================
+
+/**
+ * Unified WhatsApp adapter that works with either Baileys or Twilio
+ */
+export interface UnifiedWhatsAppAdapter {
+  /** Check if connected and ready to send */
+  isReady(): boolean;
+
+  /** Send a message */
+  sendMessage(to: string, content: string, agentId?: string): Promise<IntegrationResult<{ messageId?: string }>>;
+
+  /** Send a message as a specific agent */
+  sendAsAgent(
+    agentId: string,
+    to: string,
+    content: string,
+    confirmed?: boolean
+  ): Promise<IntegrationResult<{ messageId?: string }>>;
+
+  /** Disconnect */
+  disconnect(): Promise<void>;
+}
+
+/**
+ * Configuration for unified WhatsApp adapter
+ */
+export interface UnifiedWhatsAppConfig {
+  /** Which backend to use */
+  backend: 'baileys' | 'twilio';
+
+  /** Baileys config (if backend === 'baileys') */
+  baileys?: BaileysConfig;
+
+  /** Twilio config (if backend === 'twilio') */
+  twilio?: {
+    accountSid: string;
+    authToken: string;
+    whatsappNumber: string;
+  };
+
+  /** Agent personas for multi-agent messaging */
+  personas?: AgentPersona[];
+
+  /** Callback for incoming messages (Baileys only) */
+  onMessage?: (message: BaileysIncomingMessage) => void;
+
+  // === Restrictions ===
+
+  /** Allowlist of phone numbers that can receive messages. Empty = block all, undefined = allow all */
+  allowlist?: string[];
+
+  /** Max messages per hour (0 = unlimited) */
+  rateLimit?: number;
+
+  /** Require explicit confirmation for each send */
+  requireConfirmation?: boolean;
+
+  /** Callback when a send is blocked */
+  onBlocked?: (to: string, reason: string) => void;
+}
+
+/**
+ * Unified adapter that wraps either Baileys or Twilio
+ */
+export class UnifiedWhatsApp implements UnifiedWhatsAppAdapter {
+  private baileys: BaileysWhatsAppAdapter | null = null;
+  private twilio: WhatsAppAdapter | null = null;
+  private personas: Map<string, AgentPersona> = new Map();
+  private backend: 'baileys' | 'twilio';
+
+  // Restrictions
+  private allowlist: Set<string> | null = null; // null = allow all
+  private rateLimit: number = 0;
+  private sendTimes: number[] = []; // timestamps of recent sends
+
+  constructor(private config: UnifiedWhatsAppConfig) {
+    this.backend = config.backend;
+
+    // Register personas
+    if (config.personas) {
+      for (const p of config.personas) {
+        this.personas.set(p.id, p);
+      }
+    }
+
+    // Setup allowlist (normalize numbers)
+    if (config.allowlist !== undefined) {
+      this.allowlist = new Set(config.allowlist.map(n => this.normalizeNumber(n)));
+    }
+
+    this.rateLimit = config.rateLimit || 0;
+  }
+
+  /**
+   * Normalize phone number for comparison
+   */
+  private normalizeNumber(number: string): string {
+    return number.replace(/[\s\-\(\)]/g, '').replace(/^whatsapp:/i, '');
+  }
+
+  /**
+   * Check if a number is allowed
+   */
+  private isAllowed(to: string): { allowed: boolean; reason?: string } {
+    const normalized = this.normalizeNumber(to);
+
+    // Check allowlist
+    if (this.allowlist !== null) {
+      if (this.allowlist.size === 0) {
+        return { allowed: false, reason: 'Allowlist is empty - all sends blocked' };
+      }
+      if (!this.allowlist.has(normalized)) {
+        return { allowed: false, reason: `Number ${to} not in allowlist` };
+      }
+    }
+
+    // Check rate limit
+    if (this.rateLimit > 0) {
+      const oneHourAgo = Date.now() - 60 * 60 * 1000;
+      this.sendTimes = this.sendTimes.filter(t => t > oneHourAgo);
+      if (this.sendTimes.length >= this.rateLimit) {
+        return { allowed: false, reason: `Rate limit exceeded (${this.rateLimit}/hour)` };
+      }
+    }
+
+    return { allowed: true };
+  }
+
+  /**
+   * Record a successful send for rate limiting
+   */
+  private recordSend(): void {
+    this.sendTimes.push(Date.now());
+  }
+
+  /**
+   * Connect to WhatsApp
+   */
+  async connect(): Promise<IntegrationResult<void>> {
+    if (this.backend === 'baileys') {
+      this.baileys = createBaileysWhatsApp({
+        ...this.config.baileys,
+        onMessage: this.config.onMessage,
+      });
+
+      try {
+        await this.baileys.connect();
+        return { success: true };
+      } catch (error) {
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Baileys connection failed'
+        };
+      }
+    } else {
+      // Twilio
+      if (!this.config.twilio) {
+        return { success: false, error: 'Twilio config required' };
+      }
+
+      this.twilio = new WhatsAppAdapter();
+      if (this.config.personas) {
+        this.twilio.registerPersonas(this.config.personas);
+      }
+
+      return this.twilio.connect({
+        type: 'whatsapp',
+        metadata: this.config.twilio,
+      });
+    }
+  }
+
+  isReady(): boolean {
+    if (this.backend === 'baileys') {
+      return this.baileys?.isReady() ?? false;
+    }
+    return this.twilio?.isConnected() ?? false;
+  }
+
+  async sendMessage(
+    to: string,
+    content: string,
+    agentId?: string
+  ): Promise<IntegrationResult<{ messageId?: string }>> {
+    // Check restrictions
+    const { allowed, reason } = this.isAllowed(to);
+    if (!allowed) {
+      console.log(`[WhatsApp] BLOCKED send to ${to}: ${reason}`);
+      if (this.config.onBlocked) {
+        this.config.onBlocked(to, reason!);
+      }
+      return { success: false, error: `Blocked: ${reason}` };
+    }
+
+    // Format with persona if provided
+    let formattedContent = content;
+    if (agentId) {
+      const persona = this.personas.get(agentId);
+      if (persona) {
+        formattedContent = this.formatWithPersona(content, persona);
+      }
+    }
+
+    let result: IntegrationResult<{ messageId?: string }>;
+
+    if (this.backend === 'baileys') {
+      if (!this.baileys?.isReady()) {
+        return { success: false, error: 'Baileys not ready. Scan QR code if prompted.' };
+      }
+      const baileysResult = await this.baileys.sendMessage(to, formattedContent);
+      result = { success: baileysResult.success, data: { messageId: baileysResult.messageId }, error: baileysResult.error };
+    } else {
+      if (!this.twilio?.isConnected()) {
+        return { success: false, error: 'Twilio not connected' };
+      }
+      result = await this.twilio.sendPersonalizedMessage({ to, content, agentId }, true);
+    }
+
+    // Record send for rate limiting
+    if (result.success) {
+      this.recordSend();
+    }
+
+    return result;
+  }
+
+  async sendAsAgent(
+    agentId: string,
+    to: string,
+    content: string,
+    confirmed: boolean = true
+  ): Promise<IntegrationResult<{ messageId?: string }>> {
+    return this.sendMessage(to, content, agentId);
+  }
+
+  async disconnect(): Promise<void> {
+    if (this.baileys) {
+      await this.baileys.disconnect();
+      this.baileys = null;
+    }
+    if (this.twilio) {
+      await this.twilio.disconnect();
+      this.twilio = null;
+    }
+  }
+
+  /** Get the underlying Baileys adapter (for advanced use) */
+  getBaileysAdapter(): BaileysWhatsAppAdapter | null {
+    return this.baileys;
+  }
+
+  /** Get the underlying Twilio adapter (for advanced use) */
+  getTwilioAdapter(): WhatsAppAdapter | null {
+    return this.twilio;
+  }
+
+  private formatWithPersona(content: string, persona: AgentPersona): string {
+    const parts: string[] = [];
+    if (persona.emoji) {
+      parts.push(`${persona.emoji} *${persona.name}*`);
+    } else {
+      parts.push(`*${persona.name}*`);
+    }
+    parts.push('');
+    parts.push(content);
+    if (persona.signature) {
+      parts.push('');
+      parts.push(`_${persona.signature}_`);
+    }
+    return parts.join('\n');
+  }
+}
+
+// =============================================================================
 // Factory
 // =============================================================================
 
+/**
+ * Create a Twilio-based WhatsApp adapter (legacy)
+ */
 export function createWhatsAppAdapter(): WhatsAppAdapter {
   const adapter = new WhatsAppAdapter();
   // Pre-register angel personas
   adapter.registerPersonas(ANGEL_PERSONAS);
   return adapter;
 }
+
+/**
+ * Create a unified WhatsApp adapter
+ *
+ * @example
+ * // Baileys (free)
+ * const wa = createUnifiedWhatsApp({
+ *   backend: 'baileys',
+ *   baileys: { authDir: '~/.sonder/whatsapp-auth' },
+ *   personas: myAgentPersonas,
+ * });
+ * await wa.connect();
+ *
+ * // Twilio (paid)
+ * const wa = createUnifiedWhatsApp({
+ *   backend: 'twilio',
+ *   twilio: { accountSid, authToken, whatsappNumber },
+ *   personas: myAgentPersonas,
+ * });
+ * await wa.connect();
+ */
+export function createUnifiedWhatsApp(config: UnifiedWhatsAppConfig): UnifiedWhatsApp {
+  return new UnifiedWhatsApp(config);
+}
+
+// Re-export Baileys types for convenience
+export type { BaileysConfig, BaileysIncomingMessage as WhatsAppIncomingMessage };

@@ -16,7 +16,7 @@ import { createIdleEngine, IdleEngine, AgentContext, UserContext } from './idle/
 import { createInsightEngine, InsightEngine, FiredTrigger, UserDataSnapshot } from './insight/index.js';
 import { ResendAdapter, createEmailAdapter } from './integrations/email.js';
 import { TodoistAdapter, createTaskAdapter } from './integrations/tasks.js';
-import { WhatsAppAdapter, createWhatsAppAdapter } from './integrations/whatsapp.js';
+import { WhatsAppAdapter, createWhatsAppAdapter, UnifiedWhatsApp, createUnifiedWhatsApp } from './integrations/whatsapp.js';
 import { ICSFeedAdapter, createICSAdapter } from './integrations/calendar.js';
 import type { ICSFeedConfig } from './integrations/types.js';
 import { EngineContext, initEngineContext } from './context/index.js';
@@ -106,7 +106,7 @@ let idleEngine: IdleEngine;
 let insightEngine: InsightEngine;
 let emailAdapter: ResendAdapter | null = null;
 let taskAdapter: TodoistAdapter | null = null;
-let whatsappAdapter: WhatsAppAdapter | null = null;
+let whatsappAdapter: UnifiedWhatsApp | null = null;
 let calendarAdapter: ICSFeedAdapter | null = null;
 let engineContext: EngineContext;
 let memory: Memory;
@@ -346,7 +346,7 @@ If the user asks you to take an action (send email, etc.), use the appropriate t
         emailAdapter: emailAdapter || undefined,
         whatsappAdapter: whatsappAdapter ? {
           sendMessage: async (to: string, message: string) => {
-            const result = await whatsappAdapter.sendAsAgent(agent.id, 'chorus', to, message, true);
+            const result = await whatsappAdapter.sendAsAgent(agent.id, to, message, true);
             return result;
           }
         } : undefined,
@@ -575,12 +575,16 @@ Or just talk to us. We're here. 💫`;
   // Test WhatsApp
   async TESTWHATSAPP(chatId, state) {
     if (!whatsappAdapter) {
-      return "❌ WhatsApp not configured. Set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER in .env";
+      return "❌ WhatsApp not configured. Set WHATSAPP_USE_BAILEYS=true or Twilio credentials in .env";
     }
 
     const userPhone = process.env.USER_WHATSAPP;
     if (!userPhone) {
       return "❌ No USER_WHATSAPP configured in .env";
+    }
+
+    if (!whatsappAdapter.isReady()) {
+      return "⏳ WhatsApp is connecting... Scan QR code in terminal if using Baileys.";
     }
 
     try {
@@ -595,7 +599,7 @@ Or just talk to us. We're here. 💫`;
       if (result.success) {
         return `✅ WhatsApp sent to ${userPhone}!\n\nCheck your phone.`;
       } else {
-        return `❌ Failed to send: ${result.error}`;
+        return `❌ Failed: ${result.error}`;
       }
     } catch (error) {
       return `❌ Error: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -1034,33 +1038,73 @@ async function setupIntegrations(): Promise<void> {
     console.log('[Chorus] Todoist not configured (set TODOIST_API_KEY)');
   }
 
-  // WhatsApp (Twilio)
+  // WhatsApp - Baileys (free) or Twilio (paid)
+  const useBaileys = process.env.WHATSAPP_USE_BAILEYS === 'true';
   const twilioSid = process.env.TWILIO_ACCOUNT_SID;
   const twilioToken = process.env.TWILIO_AUTH_TOKEN;
   const twilioWhatsApp = process.env.TWILIO_WHATSAPP_NUMBER;
 
-  if (twilioSid && twilioToken && twilioWhatsApp) {
-    whatsappAdapter = createWhatsAppAdapter();
+  const chorusPersonas = agentList.map(a => ({
+    id: a.id,
+    name: a.name,
+    emoji: a.emoji,
+    signature: a.role,
+  }));
 
-    // Register Chorus personas
-    whatsappAdapter.registerPersonas(
-      agentList.map(a => ({
-        id: a.id,
-        name: a.name,
-        emoji: a.emoji,
-        signature: a.role,
-      }))
-    );
+  // Restrictions
+  const allowlistEnv = process.env.WHATSAPP_ALLOWLIST;
+  const allowlist = allowlistEnv
+    ? allowlistEnv.split(',').map(n => n.trim()).filter(Boolean)
+    : undefined; // undefined = allow all (for now)
 
-    const result = await whatsappAdapter.connect({
-      type: 'whatsapp',
-      metadata: {
+  const rateLimit = parseInt(process.env.WHATSAPP_RATE_LIMIT || '20'); // 20/hour default
+
+  if (useBaileys) {
+    // Baileys: Free, connects directly to WhatsApp Web
+    whatsappAdapter = createUnifiedWhatsApp({
+      backend: 'baileys',
+      baileys: {
+        authDir: resolve(storageDir, 'whatsapp-auth'),
+        printQRInTerminal: true,
+        onReady: () => {
+          console.log('[Chorus] WhatsApp (Baileys) ready!');
+        },
+      },
+      personas: chorusPersonas,
+      allowlist,
+      rateLimit,
+      onBlocked: (to, reason) => {
+        console.log(`[WhatsApp] BLOCKED: ${to} - ${reason}`);
+      },
+      onMessage: async (msg) => {
+        console.log(`[WhatsApp] Message from ${msg.fromFormatted}: ${msg.text?.slice(0, 50)}...`);
+        // TODO: Route incoming WhatsApp messages to conversation
+      },
+    });
+
+    const result = await whatsappAdapter.connect();
+    if (result.success) {
+      const allowMsg = allowlist ? `allowlist: ${allowlist.join(', ')}` : 'no allowlist (any number)';
+      console.log(`[Chorus] WhatsApp (Baileys) initializing - ${allowMsg}, ${rateLimit}/hour limit`);
+    } else {
+      console.warn('[Chorus] Baileys connection failed:', result.error);
+      whatsappAdapter = null;
+    }
+  } else if (twilioSid && twilioToken && twilioWhatsApp) {
+    // Twilio: Paid API
+    whatsappAdapter = createUnifiedWhatsApp({
+      backend: 'twilio',
+      twilio: {
         accountSid: twilioSid,
         authToken: twilioToken,
         whatsappNumber: twilioWhatsApp,
       },
+      personas: chorusPersonas,
+      allowlist,
+      rateLimit,
     });
 
+    const result = await whatsappAdapter.connect();
     if (result.success) {
       console.log('[Chorus] WhatsApp (Twilio) connected');
     } else {
@@ -1068,7 +1112,7 @@ async function setupIntegrations(): Promise<void> {
       whatsappAdapter = null;
     }
   } else {
-    console.log('[Chorus] WhatsApp not configured (set TWILIO_ACCOUNT_SID, TWILIO_AUTH_TOKEN, TWILIO_WHATSAPP_NUMBER)');
+    console.log('[Chorus] WhatsApp not configured (set WHATSAPP_USE_BAILEYS=true or Twilio credentials)');
   }
 
   // Calendar (ICS Feeds)
