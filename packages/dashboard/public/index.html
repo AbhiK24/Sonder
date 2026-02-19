@@ -5,15 +5,12 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sonder</title>
   <link rel="stylesheet" href="style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
-    <header class="tavern-header sonder-header">
-      <div class="tavern-sign">
-        <h1>Sonder</h1>
-        <p class="tagline">AI companions that live while you're away</p>
-      </div>
+    <header class="header">
+      <h1>Sonder</h1>
+      <p class="tagline">AI companions that live while you're away</p>
     </header>
 
     <section class="atmosphere">
@@ -21,41 +18,43 @@
     </section>
 
     <section class="section">
-      <h2 class="section-title">Active Plays</h2>
-      <div class="plays-grid" id="playsGrid">
-        <!-- Loaded via JS -->
+      <h2 class="section-title">Engine</h2>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <span class="stat-value" id="statPlays">-</span>
+          <span class="stat-label">Plays</span>
+          <span class="stat-desc">Themed experiences</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value" id="statAgents">-</span>
+          <span class="stat-label">Agents</span>
+          <span class="stat-desc">AI companions</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value" id="statSessions">-</span>
+          <span class="stat-label">Sessions</span>
+          <span class="stat-desc">Active users</span>
+        </div>
+        <div class="stat-box">
+          <span class="stat-value">1</span>
+          <span class="stat-label">Channels</span>
+          <span class="stat-desc">Telegram</span>
+        </div>
       </div>
     </section>
 
     <section class="section">
-      <h2 class="section-title">Engine Stats</h2>
-      <div class="stats-grid" id="statsGrid">
-        <div class="stat-box">
-          <span class="stat-label">Active Sessions</span>
-          <span class="stat-value" id="statSessions">0</span>
-        </div>
-        <div class="stat-box">
-          <span class="stat-label">Total Agents</span>
-          <span class="stat-value" id="statAgents">0</span>
-        </div>
-        <div class="stat-box">
-          <span class="stat-label">Messages Today</span>
-          <span class="stat-value" id="statMessages">-</span>
-        </div>
-        <div class="stat-box">
-          <span class="stat-label">Puzzles Solved</span>
-          <span class="stat-value" id="statPuzzles">-</span>
-        </div>
-      </div>
+      <h2 class="section-title">Active Plays</h2>
+      <div class="plays-grid" id="playsGrid"></div>
     </section>
 
     <section class="section">
       <h2 class="section-title">What is Sonder?</h2>
       <div class="intro-card">
-        <p>Sonder is an engine for AI companions that feel alive. Not chatbots you summon, but presences that persist.</p>
+        <p>An engine for <span class="highlight">AI companions</span> that feel genuinely alive. Not assistants that wait—presences that persist.</p>
         <ul class="feature-list">
-          <li><strong>Plays</strong> — Themed experiences with distinct casts and mechanics</li>
-          <li><strong>Agents</strong> — Characters with personality, memory, and relationships</li>
+          <li><strong>Plays</strong> — Themed experiences with distinct casts</li>
+          <li><strong>Agents</strong> — Characters with personality and memory</li>
           <li><strong>Idle Loop</strong> — The world moves while you're away</li>
           <li><strong>Reunion</strong> — Come back to find things have happened</li>
         </ul>
@@ -63,14 +62,12 @@
     </section>
 
     <footer class="footer">
-      <p>Sonder</p>
-      <p class="last-updated">Every soul has a story</p>
+      <p>Every soul has a story</p>
     </footer>
   </div>
 
   <script>
     async function load() {
-      // Load plays
       const res = await fetch('/api/plays');
       const { plays } = await res.json();
 
@@ -79,21 +76,20 @@
           <h3>${play.name}</h3>
           <p class="play-tagline">${play.tagline}</p>
           <div class="play-agents">
-            ${play.agents.map(a => `<span class="agent-emoji" title="${a.name}">${a.emoji}</span>`).join('')}
+            ${play.agents.map(a => `<span class="agent-tag">${a.emoji} ${a.name}</span>`).join('')}
           </div>
         </a>
       `).join('');
 
-      // Update stats
+      document.getElementById('statPlays').textContent = plays.length;
       document.getElementById('statAgents').textContent = plays.reduce((sum, p) => sum + p.agents.length, 0);
 
-      // Load sessions count
       try {
         const gamesRes = await fetch('/api/games');
         const { games } = await gamesRes.json();
         document.getElementById('statSessions').textContent = games.length;
       } catch (e) {
-        document.getElementById('statSessions').textContent = '-';
+        document.getElementById('statSessions').textContent = '0';
       }
     }
     load();

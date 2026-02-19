@@ -3,32 +3,28 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Sonder - Play</title>
+  <title>Sonder</title>
   <link rel="stylesheet" href="style.css">
-  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
-    <header class="tavern-header">
-      <div class="tavern-sign">
+    <header class="header" style="text-align: left; display: flex; justify-content: space-between; align-items: center;">
+      <div>
         <h1 id="playName">Loading...</h1>
         <p class="tagline" id="playTagline"></p>
       </div>
-      <a href="/plays.html" class="back-link">&larr; All Plays</a>
+      <a href="/" class="back-link">&larr; Dashboard</a>
     </header>
 
-    <section class="atmosphere" id="playDescription">
-    </section>
+    <section class="atmosphere" id="playDescription"></section>
 
     <section class="section">
       <h2 class="section-title">The Cast</h2>
-      <div class="agents-grid" id="agentsGrid">
-        <!-- Agents loaded via JS -->
-      </div>
+      <div class="agents-grid" id="agentsGrid"></div>
     </section>
 
     <footer class="footer">
-      <p>Sonder &mdash; AI companions that live while you're away</p>
+      <p>Every soul has a story</p>
     </footer>
   </div>
 
@@ -38,25 +34,24 @@
       const playId = params.get('id');
 
       if (!playId) {
-        window.location.href = '/plays.html';
+        window.location.href = '/';
         return;
       }
 
       const res = await fetch(`/api/plays/${playId}`);
       if (!res.ok) {
-        window.location.href = '/plays.html';
+        window.location.href = '/';
         return;
       }
 
       const play = await res.json();
 
-      document.title = `Sonder - ${play.name}`;
+      document.title = `${play.name} — Sonder`;
       document.getElementById('playName').textContent = play.name;
       document.getElementById('playTagline').textContent = play.tagline;
       document.getElementById('playDescription').innerHTML = `<p>${play.description}</p>`;
 
-      const grid = document.getElementById('agentsGrid');
-      grid.innerHTML = play.agents.map(agent => `
+      document.getElementById('agentsGrid').innerHTML = play.agents.map(agent => `
         <div class="agent-card">
           <div class="agent-avatar">${agent.emoji}</div>
           <div class="agent-info">

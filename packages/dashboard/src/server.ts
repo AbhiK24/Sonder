@@ -21,7 +21,8 @@ const assetsDir = resolve(__dirname, '../assets');
 config({ path: resolve(__dirname, '../../../../.env') });
 
 // Save directory (same as telegram bot)
-const saveDir = process.env.SAVE_PATH?.replace('~', process.env.HOME || '') || './saves';
+const saveDir = process.env.SAVE_PATH?.replace('~', process.env.HOME || '') ||
+  resolve(process.env.HOME || '', '.sonder/saves');
 
 interface DashboardState {
   day: number;
