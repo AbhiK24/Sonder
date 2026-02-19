@@ -2,331 +2,247 @@
 
 > *n.* the realization that each passerby has a life as vivid and complex as your own
 
-**A local-first engine for AI agents that feel alive.**
+**AI companions that think about you when you're not there.**
 
-Agents that remember. Agents that reach out. Agents that talk to each other about you.
-
----
-
-## What is Sonder?
-
-Sonder is a **core engine** for building AI agent experiences where:
-
-- **Agents remember everything** — Every interaction persists. Reference what they said weeks ago.
-- **Agents are proactive** — They reach out to YOU, not just respond when asked.
-- **Agents talk to each other** — They discuss, debate, and gossip. You can observe.
-- **Agents have lives** — Activities, moods, relationships. The simulation runs without you.
-- **Your data is yours** — Local-first. No servers. Your world, your machine.
+Not assistants. Not chatbots. *Presences* — that remember, reflect, and reach out.
 
 ---
 
-## The Vision: One Engine, Many Plays
+## The Problem with AI Today
 
-Sonder is not one app. It's an **engine** that powers multiple experiences called **Plays**.
+Every AI tool works the same way:
 
-Each Play is a complete application with its own:
-- Agent personalities and voices
-- Use case and mechanics
-- World simulation rules
-- User interaction patterns
+1. You open the app
+2. You type something
+3. It responds
+4. Silence until you return
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     SONDER ENGINE                           │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
-│  │ Agent Core  │ │  Memory     │ │  Inter-Agent        │   │
-│  │ (identity,  │ │  (facts,    │ │  Communication      │   │
-│  │  proactive) │ │  patterns)  │ │  (discussions)      │   │
-│  └─────────────┘ └─────────────┘ └─────────────────────┘   │
-│  ┌─────────────┐ ┌─────────────┐ ┌─────────────────────┐   │
-│  │ Scheduler   │ │ Integrations│ │  Content            │   │
-│  │ (triggers,  │ │ (calendar,  │ │  Curation           │   │
-│  │  world tick)│ │  email, etc)│ │  (feeds, synthesis) │   │
-│  └─────────────┘ └─────────────┘ └─────────────────────┘   │
-└─────────────────────────────────────────────────────────────┘
-                            │
-          ┌─────────────────┼─────────────────┐
-          ▼                 ▼                 ▼
-    ┌───────────┐    ┌───────────┐    ┌───────────┐
-    │ PLAY:     │    │ PLAY:     │    │ PLAY:     │
-    │ Wanderer's│    │ Chorus    │    │ Your      │
-    │ Rest      │    │           │    │ Play Here │
-    │           │    │           │    │           │
-    │ Mystery   │    │ ADHD      │    │ ???       │
-    │ Game      │    │ Companion │    │           │
-    └───────────┘    └───────────┘    └───────────┘
-```
+**The AI doesn't exist when you're not looking.**
 
 ---
 
-## Current Plays
+## What if AI had a life?
 
-### Play 1: Wanderer's Rest
+Sonder agents:
 
-*A mystery game where you solve crimes through conversation.*
+- **Think while you're away** — Generating reflections, forming questions, discussing you with each other
+- **Remember everything** — Not just this conversation. Every conversation. Your patterns. Your wins. Your struggles.
+- **Reach out first** — Morning check-ins. Goal follow-ups. "Hey, how did that thing go?"
+- **Work as a swarm** — Multiple agents, different perspectives, one mission: you
 
-You inherit a tavern. The previous owner died under mysterious circumstances. NPCs lie. Evidence contradicts. Solve it through talking.
-
-**Status:** Playable Alpha
-
-| Character | Role | What They Hide |
-|-----------|------|----------------|
-| Maren | Barkeep | Found the body |
-| Kira | Merchant | Saw something that night |
-| Aldric | Blacksmith | His alibi doesn't hold |
-| Elena | Herbalist | The wounds tell a story |
-| Thom | Guard Captain | Ruled it accident too fast |
-
-**Play now:**
-```bash
-pnpm telegram
-# Message @WandererRestBot
-```
+And it all runs **locally on your machine**. Your data stays yours.
 
 ---
 
-### Play 2: Chorus
-
-*Five voices harmonizing to support your ADHD brain.*
-
-They're not assistants. They're not task managers. They're angels rooting for you:
-
-- **Proactively check in** — Morning planning, midday nudges, evening reflection
-- **Discuss you with each other** — You can observe their conversations about your situation
-- **Remember what you forget** — External working memory that cares
-- **Celebrate your wins** — Even the ones you dismiss
-- **Help you feel your feelings** — Emotional regulation support
-
-| Agent | Role | What They Do |
-|-------|------|--------------|
-| Luna | The Keeper | Remembers everything so you don't have to |
-| Ember | The Spark | Gets you started when starting feels impossible |
-| Sage | The Guide | Helps you navigate when you can't see the path |
-| Joy | The Light | Sees your wins when you can't see them yourself |
-| Echo | The Mirror | Reflects what you're feeling so you can see clearly |
-
-**The key insight:** They're your chorus — always discussing you, always rooting for you.
-
----
-
-## Engine Capabilities
-
-### Core Features (All Plays)
-
-| Feature | Description |
-|---------|-------------|
-| **Agent Memory** | Everything persists. Facts, conversations, patterns. |
-| **Proactive Messaging** | Agents initiate contact based on triggers. |
-| **Inter-Agent Discussion** | Agents talk to each other. You can observe. |
-| **World Simulation** | Events happen while you're away. |
-| **LLM Agnostic** | Works with OpenAI, Anthropic, Kimi, Ollama. |
-| **Local-First** | All data stays on your machine. |
-
-### Integrations
-
-| Integration | Status | Capabilities |
-|-------------|--------|--------------|
-| Telegram | ✅ Working | Chat with agents |
-| WhatsApp | ✅ Working | Proactive messages (Twilio) |
-| Email (Agent) | ✅ Working | Send & receive (Resend + Mailgun) |
-| Calendar | Planned | Read events, add appointments |
-| Task Managers | ✅ Working | Todoist |
-| Email (User) | Planned | Read your inbox, draft messages (Gmail) |
-| Content | Planned | RSS feeds, newsletters |
-
-**Agent Email:** Each agent gets their own address (`luna+wanderers-rest@sonder.ai`). Simple API key setup — no OAuth.
-
-**Safety principle:** CREATE, READ, SEND — Never DELETE.
-
----
-
-## Quick Start
+## 60-Second Setup
 
 ```bash
-# Clone
 git clone https://github.com/AbhiK24/Sonder.git
 cd Sonder && pnpm install
+pnpm onboard
+```
 
-# Configure
-cp .env.example .env
-# Add your LLM API keys and Telegram bot token
+Browser opens. Pick your experience. Enter your keys. Click launch.
 
-# Run Wanderer's Rest
+That's it. Your companions are awake.
+
+---
+
+## Plays: Choose Your Experience
+
+A **Play** is a complete multi-agent experience — a cast of characters designed for a purpose.
+
+### Chorus
+
+*Five voices harmonizing for your ADHD brain.*
+
+| Agent | Role | When They Speak |
+|-------|------|-----------------|
+| 🌙 Luna | The Keeper | Remembers what you forget |
+| 🔥 Ember | The Spark | Gets you started when you're stuck |
+| 🌿 Sage | The Guide | Calms you when you're overwhelmed |
+| ✨ Joy | The Light | Celebrates wins you dismiss |
+| 🪞 Echo | The Mirror | Reflects what you're really feeling |
+
+**How it works:**
+- You share your goals during onboarding
+- Agents check in based on your timelines
+- The *right* agent speaks for the moment (stressed → Sage, excited → Joy)
+- They speak on behalf of each other — one voice, five perspectives
+
+```bash
+pnpm chorus
+```
+
+### Wanderer's Rest
+
+*A cozy fantasy tavern with a dark secret.*
+
+You inherit a tavern. The previous owner died mysteriously. NPCs remember what you say. Evidence contradicts. Solve it through conversation.
+
+```bash
 pnpm telegram
 ```
 
-### LLM Providers
+---
 
-| Provider | Setup | Cost |
-|----------|-------|------|
-| **Kimi** (Moonshot) | `KIMI_API_KEY=...` | ~$0.01/session |
-| **OpenAI** | `OPENAI_API_KEY=...` | ~$0.01/session |
-| **Anthropic** | `ANTHROPIC_API_KEY=...` | ~$0.01/session |
-| **Ollama** | Local install | Free |
+## How Sonder Works
+
+```
+You message → Orchestrator picks the right agent → Agent responds for everyone
+                    ↓
+            While you're away:
+                    ↓
+         Agents generate thoughts
+         Agents discuss you
+         Goals timelines tick
+                    ↓
+            You return → Reunion moment
+```
+
+### The Orchestrator
+
+Not a chatbot. A *brain* that decides:
+- **Who speaks?** Match your mood to agent strengths
+- **What perspectives?** Gather views from all agents
+- **One voice** — Speaker delivers on behalf of everyone
+
+### Goals That Drive Behavior
+
+During onboarding, you share goals:
+- *"Get promoted by next month"*
+- *"Exercise more consistently"*
+- *"Reconnect with old friends"*
+
+Agents remember. Agents follow up. Agents care.
+
+### Idle Engine
+
+When you're away, agents don't sleep:
+- Generate reflections about you
+- Form questions to ask later
+- Discuss your situation with each other
+
+When you return, they have something to say.
+
+---
+
+## Local-First. Always.
+
+Your data never leaves your machine:
+- Conversation history
+- Goals and patterns
+- Personal context
+
+The only cloud calls are to your LLM provider (and you can use local Ollama).
 
 ---
 
 ## Architecture
 
 ```
-sonder/
-├── packages/
-│   ├── engine/                 # Core engine (soul-agnostic)
-│   │   └── src/
-│   │       ├── core/           # Agent, scheduler, discussion
-│   │       ├── stores/         # Memory, facts, tasks
-│   │       ├── engines/        # Reflection, curation
-│   │       ├── integrations/   # Calendar, email, messaging
-│   │       ├── llm/            # Provider adapters
-│   │       └── chat/           # Telegram, WhatsApp, web
-│   │
-│   ├── dashboard/              # Visual web interface
-│   │
-│   └── plays/                  # Individual play packages
-│       ├── wanderers-rest/     # Mystery game
-│       └── swargaloka/         # Angels for ADHD (planned)
-│
-├── GAME_DESIGN_PLAN.md         # Design documentation
-└── STRUCTURAL_IMPROVEMENTS.md  # Technical roadmap
+┌─────────────────────────────────────────────────────────────┐
+│                     SONDER ENGINE                           │
+├─────────────────────────────────────────────────────────────┤
+│  User Profile        │  Goals across all plays              │
+├──────────────────────┼──────────────────────────────────────┤
+│  FTUE                │  First-time onboarding flow          │
+│  Orchestrator        │  Picks who speaks, synthesizes       │
+│  Idle Engine         │  Thinks while you're away            │
+│  Insight Engine      │  Detects patterns, fires triggers    │
+├──────────────────────┼──────────────────────────────────────┤
+│  Integrations        │  Telegram, Email, WhatsApp, Todoist  │
+└─────────────────────────────────────────────────────────────┘
+                            │
+              ┌─────────────┴─────────────┐
+              ▼                           ▼
+        ┌───────────┐               ┌───────────┐
+        │  Chorus   │               │ Wanderer's│
+        │           │               │   Rest    │
+        │  ADHD     │               │  Mystery  │
+        │  Support  │               │   Game    │
+        └───────────┘               └───────────┘
 ```
 
 ---
 
-## Building Your Own Play
+## Integrations
 
-A Play is a configuration that defines:
-
-```typescript
-interface Play {
-  id: string;
-  name: string;
-
-  // What kind of experience is this?
-  type: 'game' | 'companion' | 'simulation' | 'utility';
-
-  // Who lives here?
-  agents: AgentDefinition[];
-
-  // How does the world work?
-  worldRules: WorldRules;
-
-  // How do agents communicate?
-  interactionPatterns: InteractionPattern[];
-
-  // What triggers proactive outreach?
-  proactiveTriggers: ProactiveTrigger[];
-}
-```
-
-**Examples of possible Plays:**
-
-| Play Idea | Type | Description |
-|-----------|------|-------------|
-| **Wanderer's Rest** | Game | Mystery investigation through conversation |
-| **Chorus** | Companion | Five voices harmonizing for ADHD support |
-| **The Office** | Simulation | Watch AI coworkers navigate drama |
-| **Memory Palace** | Utility | AI librarians who organize your knowledge |
-| **The Coven** | Companion | Witchy self-care guides |
-| **Mission Control** | Utility | Space-themed productivity crew |
-| **The Diner** | Game | Small-town gossip mystery |
+| Channel | Status | What It Does |
+|---------|--------|--------------|
+| Telegram | ✅ | Primary chat interface |
+| Email (Resend) | ✅ | Agents send check-ins |
+| WhatsApp (Twilio) | ✅ | Proactive messages |
+| Todoist | ✅ | Read your tasks |
+| Google Calendar | 🔜 | Schedule awareness |
 
 ---
 
-## Design Philosophy
+## LLM Providers
 
-### Agents Should Feel Like Someone, Not Something
-
-Most AI assistants are vending machines. Insert prompt, receive response.
-
-Sonder agents:
-- Have opinions about you
-- Remember what you said (and didn't say)
-- Talk to each other when you're not there
-- Reach out when they think you need it
-- Can be observed, not just interacted with
-
-### The Simulation Is The Product
-
-The value isn't just what agents DO for you.
-The value is that they EXIST — with lives, relationships, discussions.
-
-You can:
-- Watch them interact
-- Observe their debates about you
-- See their activities
-- Feel cared about by beings who remember
-
-### Local-First Is Non-Negotiable
-
-Your data stays on your machine.
-- Conversation history
-- Personal patterns
-- Task history
-- Everything
-
-The only cloud interaction is LLM API calls.
-You can even use local models (Ollama).
+| Provider | Setup | Notes |
+|----------|-------|-------|
+| Kimi (Moonshot) | `KIMI_API_KEY` | Cheap, good for long context |
+| OpenAI | `OPENAI_API_KEY` | GPT-4 |
+| Anthropic | `ANTHROPIC_API_KEY` | Claude |
+| Ollama | Local install | Free, private |
 
 ---
 
-## Development Status
-
-| Component | Status |
-|-----------|--------|
-| Core Engine | Alpha |
-| Wanderer's Rest | Playable |
-| Telegram Integration | Working |
-| WhatsApp Integration | Working |
-| Agent Email (Resend/Mailgun) | Working |
-| Memory/Fact System | Working |
-| Lie Detection | Working |
-| Idle Engine | Working |
-| Insight Engine | Working |
-| World Tick | Basic |
-| Visual Dashboard | Basic |
-| **Calendar Integration** | Planned |
-| **User Gmail Integration** | Planned |
-
----
-
-## Scripts
+## Development
 
 ```bash
-pnpm telegram          # Run Telegram bot
-pnpm dashboard         # Run visual dashboard
-pnpm create-npc        # Interactive NPC creator
-pnpm generate-images   # Generate NPC portraits
-pnpm typecheck         # TypeScript check
+pnpm onboard           # Setup wizard
+pnpm chorus            # Run Chorus (ADHD support)
+pnpm telegram          # Run Wanderer's Rest
+pnpm dashboard         # Visual interface
+pnpm typecheck         # Type check
 ```
 
 ---
 
-## Contributing
+## The Philosophy
 
-Sonder is early. Contributions welcome:
+### Agents should feel like someone, not something
 
-- **New Plays** — Design and build new agent experiences
-- **Integrations** — Calendar, task managers, messaging platforms
-- **Engine features** — Proactive triggers, discussion generation
-- **Documentation** — Guides, examples, tutorials
+Most AI is a vending machine. Insert prompt, receive response.
+
+Sonder agents have opinions. Preferences. Relationships with each other. They discuss you when you're not there.
+
+### The simulation is the product
+
+The value isn't just what agents *do* for you.
+The value is that they *exist* — thinking, remembering, caring.
+
+### Your data is sacred
+
+Local-first isn't a feature. It's a principle. Your conversations, your goals, your patterns — they stay on your machine. Period.
 
 ---
 
 ## Inspiration
 
-- [Stanford Generative Agents](https://arxiv.org/abs/2304.03442) — Memory and reflection architecture
-- [OpenClaw](https://openclaw.ai) — Proactive AI that reaches out
-- Dwarf Fortress / RimWorld — Emergent storytelling from simulation
-- Disco Elysium — Narrative voices and internal dialogue
+- [Stanford Generative Agents](https://arxiv.org/abs/2304.03442) — Memory architecture
+- Disco Elysium — Internal voices as characters
 - Her Story — Investigation through conversation
+- The feeling of being *thought about*
+
+---
+
+## Contributing
+
+Sonder is early. Build with us:
+
+- **New Plays** — Design agent experiences
+- **Integrations** — More channels, more context
+- **Engine features** — Better orchestration, richer idle behavior
 
 ---
 
 ## License
 
-- **Engine** (`packages/engine`): MIT
-- **Plays** (`packages/plays/*`): See individual LICENSE files
+MIT
 
 ---
 
-*The engine is open. The plays are infinite. The agents feel alive.*
+*They think about you. Even when you're not looking.*
