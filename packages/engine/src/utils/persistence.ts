@@ -29,6 +29,8 @@ export interface SavedChatState {
   day: number;
   savedAt: string;   // ISO string
   facts?: object;    // Serialized FactStore
+  // Extended fields for different plays
+  [key: string]: unknown;
 }
 
 export class Persistence {
@@ -49,20 +51,31 @@ export class Persistence {
     return join(this.saveDir, `chat_${chatId}.json`);
   }
 
-  save(state: SavedChatState): void {
-    const path = this.getPath(state.chatId);
+  save(chatIdOrState: number | SavedChatState, partialState?: Partial<SavedChatState>): void {
+    let chatId: number;
+    let state: Partial<SavedChatState>;
+
+    if (typeof chatIdOrState === 'number') {
+      chatId = chatIdOrState;
+      state = { ...partialState, chatId, savedAt: new Date().toISOString() };
+    } else {
+      chatId = chatIdOrState.chatId;
+      state = { ...chatIdOrState, savedAt: new Date().toISOString() };
+    }
+
+    const path = this.getPath(chatId);
     const data = JSON.stringify(state, null, 2);
     writeFileSync(path, data, 'utf-8');
   }
 
-  load(chatId: number): SavedChatState | null {
+  load<T extends Partial<SavedChatState> = SavedChatState>(chatId: number): T | null {
     const path = this.getPath(chatId);
     if (!existsSync(path)) {
       return null;
     }
     try {
       const data = readFileSync(path, 'utf-8');
-      return JSON.parse(data) as SavedChatState;
+      return JSON.parse(data) as T;
     } catch {
       return null;
     }

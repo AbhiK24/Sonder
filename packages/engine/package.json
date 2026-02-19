@@ -20,6 +20,7 @@
     "dev:watch": "tsx watch src/dev.ts",
     "telegram": "tsx src/telegram-bot.ts",
     "chorus": "tsx src/chorus-telegram-bot.ts",
+    "wanderers-rest": "tsx src/wanderers-rest-telegram-bot.ts",
     "create-npc": "tsx src/scripts/create-npc.ts",
     "generate-images": "tsx src/scripts/generate-npc-images.ts",
     "build": "tsc",

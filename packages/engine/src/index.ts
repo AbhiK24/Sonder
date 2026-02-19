@@ -31,5 +31,8 @@ export { NPCManager } from './npcs/manager.js';
 // Chat
 export { TelegramBot } from './chat/telegram.js';
 
+// Puzzles
+export * from './puzzles/index.js';
+
 // Version
 export const VERSION = '0.1.0';
