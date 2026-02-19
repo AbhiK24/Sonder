@@ -1388,7 +1388,7 @@
       nextStep();
     }
 
-    // Summary
+    // Summary - check both value and .configured class (for pre-existing secrets)
     function updateSummary() {
       const playNames = {
         'chorus': '🎵 Chorus',
@@ -1403,25 +1403,29 @@
       document.getElementById('summary-llm').textContent = providers[provider] || provider;
       document.getElementById('summary-llm').classList.add('configured');
 
-      const telegram = document.getElementById('telegram-token').value;
-      document.getElementById('summary-telegram').textContent = telegram ? 'Configured' : 'Not configured';
-      document.getElementById('summary-telegram').classList.toggle('configured', !!telegram);
-      document.getElementById('summary-telegram').classList.toggle('missing', !telegram);
+      const telegramEl = document.getElementById('telegram-token');
+      const hasTelegram = telegramEl.value || telegramEl.classList.contains('configured');
+      document.getElementById('summary-telegram').textContent = hasTelegram ? 'Configured' : 'Not configured';
+      document.getElementById('summary-telegram').classList.toggle('configured', hasTelegram);
+      document.getElementById('summary-telegram').classList.toggle('missing', !hasTelegram);
 
-      const email = document.getElementById('resend-key').value;
-      document.getElementById('summary-email').textContent = email ? 'Configured' : 'Skipped';
-      document.getElementById('summary-email').classList.toggle('configured', !!email);
-      document.getElementById('summary-email').classList.toggle('missing', !email);
+      const emailEl = document.getElementById('resend-key');
+      const hasEmail = emailEl.value || emailEl.classList.contains('configured');
+      document.getElementById('summary-email').textContent = hasEmail ? 'Configured' : 'Skipped';
+      document.getElementById('summary-email').classList.toggle('configured', hasEmail);
+      document.getElementById('summary-email').classList.toggle('missing', !hasEmail);
 
-      const whatsapp = document.getElementById('twilio-sid').value;
-      document.getElementById('summary-whatsapp').textContent = whatsapp ? 'Configured' : 'Skipped';
-      document.getElementById('summary-whatsapp').classList.toggle('configured', !!whatsapp);
-      document.getElementById('summary-whatsapp').classList.toggle('missing', !whatsapp);
+      const whatsappEl = document.getElementById('twilio-sid');
+      const hasWhatsapp = whatsappEl.value || whatsappEl.classList.contains('configured');
+      document.getElementById('summary-whatsapp').textContent = hasWhatsapp ? 'Configured' : 'Skipped';
+      document.getElementById('summary-whatsapp').classList.toggle('configured', hasWhatsapp);
+      document.getElementById('summary-whatsapp').classList.toggle('missing', !hasWhatsapp);
 
-      const todoist = document.getElementById('todoist-key').value;
-      document.getElementById('summary-todoist').textContent = todoist ? 'Configured' : 'Skipped';
-      document.getElementById('summary-todoist').classList.toggle('configured', !!todoist);
-      document.getElementById('summary-todoist').classList.toggle('missing', !todoist);
+      const todoistEl = document.getElementById('todoist-key');
+      const hasTodoist = todoistEl.value || todoistEl.classList.contains('configured');
+      document.getElementById('summary-todoist').textContent = hasTodoist ? 'Configured' : 'Skipped';
+      document.getElementById('summary-todoist').classList.toggle('configured', hasTodoist);
+      document.getElementById('summary-todoist').classList.toggle('missing', !hasTodoist);
 
       updateICSFeeds();
       const calCount = icsFeeds.length;
