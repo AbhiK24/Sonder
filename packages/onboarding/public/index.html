@@ -1,0 +1,654 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sonder Setup</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      min-height: 100vh;
+      color: #e4e4e7;
+      padding: 40px 20px;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+    }
+
+    h1 {
+      font-size: 2.5rem;
+      text-align: center;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      text-align: center;
+      color: #a1a1aa;
+      margin-bottom: 40px;
+    }
+
+    .step {
+      display: none;
+      animation: fadeIn 0.3s ease;
+    }
+
+    .step.active { display: block; }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .play-card {
+      background: rgba(255,255,255,0.05);
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 16px;
+      padding: 24px;
+      margin-bottom: 16px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .play-card:hover {
+      background: rgba(255,255,255,0.08);
+      border-color: rgba(255,255,255,0.2);
+      transform: translateY(-2px);
+    }
+
+    .play-card.selected {
+      border-color: #8b5cf6;
+      background: rgba(139, 92, 246, 0.1);
+    }
+
+    .play-card h3 {
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+
+    .play-card p {
+      color: #a1a1aa;
+      line-height: 1.5;
+    }
+
+    .form-group {
+      margin-bottom: 20px;
+    }
+
+    label {
+      display: block;
+      margin-bottom: 8px;
+      font-weight: 500;
+    }
+
+    .label-hint {
+      font-weight: normal;
+      color: #71717a;
+      font-size: 0.9rem;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 14px 16px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      background: rgba(255,255,255,0.05);
+      color: #fff;
+      font-size: 1rem;
+      transition: border-color 0.2s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: #8b5cf6;
+    }
+
+    input::placeholder { color: #52525b; }
+
+    .btn {
+      padding: 14px 28px;
+      border: none;
+      border-radius: 10px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .btn-primary {
+      background: #8b5cf6;
+      color: white;
+    }
+
+    .btn-primary:hover { background: #7c3aed; }
+    .btn-primary:disabled { background: #4c1d95; cursor: not-allowed; }
+
+    .btn-secondary {
+      background: rgba(255,255,255,0.1);
+      color: white;
+    }
+
+    .btn-secondary:hover { background: rgba(255,255,255,0.15); }
+
+    .btn-test {
+      padding: 10px 16px;
+      font-size: 0.9rem;
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+      margin-left: 10px;
+    }
+
+    .btn-test:hover { background: rgba(34, 197, 94, 0.3); }
+
+    .btn-row {
+      display: flex;
+      justify-content: space-between;
+      margin-top: 30px;
+    }
+
+    .input-row {
+      display: flex;
+      gap: 10px;
+    }
+
+    .input-row input { flex: 1; }
+
+    .status {
+      padding: 10px 14px;
+      border-radius: 8px;
+      font-size: 0.9rem;
+      margin-top: 10px;
+    }
+
+    .status.success {
+      background: rgba(34, 197, 94, 0.2);
+      color: #4ade80;
+    }
+
+    .status.error {
+      background: rgba(239, 68, 68, 0.2);
+      color: #f87171;
+    }
+
+    .provider-options {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .provider-option {
+      padding: 16px;
+      border: 2px solid rgba(255,255,255,0.1);
+      border-radius: 10px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.2s;
+    }
+
+    .provider-option:hover {
+      background: rgba(255,255,255,0.05);
+    }
+
+    .provider-option.selected {
+      border-color: #8b5cf6;
+      background: rgba(139, 92, 246, 0.1);
+    }
+
+    .provider-option .icon { font-size: 1.5rem; margin-bottom: 6px; }
+    .provider-option .name { font-weight: 600; }
+    .provider-option .desc { font-size: 0.8rem; color: #71717a; }
+
+    .optional-badge {
+      background: rgba(255,255,255,0.1);
+      padding: 4px 10px;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      color: #a1a1aa;
+      margin-left: 8px;
+    }
+
+    .step-header {
+      margin-bottom: 30px;
+    }
+
+    .step-header h2 {
+      font-size: 1.5rem;
+      margin-bottom: 8px;
+    }
+
+    .step-header p {
+      color: #a1a1aa;
+    }
+
+    .progress-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 40px;
+    }
+
+    .progress-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.2);
+    }
+
+    .progress-dot.active { background: #8b5cf6; }
+    .progress-dot.done { background: #4ade80; }
+
+    .skip-link {
+      color: #71717a;
+      text-decoration: none;
+      font-size: 0.9rem;
+    }
+
+    .skip-link:hover { color: #a1a1aa; }
+
+    .help-link {
+      color: #8b5cf6;
+      text-decoration: none;
+    }
+
+    .help-link:hover { text-decoration: underline; }
+
+    .final-summary {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      padding: 20px;
+      margin-bottom: 20px;
+    }
+
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 10px 0;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .summary-item:last-child { border: none; }
+    .summary-item .label { color: #a1a1aa; }
+    .summary-item .value { font-weight: 500; }
+    .summary-item .value.configured { color: #4ade80; }
+    .summary-item .value.missing { color: #f87171; }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎭 Sonder</h1>
+    <p class="subtitle">AI companions that have lives without you</p>
+
+    <div class="progress-bar" id="progressBar"></div>
+
+    <!-- Step 0: Choose Play -->
+    <div class="step active" data-step="0">
+      <div class="step-header">
+        <h2>Choose your experience</h2>
+        <p>Each play is a unique multi-agent experience.</p>
+      </div>
+
+      <div class="play-card" data-play="chorus" onclick="selectPlay('chorus')">
+        <h3>🎵 Chorus</h3>
+        <p>Five voices harmonizing to support your ADHD brain. They remember what you forget, spark when you're stuck, guide when you're lost, celebrate your wins, and reflect your feelings.</p>
+      </div>
+
+      <div class="play-card" data-play="wanderers-rest" onclick="selectPlay('wanderers-rest')">
+        <h3>🏠 Wanderer's Rest</h3>
+        <p>A mystery game where you solve crimes through conversation. You inherit a tavern. The previous owner died mysteriously. NPCs lie. Evidence contradicts. Solve it by talking.</p>
+      </div>
+
+      <div class="btn-row">
+        <span></span>
+        <button class="btn btn-primary" onclick="nextStep()" id="playNextBtn" disabled>Continue</button>
+      </div>
+    </div>
+
+    <!-- Step 1: LLM Provider -->
+    <div class="step" data-step="1">
+      <div class="step-header">
+        <h2>AI Brain</h2>
+        <p>Choose which AI model powers your companions.</p>
+      </div>
+
+      <div class="provider-options">
+        <div class="provider-option" data-provider="kimi" onclick="selectProvider('kimi')">
+          <div class="icon">🌙</div>
+          <div class="name">Kimi</div>
+          <div class="desc">Cheap & good</div>
+        </div>
+        <div class="provider-option" data-provider="openai" onclick="selectProvider('openai')">
+          <div class="icon">🤖</div>
+          <div class="name">OpenAI</div>
+          <div class="desc">GPT-4</div>
+        </div>
+        <div class="provider-option" data-provider="anthropic" onclick="selectProvider('anthropic')">
+          <div class="icon">🧠</div>
+          <div class="name">Anthropic</div>
+          <div class="desc">Claude</div>
+        </div>
+        <div class="provider-option" data-provider="ollama" onclick="selectProvider('ollama')">
+          <div class="icon">💻</div>
+          <div class="name">Ollama</div>
+          <div class="desc">Free, local</div>
+        </div>
+      </div>
+
+      <div class="form-group" id="apiKeyGroup" style="display:none;">
+        <label>API Key <span class="label-hint" id="apiKeyHint"></span></label>
+        <div class="input-row">
+          <input type="password" id="llmApiKey" placeholder="Enter your API key">
+          <button class="btn btn-test" onclick="testLLM()">Test</button>
+        </div>
+        <div class="status" id="llmStatus" style="display:none;"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+        <button class="btn btn-primary" onclick="saveLLMAndNext()" id="llmNextBtn" disabled>Continue</button>
+      </div>
+    </div>
+
+    <!-- Step 2: Telegram -->
+    <div class="step" data-step="2">
+      <div class="step-header">
+        <h2>Telegram Bot</h2>
+        <p>Your companions live in Telegram. Create a bot to chat with them.</p>
+      </div>
+
+      <ol style="color: #a1a1aa; margin-bottom: 20px; padding-left: 20px; line-height: 1.8;">
+        <li>Open Telegram and message <a href="https://t.me/BotFather" class="help-link" target="_blank">@BotFather</a></li>
+        <li>Send <code>/newbot</code> and follow the prompts</li>
+        <li>Copy the token BotFather gives you</li>
+      </ol>
+
+      <div class="form-group">
+        <label>Bot Token</label>
+        <div class="input-row">
+          <input type="password" id="telegramToken" placeholder="123456789:ABCdefGHI...">
+          <button class="btn btn-test" onclick="testTelegram()">Test</button>
+        </div>
+        <div class="status" id="telegramStatus" style="display:none;"></div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+        <button class="btn btn-primary" onclick="saveTelegramAndNext()" id="telegramNextBtn" disabled>Continue</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Optional Integrations -->
+    <div class="step" data-step="3">
+      <div class="step-header">
+        <h2>Integrations <span class="optional-badge">Optional</span></h2>
+        <p>Connect more services for richer experiences. You can skip this and add them later.</p>
+      </div>
+
+      <div class="form-group">
+        <label>Email (Resend) <span class="label-hint">- agents send you check-ins</span></label>
+        <input type="password" id="resendKey" placeholder="re_...">
+      </div>
+
+      <div class="form-group">
+        <label>Your Email <span class="label-hint">- where check-ins go</span></label>
+        <input type="email" id="userEmail" placeholder="you@example.com">
+      </div>
+
+      <div class="form-group">
+        <label>Todoist API Key <span class="label-hint">- agents see your tasks</span></label>
+        <input type="password" id="todoistKey" placeholder="Get from Todoist Settings > Integrations">
+      </div>
+
+      <div class="form-group">
+        <label>Timezone</label>
+        <select id="timezone">
+          <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+          <option value="America/New_York">America/New_York (EST)</option>
+          <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+          <option value="Europe/London">Europe/London (GMT)</option>
+          <option value="UTC">UTC</option>
+        </select>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+        <button class="btn btn-primary" onclick="saveIntegrationsAndNext()">Continue</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Summary & Launch -->
+    <div class="step" data-step="4">
+      <div class="step-header">
+        <h2>Ready to launch! 🚀</h2>
+        <p>Here's your setup. Click Launch to start your companions.</p>
+      </div>
+
+      <div class="final-summary" id="summary"></div>
+
+      <div class="btn-row">
+        <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+        <button class="btn btn-primary" onclick="launch()" style="padding: 16px 40px; font-size: 1.1rem;">Launch Sonder</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 0;
+    let selectedPlay = null;
+    let selectedProvider = null;
+    const totalSteps = 5;
+
+    function updateProgress() {
+      const bar = document.getElementById('progressBar');
+      bar.innerHTML = '';
+      for (let i = 0; i < totalSteps; i++) {
+        const dot = document.createElement('div');
+        dot.className = 'progress-dot';
+        if (i < currentStep) dot.classList.add('done');
+        if (i === currentStep) dot.classList.add('active');
+        bar.appendChild(dot);
+      }
+    }
+
+    function showStep(step) {
+      document.querySelectorAll('.step').forEach(s => s.classList.remove('active'));
+      document.querySelector(`[data-step="${step}"]`).classList.add('active');
+      currentStep = step;
+      updateProgress();
+    }
+
+    function nextStep() { showStep(currentStep + 1); }
+    function prevStep() { showStep(currentStep - 1); }
+
+    function selectPlay(play) {
+      selectedPlay = play;
+      document.querySelectorAll('.play-card').forEach(c => c.classList.remove('selected'));
+      document.querySelector(`[data-play="${play}"]`).classList.add('selected');
+      document.getElementById('playNextBtn').disabled = false;
+    }
+
+    function selectProvider(provider) {
+      selectedProvider = provider;
+      document.querySelectorAll('.provider-option').forEach(o => o.classList.remove('selected'));
+      document.querySelector(`[data-provider="${provider}"]`).classList.add('selected');
+
+      const apiKeyGroup = document.getElementById('apiKeyGroup');
+      const hint = document.getElementById('apiKeyHint');
+
+      if (provider === 'ollama') {
+        apiKeyGroup.style.display = 'none';
+        document.getElementById('llmNextBtn').disabled = false;
+      } else {
+        apiKeyGroup.style.display = 'block';
+        document.getElementById('llmNextBtn').disabled = true;
+
+        const hints = {
+          kimi: 'Get from platform.moonshot.cn',
+          openai: 'Get from platform.openai.com',
+          anthropic: 'Get from console.anthropic.com'
+        };
+        hint.textContent = '- ' + hints[provider];
+      }
+    }
+
+    async function testLLM() {
+      const apiKey = document.getElementById('llmApiKey').value;
+      const status = document.getElementById('llmStatus');
+      status.style.display = 'block';
+      status.className = 'status';
+      status.textContent = 'Testing...';
+
+      const res = await fetch('/api/test/llm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: selectedProvider, apiKey })
+      });
+      const data = await res.json();
+
+      status.className = 'status ' + (data.success ? 'success' : 'error');
+      status.textContent = data.message;
+
+      if (data.success) {
+        document.getElementById('llmNextBtn').disabled = false;
+      }
+    }
+
+    async function saveLLMAndNext() {
+      const apiKey = document.getElementById('llmApiKey').value;
+      const keyMap = { kimi: 'kimiApiKey', openai: 'openaiApiKey', anthropic: 'anthropicApiKey' };
+
+      const body = { llmProvider: selectedProvider };
+      if (selectedProvider !== 'ollama') {
+        body[keyMap[selectedProvider]] = apiKey;
+      }
+
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      nextStep();
+    }
+
+    async function testTelegram() {
+      const token = document.getElementById('telegramToken').value;
+      const status = document.getElementById('telegramStatus');
+      status.style.display = 'block';
+      status.className = 'status';
+      status.textContent = 'Testing...';
+
+      const res = await fetch('/api/test/telegram', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ token })
+      });
+      const data = await res.json();
+
+      status.className = 'status ' + (data.success ? 'success' : 'error');
+      status.textContent = data.message;
+
+      if (data.success) {
+        document.getElementById('telegramNextBtn').disabled = false;
+      }
+    }
+
+    async function saveTelegramAndNext() {
+      const token = document.getElementById('telegramToken').value;
+      const tokenKey = selectedPlay === 'chorus' ? 'chorusTelegramToken' : 'wanderersRestTelegramToken';
+
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [tokenKey]: token, play: selectedPlay })
+      });
+
+      nextStep();
+    }
+
+    async function saveIntegrationsAndNext() {
+      const body = {
+        resendApiKey: document.getElementById('resendKey').value,
+        userEmail: document.getElementById('userEmail').value,
+        todoistApiKey: document.getElementById('todoistKey').value,
+        timezone: document.getElementById('timezone').value
+      };
+
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body)
+      });
+
+      updateSummary();
+      nextStep();
+    }
+
+    function updateSummary() {
+      const playNames = {
+        'chorus': '🎵 Chorus',
+        'wanderers-rest': '🏠 Wanderer\'s Rest'
+      };
+
+      const providerNames = {
+        kimi: 'Kimi (Moonshot)',
+        openai: 'OpenAI',
+        anthropic: 'Anthropic',
+        ollama: 'Ollama (local)'
+      };
+
+      const email = document.getElementById('userEmail').value;
+      const todoist = document.getElementById('todoistKey').value;
+
+      document.getElementById('summary').innerHTML = `
+        <div class="summary-item">
+          <span class="label">Play</span>
+          <span class="value">${playNames[selectedPlay]}</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">AI Provider</span>
+          <span class="value">${providerNames[selectedProvider]}</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">Telegram</span>
+          <span class="value configured">Configured</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">Email</span>
+          <span class="value ${email ? 'configured' : 'missing'}">${email || 'Not configured'}</span>
+        </div>
+        <div class="summary-item">
+          <span class="label">Todoist</span>
+          <span class="value ${todoist ? 'configured' : 'missing'}">${todoist ? 'Configured' : 'Not configured'}</span>
+        </div>
+      `;
+    }
+
+    async function launch() {
+      await fetch('/api/launch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ play: selectedPlay })
+      });
+
+      document.querySelector('.container').innerHTML = `
+        <div style="text-align: center; padding: 60px 20px;">
+          <h1 style="font-size: 3rem; margin-bottom: 20px;">🎉</h1>
+          <h2 style="margin-bottom: 10px;">Sonder is running!</h2>
+          <p style="color: #a1a1aa; margin-bottom: 30px;">Open Telegram and message your bot to start chatting.</p>
+          <p style="color: #71717a; font-size: 0.9rem;">You can close this window.</p>
+        </div>
+      `;
+    }
+
+    // Initialize
+    updateProgress();
+  </script>
+</body>
+</html>
