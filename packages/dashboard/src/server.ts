@@ -370,7 +370,7 @@ const PORT = parseInt(process.env.DASHBOARD_PORT || '3000');
 app.listen(PORT, () => {
   console.log(`\n🎭 Sonder Dashboard`);
   console.log(`   http://localhost:${PORT}\n`);
-  console.log(`   /        - Dashboard home`);
-  console.log(`   /setup   - Setup wizard`);
+  console.log(`   /            - Dashboard home`);
+  console.log(`   /setup.html  - Setup wizard`);
   console.log(`   Sessions: ${listSavedChats().length}\n`);
 });

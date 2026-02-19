@@ -56,10 +56,10 @@ They're not waiting for commands. They're *paying attention*.
 ```bash
 git clone https://github.com/AbhiK24/Sonder.git
 cd Sonder && pnpm install
-pnpm onboard
+pnpm dashboard
 ```
 
-Browser opens. Pick your experience. Enter your keys. Click launch.
+Open http://localhost:3000/setup.html — pick your experience, enter your keys, click launch.
 
 That's it. Your companions are awake.
 
@@ -118,7 +118,7 @@ The only cloud calls are to your LLM provider (and you can use local Ollama for 
 | Email (Resend) | Agents send you thoughtful check-ins |
 | WhatsApp (Twilio) | Proactive nudges to your phone |
 | Todoist | Agents see your tasks, understand your load |
-| Google Calendar | Schedule-aware check-ins (coming soon) |
+| Calendar (ICS) | Schedule-aware check-ins via any calendar |
 
 ---
 
@@ -155,10 +155,9 @@ Local-first isn't a feature. It's a principle. Your conversations, your goals, y
 ## Development
 
 ```bash
-pnpm onboard           # Setup wizard
+pnpm dashboard         # Dashboard + Setup wizard (http://localhost:3000)
 pnpm chorus            # Run Chorus (ADHD support)
-pnpm tavern            # Run Wanderer's Rest
-pnpm dashboard         # Visual interface
+pnpm wanderers-rest    # Run Wanderer's Rest
 ```
 
 ---

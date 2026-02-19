@@ -7,9 +7,10 @@
   "scripts": {
     "dev": "pnpm --filter @sonder/engine dev",
     "dashboard": "pnpm --filter @sonder/dashboard dev",
+    "setup": "pnpm --filter @sonder/dashboard dev",
     "chorus": "pnpm --filter @sonder/engine chorus",
     "tavern": "pnpm --filter @sonder/engine telegram",
-    "onboard": "pnpm --filter @sonder/onboarding dev",
+    "wanderers-rest": "pnpm --filter @sonder/engine wanderers-rest",
     "create-npc": "pnpm --filter @sonder/engine create-npc",
     "generate-images": "pnpm --filter @sonder/engine generate-images",
     "build": "pnpm -r build",

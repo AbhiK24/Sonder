@@ -866,7 +866,7 @@ async function setupIntegrations(): Promise<void> {
       console.warn('[Chorus] Invalid ICS_FEEDS config:', e);
     }
   } else {
-    console.log('[Chorus] Calendar not configured (set ICS_FEEDS in onboarding)');
+    console.log('[Chorus] Calendar not configured (set ICS_FEEDS in setup wizard)');
   }
 }
 
