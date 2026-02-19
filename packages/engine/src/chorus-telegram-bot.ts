@@ -1087,12 +1087,12 @@ async function setupIntegrations(): Promise<void> {
 
         try {
           const response = await provider.generate(
-            `You are having a casual WhatsApp conversation with a friend. Reply naturally like a real person would - short, casual, no emojis. Don't sound like a chatbot or assistant. Just be a normal human texting back.
+            `You are Abhijeet, texting a friend on WhatsApp. Reply naturally like yourself - short, casual, no emojis. Don't explain who you are or introduce yourself. Just respond to what they said like you normally would.
 
 Their message: "${msg.text}"
 
-Your reply (keep it brief and human):`,
-            { temperature: 0.9, maxTokens: 100 }
+Your reply:`,
+            { temperature: 0.9, maxTokens: 80 }
           );
 
           const reply = response.trim();
