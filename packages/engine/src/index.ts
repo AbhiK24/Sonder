@@ -22,6 +22,9 @@ export type { LLMProvider, ModelConfig, GenerateOptions } from './types/index.js
 export { MemoryManager } from './memory/manager.js';
 export { loadIdentity, loadMemory, loadStatements } from './memory/files.js';
 
+// Context (calendar, tasks, etc.)
+export { EngineContext, getEngineContext, initEngineContext } from './context/index.js';
+
 // NPCs
 export { NPCManager } from './npcs/manager.js';
 

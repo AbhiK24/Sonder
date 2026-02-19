@@ -1,0 +1,364 @@
+/**
+ * Engine Context
+ *
+ * Central store for integration data (calendar, tasks, etc.)
+ * Lives at engine level - accessible to all plays.
+ * Refreshes periodically to keep data fresh.
+ */
+
+import type { CalendarEvent, Task } from '../integrations/types.js';
+import type { ICSFeedAdapter } from '../integrations/calendar.js';
+import type { TodoistAdapter } from '../integrations/tasks.js';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface CalendarSnapshot {
+  events: CalendarEvent[];
+  fetchedAt: Date;
+  nextRefresh: Date;
+}
+
+export interface TasksSnapshot {
+  tasks: Task[];
+  fetchedAt: Date;
+  nextRefresh: Date;
+}
+
+export interface EngineContextData {
+  calendar: CalendarSnapshot | null;
+  tasks: TasksSnapshot | null;
+}
+
+export interface EngineContextConfig {
+  calendarAdapter?: ICSFeedAdapter | null;
+  taskAdapter?: TodoistAdapter | null;
+  calendarRefreshMinutes?: number;  // Default: 15
+  tasksRefreshMinutes?: number;     // Default: 5
+  calendarLookAheadDays?: number;   // Default: 14 (2 weeks)
+}
+
+// =============================================================================
+// Engine Context Class
+// =============================================================================
+
+export class EngineContext {
+  private data: EngineContextData = {
+    calendar: null,
+    tasks: null,
+  };
+
+  private config: Required<EngineContextConfig>;
+  private refreshInterval: NodeJS.Timeout | null = null;
+
+  constructor(config: EngineContextConfig = {}) {
+    this.config = {
+      calendarAdapter: config.calendarAdapter || null,
+      taskAdapter: config.taskAdapter || null,
+      calendarRefreshMinutes: config.calendarRefreshMinutes || 15,
+      tasksRefreshMinutes: config.tasksRefreshMinutes || 5,
+      calendarLookAheadDays: config.calendarLookAheadDays || 14,
+    };
+  }
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Start the context - fetch initial data and set up refresh
+   */
+  async start(): Promise<void> {
+    console.log('[EngineContext] Starting...');
+
+    // Initial fetch
+    await this.refreshAll();
+
+    // Set up periodic refresh (every minute, checks if refresh needed)
+    this.refreshInterval = setInterval(() => this.checkRefresh(), 60 * 1000);
+
+    console.log('[EngineContext] Started');
+  }
+
+  /**
+   * Stop the context
+   */
+  stop(): void {
+    if (this.refreshInterval) {
+      clearInterval(this.refreshInterval);
+      this.refreshInterval = null;
+    }
+    console.log('[EngineContext] Stopped');
+  }
+
+  /**
+   * Update adapters (e.g., after onboarding)
+   */
+  setAdapters(config: Partial<EngineContextConfig>): void {
+    if (config.calendarAdapter !== undefined) {
+      this.config.calendarAdapter = config.calendarAdapter;
+    }
+    if (config.taskAdapter !== undefined) {
+      this.config.taskAdapter = config.taskAdapter;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Refresh Logic
+  // ---------------------------------------------------------------------------
+
+  private async checkRefresh(): Promise<void> {
+    const now = new Date();
+
+    // Check calendar
+    if (this.data.calendar && now >= this.data.calendar.nextRefresh) {
+      await this.refreshCalendar();
+    }
+
+    // Check tasks
+    if (this.data.tasks && now >= this.data.tasks.nextRefresh) {
+      await this.refreshTasks();
+    }
+  }
+
+  async refreshAll(): Promise<void> {
+    await Promise.all([
+      this.refreshCalendar(),
+      this.refreshTasks(),
+    ]);
+  }
+
+  async refreshCalendar(): Promise<void> {
+    const adapter = this.config.calendarAdapter;
+    if (!adapter || !adapter.isConnected()) {
+      return;
+    }
+
+    try {
+      const now = new Date();
+      const endDate = new Date(now.getTime() + this.config.calendarLookAheadDays * 24 * 60 * 60 * 1000);
+
+      const result = await adapter.getEvents(now, endDate);
+
+      if (result.success && result.data) {
+        this.data.calendar = {
+          events: result.data,
+          fetchedAt: now,
+          nextRefresh: new Date(now.getTime() + this.config.calendarRefreshMinutes * 60 * 1000),
+        };
+        console.log(`[EngineContext] Calendar refreshed: ${result.data.length} events`);
+      }
+    } catch (error) {
+      console.warn('[EngineContext] Calendar refresh failed:', error);
+    }
+  }
+
+  async refreshTasks(): Promise<void> {
+    const adapter = this.config.taskAdapter;
+    if (!adapter || !adapter.isConnected()) {
+      return;
+    }
+
+    try {
+      const now = new Date();
+      const result = await adapter.getTasks({});
+
+      if (result.success && result.data) {
+        this.data.tasks = {
+          tasks: result.data,
+          fetchedAt: now,
+          nextRefresh: new Date(now.getTime() + this.config.tasksRefreshMinutes * 60 * 1000),
+        };
+        console.log(`[EngineContext] Tasks refreshed: ${result.data.length} tasks`);
+      }
+    } catch (error) {
+      console.warn('[EngineContext] Tasks refresh failed:', error);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Getters - What plays use
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Get all calendar events (next 2 weeks)
+   */
+  getCalendarEvents(): CalendarEvent[] {
+    return this.data.calendar?.events || [];
+  }
+
+  /**
+   * Get upcoming calendar events (next N hours)
+   */
+  getUpcomingEvents(hours: number = 24): CalendarEvent[] {
+    const events = this.getCalendarEvents();
+    const now = new Date();
+    const cutoff = new Date(now.getTime() + hours * 60 * 60 * 1000);
+
+    return events.filter(e => e.startTime >= now && e.startTime <= cutoff);
+  }
+
+  /**
+   * Get today's events
+   */
+  getTodayEvents(): CalendarEvent[] {
+    const events = this.getCalendarEvents();
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+    return events.filter(e => e.startTime >= startOfDay && e.startTime < endOfDay);
+  }
+
+  /**
+   * Get events for a specific date
+   */
+  getEventsForDate(date: Date): CalendarEvent[] {
+    const events = this.getCalendarEvents();
+    const startOfDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+    return events.filter(e => e.startTime >= startOfDay && e.startTime < endOfDay);
+  }
+
+  /**
+   * Get all tasks
+   */
+  getTasks(): Task[] {
+    return this.data.tasks?.tasks || [];
+  }
+
+  /**
+   * Get tasks due today
+   */
+  getTodayTasks(): Task[] {
+    const tasks = this.getTasks();
+    const now = new Date();
+    const startOfDay = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+    const endOfDay = new Date(startOfDay.getTime() + 24 * 60 * 60 * 1000);
+
+    return tasks.filter(t => t.dueDate && t.dueDate >= startOfDay && t.dueDate < endOfDay);
+  }
+
+  /**
+   * Get overdue tasks
+   */
+  getOverdueTasks(): Task[] {
+    const tasks = this.getTasks();
+    const now = new Date();
+
+    return tasks.filter(t => t.dueDate && t.dueDate < now && !t.completed);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Context Summary - For prompts
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Get a formatted summary for agent prompts
+   */
+  getContextSummary(): string {
+    const parts: string[] = [];
+
+    // Calendar summary
+    const todayEvents = this.getTodayEvents();
+    const upcomingEvents = this.getUpcomingEvents(48); // Next 48 hours
+
+    if (upcomingEvents.length > 0) {
+      const eventLines = upcomingEvents.slice(0, 10).map(e => {
+        const dateStr = e.startTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
+        const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const calName = e.calendarName ? ` [${e.calendarName}]` : '';
+        return `- ${dateStr} ${timeStr}: ${e.title}${calName}`;
+      });
+
+      parts.push(`## Calendar (next 48h)\n${eventLines.join('\n')}`);
+    }
+
+    // Tasks summary
+    const todayTasks = this.getTodayTasks();
+    const overdueTasks = this.getOverdueTasks();
+
+    if (overdueTasks.length > 0 || todayTasks.length > 0) {
+      const taskLines: string[] = [];
+
+      if (overdueTasks.length > 0) {
+        taskLines.push(`⚠️ Overdue: ${overdueTasks.length} task${overdueTasks.length > 1 ? 's' : ''}`);
+        overdueTasks.slice(0, 3).forEach(t => {
+          taskLines.push(`  - ${t.content}`);
+        });
+      }
+
+      if (todayTasks.length > 0) {
+        taskLines.push(`Today: ${todayTasks.length} task${todayTasks.length > 1 ? 's' : ''}`);
+        todayTasks.slice(0, 5).forEach(t => {
+          taskLines.push(`  - ${t.content}`);
+        });
+      }
+
+      parts.push(`## Tasks\n${taskLines.join('\n')}`);
+    }
+
+    return parts.join('\n\n');
+  }
+
+  /**
+   * Get full 2-week calendar view for deep context
+   */
+  getFullCalendarContext(): string {
+    const events = this.getCalendarEvents();
+    if (events.length === 0) {
+      return '';
+    }
+
+    // Group by date
+    const byDate = new Map<string, CalendarEvent[]>();
+
+    for (const event of events) {
+      const dateKey = event.startTime.toISOString().split('T')[0];
+      if (!byDate.has(dateKey)) {
+        byDate.set(dateKey, []);
+      }
+      byDate.get(dateKey)!.push(event);
+    }
+
+    // Format
+    const lines: string[] = ['## Calendar (next 2 weeks)'];
+
+    const sortedDates = Array.from(byDate.keys()).sort();
+    for (const dateKey of sortedDates) {
+      const events = byDate.get(dateKey)!;
+      const date = new Date(dateKey);
+      const dateStr = date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+
+      lines.push(`\n**${dateStr}**`);
+
+      for (const e of events) {
+        const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const calName = e.calendarName ? ` [${e.calendarName}]` : '';
+        lines.push(`- ${timeStr}: ${e.title}${calName}`);
+      }
+    }
+
+    return lines.join('\n');
+  }
+}
+
+// =============================================================================
+// Singleton Instance
+// =============================================================================
+
+let engineContext: EngineContext | null = null;
+
+export function getEngineContext(): EngineContext {
+  if (!engineContext) {
+    engineContext = new EngineContext();
+  }
+  return engineContext;
+}
+
+export function initEngineContext(config: EngineContextConfig): EngineContext {
+  engineContext = new EngineContext(config);
+  return engineContext;
+}

@@ -19,6 +19,7 @@ import { TodoistAdapter, createTaskAdapter } from './integrations/tasks.js';
 import { WhatsAppAdapter, createWhatsAppAdapter } from './integrations/whatsapp.js';
 import { ICSFeedAdapter, createICSAdapter } from './integrations/calendar.js';
 import type { ICSFeedConfig } from './integrations/types.js';
+import { EngineContext, initEngineContext } from './context/index.js';
 import { Persistence } from './utils/persistence.js';
 import type { ModelConfig, LLMProvider } from './types/index.js';
 
@@ -91,6 +92,7 @@ let emailAdapter: ResendAdapter | null = null;
 let taskAdapter: TodoistAdapter | null = null;
 let whatsappAdapter: WhatsAppAdapter | null = null;
 let calendarAdapter: ICSFeedAdapter | null = null;
+let engineContext: EngineContext;
 let bot: Bot;
 
 // Persistence
@@ -262,23 +264,10 @@ Prompt hints: ${template.promptHints.join(' | ')}`;
 ${context.reunionContext}`;
   }
 
-  // Add calendar context if available
-  if (calendarAdapter) {
-    try {
-      const upcoming = await calendarAdapter.getUpcoming(24); // Next 24 hours
-      if (upcoming.success && upcoming.data && upcoming.data.length > 0) {
-        const events = upcoming.data.slice(0, 5); // Max 5 events
-        const eventsList = events.map(e => {
-          const time = e.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-          const calName = e.calendarName ? ` (${e.calendarName})` : '';
-          return `- ${time}: ${e.title}${calName}`;
-        }).join('\n');
-        systemPrompt += `\n\n## User's Schedule (next 24h)
-${eventsList}`;
-      }
-    } catch (e) {
-      // Silently ignore calendar errors
-    }
+  // Add engine context (calendar, tasks, etc.)
+  const contextSummary = engineContext.getContextSummary();
+  if (contextSummary) {
+    systemPrompt += `\n\n${contextSummary}`;
   }
 
   // Build conversation prompt
@@ -920,6 +909,17 @@ async function main() {
 
   // Setup integrations
   await setupIntegrations();
+
+  // Initialize engine context with integrations
+  engineContext = initEngineContext({
+    calendarAdapter,
+    taskAdapter,
+    calendarLookAheadDays: 14,  // 2 weeks
+    calendarRefreshMinutes: 15,
+    tasksRefreshMinutes: 5,
+  });
+  await engineContext.start();
+  console.log('✓ Engine context started');
 
   // Setup engines
   setupIdleEngine();
