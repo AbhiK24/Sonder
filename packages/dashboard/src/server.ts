@@ -152,6 +152,50 @@ app.get('/api/state', (req, res) => {
   res.json(state || getDemoData());
 });
 
+// Play definitions
+const PLAYS = [
+  {
+    id: 'wanderers-rest',
+    name: "Wanderer's Rest",
+    tagline: 'A tavern mystery where time passes without you',
+    description: 'Inherit a tavern with dark secrets. Solve daily puzzles, build trust with regulars, uncover what really happened to Old Harren.',
+    agents: [
+      { id: 'maren', name: 'Maren', emoji: '🍺', role: 'Barkeep', bio: 'Knows everyone\'s secrets. Trusted the old owner like family.' },
+      { id: 'kira', name: 'Kira', emoji: '📦', role: 'Merchant', bio: 'Travels between towns. Hears things others don\'t.' },
+      { id: 'aldric', name: 'Aldric', emoji: '🔨', role: 'Blacksmith', bio: 'Strong and quiet. Owes debts he doesn\'t talk about.' },
+      { id: 'elena', name: 'Elena', emoji: '🌿', role: 'Herbalist', bio: 'Heals the sick. Some say she sees things.' },
+      { id: 'thom', name: 'Thom', emoji: '⚔️', role: 'Guard Captain', bio: 'Keeps the peace. But whose peace?' },
+    ],
+  },
+  {
+    id: 'chorus',
+    name: 'Chorus',
+    tagline: 'Your productivity ensemble',
+    description: 'Five AI companions help you think, plan, do, and grow. Each with distinct personality and purpose.',
+    agents: [
+      { id: 'kai', name: 'Kai', emoji: '🎯', role: 'The Anchor', bio: 'Grounds you when overwhelmed. Calm, steady presence.' },
+      { id: 'nova', name: 'Nova', emoji: '✨', role: 'The Spark', bio: 'Ignites momentum. Celebrates wins, nudges forward.' },
+      { id: 'sage', name: 'Sage', emoji: '🌿', role: 'The Mirror', bio: 'Reflects patterns back. Asks the hard questions.' },
+      { id: 'echo', name: 'Echo', emoji: '🔮', role: 'The Keeper', bio: 'Remembers everything. Connects past to present.' },
+      { id: 'arc', name: 'Arc', emoji: '🌈', role: 'The Bridge', bio: 'Sees the big picture. Weaves threads together.' },
+    ],
+  },
+];
+
+// API: Get all plays
+app.get('/api/plays', (req, res) => {
+  res.json({ plays: PLAYS });
+});
+
+// API: Get specific play
+app.get('/api/plays/:playId', (req, res) => {
+  const play = PLAYS.find(p => p.id === req.params.playId);
+  if (!play) {
+    return res.status(404).json({ error: 'Play not found' });
+  }
+  res.json(play);
+});
+
 // Demo data
 function getDemoData(): DashboardState {
   return {

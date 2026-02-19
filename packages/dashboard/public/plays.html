@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sonder - Plays</title>
+  <link rel="stylesheet" href="style.css">
+  <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="container">
+    <header class="tavern-header">
+      <div class="tavern-sign">
+        <h1>Sonder</h1>
+        <p class="tagline">Every soul has a story</p>
+      </div>
+    </header>
+
+    <section class="section">
+      <h2 class="section-title">Available Plays</h2>
+      <div class="plays-grid" id="playsGrid">
+        <!-- Plays loaded via JS -->
+      </div>
+    </section>
+
+    <footer class="footer">
+      <p>Sonder &mdash; AI companions that live while you're away</p>
+    </footer>
+  </div>
+
+  <script>
+    async function loadPlays() {
+      const res = await fetch('/api/plays');
+      const { plays } = await res.json();
+
+      const grid = document.getElementById('playsGrid');
+      grid.innerHTML = plays.map(play => `
+        <a href="/play.html?id=${play.id}" class="play-card">
+          <h3>${play.name}</h3>
+          <p class="play-tagline">${play.tagline}</p>
+          <p class="play-desc">${play.description}</p>
+          <div class="play-agents">
+            ${play.agents.slice(0, 5).map(a => `<span class="agent-emoji" title="${a.name}">${a.emoji}</span>`).join('')}
+          </div>
+        </a>
+      `).join('');
+    }
+    loadPlays();
+  </script>
+</body>
+</html>

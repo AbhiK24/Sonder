@@ -399,10 +399,7 @@ function handlePuzzleAnswer(chatId: number, state: UserState, answer: string): s
  * Get today's puzzle if available
  */
 function presentPuzzle(chatId: number, state: UserState): string | null {
-  // Already did puzzle today
-  if (state.todayPuzzleAttempted) {
-    return null;
-  }
+  // Puzzle always available on demand (no 24hr restriction)
 
   // Get content for current day
   const content = getDayContent(state.currentDay);
@@ -444,23 +441,7 @@ const COMMANDS: Record<string, (chatId: number, state: UserState, args?: string)
     // Returning user - check for puzzle
     state.sessionCount++;
 
-    if (state.todayPuzzleAttempted) {
-      saveState(chatId);
-      const p = state.caseProgress;
-      const percent = Math.round((p.progressPoints / p.pointsToSolve) * 100);
-      const bar = '▓'.repeat(Math.round(percent / 10)) + '░'.repeat(10 - Math.round(percent / 10));
-
-      return `Welcome back to *Wanderer's Rest*.
-
-You've already done today's puzzle.
-
-*Progress:* ${p.progressPoints}/${p.pointsToSolve} points
-${bar} ${percent}%
-
-Come back tomorrow for the next clue.
-
-In the meantime, talk to the regulars: MAREN, KIRA, ALDRIC, ELENA, THOM`;
-    }
+    // Always offer puzzle on return
 
     // Present puzzle
     const puzzle = presentPuzzle(chatId, state);
@@ -517,19 +498,7 @@ RESET - Start over`;
       return formatPuzzle(state.currentPuzzleContent);
     }
 
-    // Check if already done today
-    if (state.todayPuzzleAttempted) {
-      const p = state.caseProgress;
-      const percent = Math.round((p.progressPoints / p.pointsToSolve) * 100);
-      const bar = '▓'.repeat(Math.round(percent / 10)) + '░'.repeat(10 - Math.round(percent / 10));
-
-      return `You've already done today's puzzle.
-
-*Progress:* ${p.progressPoints}/${p.pointsToSolve} points
-${bar} ${percent}%
-
-Come back tomorrow for the next clue.`;
-    }
+    // Puzzle on demand - no daily restriction
 
     // Present puzzle
     const puzzle = presentPuzzle(chatId, state);
