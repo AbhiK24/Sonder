@@ -14,6 +14,8 @@ import {
   ICSFeedConfig
 } from './types.js';
 import ical from 'node-ical';
+import rrule from 'rrule';
+const { RRule, RRuleSet } = rrule;
 
 // =============================================================================
 // Google Calendar Adapter
@@ -168,7 +170,7 @@ export class GoogleCalendarAdapter implements CalendarAdapter {
         return { success: false, error: `Token exchange failed: ${error}` };
       }
 
-      const data = await response.json();
+      const data = await response.json() as { access_token: string; refresh_token: string; expires_in: number };
 
       return {
         success: true,
@@ -222,7 +224,7 @@ export class GoogleCalendarAdapter implements CalendarAdapter {
         return { success: false, error: `API error: ${response.status}` };
       }
 
-      const data = await response.json();
+      const data = await response.json() as { items?: any[] };
       const events = this.parseEvents(data.items || []);
 
       return { success: true, data: events };
@@ -399,7 +401,22 @@ export class GoogleCalendarAdapter implements CalendarAdapter {
 
 interface CachedFeed {
   events: CalendarEvent[];
+  rawEvents: RawICSEvent[];  // Store raw events for RRULE expansion
   fetchedAt: Date;
+}
+
+interface RawICSEvent {
+  uid: string;
+  summary: string;
+  description?: string;
+  location?: string;
+  startTime: Date;
+  endTime: Date;
+  isAllDay: boolean;
+  rrule?: string;  // Raw RRULE string
+  exdate?: Date[]; // Excluded dates
+  feedId: string;
+  feedName: string;
 }
 
 export class ICSFeedAdapter implements CalendarAdapter {
@@ -558,54 +575,156 @@ export class ICSFeedAdapter implements CalendarAdapter {
     const cached = this.cache.get(feed.id);
     const refreshMs = (feed.refreshMinutes || this.defaultRefreshMinutes) * 60 * 1000;
 
-    let events: CalendarEvent[];
+    let rawEvents: RawICSEvent[];
 
     if (cached && Date.now() - cached.fetchedAt.getTime() < refreshMs) {
-      events = cached.events;
+      rawEvents = cached.rawEvents;
     } else {
-      events = await this.fetchFeed(feed);
-      this.cache.set(feed.id, { events, fetchedAt: new Date() });
+      const fetched = await this.fetchFeed(feed);
+      this.cache.set(feed.id, {
+        events: fetched.events,
+        rawEvents: fetched.rawEvents,
+        fetchedAt: new Date()
+      });
+      rawEvents = fetched.rawEvents;
     }
 
-    // Filter by date range
-    return events.filter(event => {
-      return event.startTime >= startDate && event.startTime <= endDate;
-    });
+    // Expand recurring events and filter by date range
+    return this.expandRecurringEvents(rawEvents, startDate, endDate);
   }
 
-  private async fetchFeed(feed: ICSFeedConfig): Promise<CalendarEvent[]> {
+  /**
+   * Expand recurring events into individual instances within the date range
+   */
+  private expandRecurringEvents(
+    rawEvents: RawICSEvent[],
+    startDate: Date,
+    endDate: Date
+  ): CalendarEvent[] {
+    const results: CalendarEvent[] = [];
+    const seenKeys = new Set<string>(); // Dedupe by uid + start time
+
+    for (const raw of rawEvents) {
+      if (raw.rrule) {
+        // Expand recurring event
+        try {
+          const ruleSet = new RRuleSet();
+
+          // Parse the RRULE - handle multi-line format from node-ical
+          let rruleStr = raw.rrule;
+          // Extract just the RRULE part if it has DTSTART prefix
+          const rruleMatch = rruleStr.match(/RRULE:(.+?)(?:\n|$)/);
+          if (rruleMatch) {
+            rruleStr = rruleMatch[1];
+          } else if (rruleStr.startsWith('RRULE:')) {
+            rruleStr = rruleStr.substring(6);
+          }
+
+          const rule = RRule.fromString(`DTSTART:${this.formatDateForRRule(raw.startTime)}\n${rruleStr}`);
+          ruleSet.rrule(rule);
+
+          // Add exclusion dates
+          if (raw.exdate) {
+            for (const exd of raw.exdate) {
+              ruleSet.exdate(exd);
+            }
+          }
+
+          // Get occurrences within date range
+          const duration = raw.endTime.getTime() - raw.startTime.getTime();
+          const occurrences = ruleSet.between(startDate, endDate, true);
+
+          for (const occurrence of occurrences) {
+            const key = `${raw.uid}-${occurrence.getTime()}`;
+            if (seenKeys.has(key)) continue;
+            seenKeys.add(key);
+
+            results.push({
+              id: `${raw.uid}-${occurrence.getTime()}`,
+              title: raw.summary,
+              description: raw.description,
+              startTime: occurrence,
+              endTime: new Date(occurrence.getTime() + duration),
+              location: raw.location,
+              isAllDay: raw.isAllDay,
+              calendarId: raw.feedId,
+              calendarName: raw.feedName,
+            });
+          }
+        } catch (error) {
+          console.warn(`[ICS] Failed to expand RRULE for "${raw.summary}":`, error);
+          // Fall back to single event
+          if (raw.startTime >= startDate && raw.startTime <= endDate) {
+            const key = `${raw.uid}-${raw.startTime.getTime()}`;
+            if (!seenKeys.has(key)) {
+              seenKeys.add(key);
+              results.push(this.rawToCalendarEvent(raw));
+            }
+          }
+        }
+      } else {
+        // Single event - filter by date range
+        if (raw.startTime >= startDate && raw.startTime <= endDate) {
+          const key = `${raw.uid}-${raw.startTime.getTime()}`;
+          if (!seenKeys.has(key)) {
+            seenKeys.add(key);
+            results.push(this.rawToCalendarEvent(raw));
+          }
+        }
+      }
+    }
+
+    return results.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+  }
+
+  private formatDateForRRule(date: Date): string {
+    return date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
+  }
+
+  private rawToCalendarEvent(raw: RawICSEvent): CalendarEvent {
+    return {
+      id: raw.uid,
+      title: raw.summary,
+      description: raw.description,
+      startTime: raw.startTime,
+      endTime: raw.endTime,
+      location: raw.location,
+      isAllDay: raw.isAllDay,
+      calendarId: raw.feedId,
+      calendarName: raw.feedName,
+    };
+  }
+
+  private async fetchFeed(feed: ICSFeedConfig): Promise<{ events: CalendarEvent[]; rawEvents: RawICSEvent[] }> {
     console.log(`[ICS] Fetching: ${feed.name} (${feed.url.slice(0, 50)}...)`);
 
     const data = await ical.async.fromURL(feed.url);
     const events: CalendarEvent[] = [];
+    const rawEvents: RawICSEvent[] = [];
 
     for (const key in data) {
       const item = data[key];
       if (!item || item.type !== 'VEVENT') continue;
 
-      const event = this.parseICSEvent(item as ical.VEvent, feed);
-      if (event) {
-        events.push(event);
+      const parsed = this.parseICSEventWithRRule(item as ical.VEvent, feed);
+      if (parsed) {
+        rawEvents.push(parsed.raw);
+        events.push(parsed.event);
       }
     }
 
-    console.log(`[ICS] Found ${events.length} events in ${feed.name}`);
-    return events;
+    console.log(`[ICS] Found ${events.length} events in ${feed.name} (${rawEvents.filter(e => e.rrule).length} recurring)`);
+
+    return { events, rawEvents };
   }
 
   /**
-   * Extract string value from ICS field (handles both string and ParameterValue types)
+   * Parse an ICS event and extract RRULE for later expansion
    */
-  private getStringValue(value: unknown): string | undefined {
-    if (!value) return undefined;
-    if (typeof value === 'string') return value;
-    if (typeof value === 'object' && 'val' in (value as object)) {
-      return (value as { val: string }).val;
-    }
-    return String(value);
-  }
-
-  private parseICSEvent(item: ical.VEvent, feed: ICSFeedConfig): CalendarEvent | null {
+  private parseICSEventWithRRule(
+    item: ical.VEvent,
+    feed: ICSFeedConfig
+  ): { event: CalendarEvent; raw: RawICSEvent } | null {
     try {
       // For recurring event instances, use recurrenceId as the actual date
       let startTime: Date | null = null;
@@ -631,30 +750,92 @@ export class ICSFeedAdapter implements CalendarAdapter {
 
       if (!startTime || !endTime) return null;
 
-      // Skip events too far in the past (> 1 year)
+      // Skip events too far in the past (> 1 year) unless they're recurring
       const oneYearAgo = new Date();
       oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
-      if (startTime < oneYearAgo) return null;
+      const hasRRule = !!(item as any).rrule;
+      if (startTime < oneYearAgo && !hasRRule) return null;
 
-      // Determine if all-day
       const isAllDay = item.datetype === 'date';
+      const uid = this.getStringValue(item.uid) || `${feed.id}-${startTime.getTime()}`;
+      const summary = this.getStringValue(item.summary) || 'Untitled Event';
+      const description = this.getStringValue(item.description);
+      const location = this.getStringValue(item.location);
 
-      return {
-        id: this.getStringValue(item.uid) || `${feed.id}-${startTime.getTime()}`,
-        title: this.getStringValue(item.summary) || 'Untitled Event',
-        description: this.getStringValue(item.description),
+      // Extract RRULE
+      let rrule: string | undefined;
+      const rruleObj = (item as any).rrule;
+      if (rruleObj) {
+        // node-ical returns rrule as an object with toString()
+        if (typeof rruleObj === 'string') {
+          rrule = rruleObj;
+        } else if (rruleObj.toString) {
+          rrule = rruleObj.toString();
+        }
+      }
+
+      // Extract EXDATE (excluded dates)
+      let exdate: Date[] | undefined;
+      const exdateRaw = (item as any).exdate;
+      if (exdateRaw) {
+        exdate = [];
+        if (typeof exdateRaw === 'object') {
+          for (const key in exdateRaw) {
+            const d = exdateRaw[key];
+            if (d instanceof Date) {
+              exdate.push(d);
+            } else if (typeof d === 'string') {
+              exdate.push(new Date(d));
+            }
+          }
+        }
+      }
+
+      const raw: RawICSEvent = {
+        uid,
+        summary,
+        description,
+        location,
         startTime,
         endTime,
-        location: this.getStringValue(item.location),
+        isAllDay,
+        rrule,
+        exdate,
+        feedId: feed.id,
+        feedName: feed.name,
+      };
+
+      const event: CalendarEvent = {
+        id: uid,
+        title: summary,
+        description,
+        startTime,
+        endTime,
+        location,
         isAllDay,
         calendarId: feed.id,
         calendarName: feed.name,
       };
+
+      return { event, raw };
     } catch (error) {
       console.warn(`[ICS] Failed to parse event:`, error);
       return null;
     }
   }
+
+  /**
+   * Extract string value from ICS field (handles both string and ParameterValue types)
+   */
+  private getStringValue(value: unknown): string | undefined {
+    if (!value) return undefined;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object' && 'val' in (value as object)) {
+      return (value as { val: string }).val;
+    }
+    return String(value);
+  }
+
 }
 
 // =============================================================================
