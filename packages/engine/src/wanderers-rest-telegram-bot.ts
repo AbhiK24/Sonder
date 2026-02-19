@@ -16,15 +16,11 @@ import { fileURLToPath } from 'url';
 import { createProvider } from './llm/providers.js';
 import {
   PuzzleEngine,
-  PuzzleFormatter,
-  DigestGenerator,
-  StoryGenerator,
-  type Puzzle,
   type CaseProgress,
-  type DailyDigest,
 } from './puzzles/index.js';
 import { Persistence } from './utils/persistence.js';
 import type { ModelConfig, LLMProvider } from './types/index.js';
+import { CaseGenerator, CaseGenerationManager, WANDERERS_REST_CONTEXT } from './case-generator.js';
 
 // Wanderer's Rest play imports
 import {
@@ -32,11 +28,17 @@ import {
   npcList,
   coreCast,
   harrenCase,
-  tavernWelcome,
-  generatePuzzleStatements,
   getAllNPCKnowledge,
 } from '../../plays/wanderers-rest/index.js';
 import type { WanderersNPC, WanderersNPCId } from '../../plays/wanderers-rest/types.js';
+import {
+  CASE_CONTENT,
+  getDayContent,
+  WELCOME_MESSAGE,
+  getPostPuzzleMessage,
+  getCaseSolvedMessage,
+  type DayContent,
+} from '../../plays/wanderers-rest/case-content.js';
 
 // Load .env
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -63,10 +65,9 @@ interface UserState {
 
   // Case progress
   caseProgress: CaseProgress;
-
-  // Today's puzzle
-  currentPuzzle?: Puzzle;
-  pendingDigest?: DailyDigest;
+  currentDay: number;              // Which day of the case they're on (1-15)
+  lastPuzzleDate?: string;         // YYYY-MM-DD of last puzzle attempt
+  todayPuzzleAttempted: boolean;   // Have they done today's puzzle?
 
   // Conversation history with NPCs
   history: Array<{
@@ -81,6 +82,11 @@ interface UserState {
 
   // Current NPC talking to
   talkingTo?: WanderersNPCId;
+
+  // FTUE state
+  hasSeenWelcome: boolean;
+  awaitingPuzzleAnswer: boolean;
+  currentPuzzleContent?: DayContent;
 }
 
 // =============================================================================
@@ -92,10 +98,8 @@ const userStates = new Map<number, UserState>();
 // Services
 let provider: LLMProvider;
 let puzzleEngine: PuzzleEngine;
-let puzzleFormatter: PuzzleFormatter;
-let digestGenerator: DigestGenerator;
-let storyGenerator: StoryGenerator;
 let bot: Bot;
+let caseGenerationManager: CaseGenerationManager;
 
 // Persistence
 const saveDir = process.env.SAVE_PATH?.replace('~', process.env.HOME || '') ||
@@ -110,10 +114,17 @@ interface SavedWanderersState {
   lastSeen: string;
   sessionCount: number;
   caseProgress: CaseProgress;
-  currentPuzzle?: Puzzle;
+  currentDay: number;
+  lastPuzzleDate?: string;
+  todayPuzzleAttempted: boolean;
   history: UserState['history'];
   trust: Record<WanderersNPCId, number>;
   talkingTo?: WanderersNPCId;
+  hasSeenWelcome: boolean;
+}
+
+function getTodayString(): string {
+  return new Date().toISOString().split('T')[0];
 }
 
 function getState(chatId: number): UserState {
@@ -121,6 +132,10 @@ function getState(chatId: number): UserState {
     const saved = persistence.load<SavedWanderersState>(chatId);
 
     if (saved) {
+      // Check if it's a new day - reset puzzle availability
+      const today = getTodayString();
+      const isNewDay = saved.lastPuzzleDate !== today;
+
       userStates.set(chatId, {
         id: chatId,
         lastSeen: new Date(saved.lastSeen),
@@ -130,12 +145,16 @@ function getState(chatId: number): UserState {
           harrenCase.id,
           harrenCase.name
         ),
-        currentPuzzle: saved.currentPuzzle,
+        currentDay: saved.currentDay || 1,
+        lastPuzzleDate: saved.lastPuzzleDate,
+        todayPuzzleAttempted: isNewDay ? false : saved.todayPuzzleAttempted,
         history: saved.history || [],
         trust: saved.trust || initTrust(),
         talkingTo: saved.talkingTo,
+        hasSeenWelcome: saved.hasSeenWelcome || false,
+        awaitingPuzzleAnswer: false,
       });
-      console.log(`[${chatId}] Loaded save (session ${saved.sessionCount})`);
+      console.log(`[${chatId}] Loaded save (day ${saved.currentDay}, puzzleToday: ${!isNewDay && saved.todayPuzzleAttempted})`);
     } else {
       userStates.set(chatId, {
         id: chatId,
@@ -143,8 +162,12 @@ function getState(chatId: number): UserState {
         sessionCount: 1,
         isNewUser: true,
         caseProgress: puzzleEngine.createCaseProgress(harrenCase.id, harrenCase.name),
+        currentDay: 1,
+        todayPuzzleAttempted: false,
         history: [],
         trust: initTrust(),
+        hasSeenWelcome: false,
+        awaitingPuzzleAnswer: false,
       });
       console.log(`[${chatId}] New user`);
     }
@@ -169,10 +192,13 @@ function saveState(chatId: number): void {
     lastSeen: state.lastSeen.toISOString(),
     sessionCount: state.sessionCount,
     caseProgress: state.caseProgress,
-    currentPuzzle: state.currentPuzzle,
+    currentDay: state.currentDay,
+    lastPuzzleDate: state.lastPuzzleDate,
+    todayPuzzleAttempted: state.todayPuzzleAttempted,
     history: state.history.slice(-100),
     trust: state.trust,
     talkingTo: state.talkingTo,
+    hasSeenWelcome: state.hasSeenWelcome,
   };
 
   persistence.save(chatId, saveData as unknown as Partial<import('./utils/persistence.js').SavedChatState>);
@@ -229,7 +255,8 @@ ${recentHistory || '(First conversation)'}
 ${userMessage}
 
 ## Your Response
-Respond as ${npc.name}. Stay in character. Be brief (1-3 sentences). ${trustLevel < 50 ? 'Be guarded and suspicious.' : trustLevel < 75 ? 'Be cautiously friendly.' : 'Be more open and trusting.'}`;
+Respond in character. Be brief (1-3 sentences). ${trustLevel < 50 ? 'Be guarded and suspicious.' : trustLevel < 75 ? 'Be cautiously friendly.' : 'Be more open and trusting.'}
+IMPORTANT: Do NOT start with your name. Just speak directly.`;
 
   try {
     const response = await provider.generate(prompt, {
@@ -244,84 +271,151 @@ Respond as ${npc.name}. Stay in character. Be brief (1-3 sentences). ${trustLeve
 }
 
 // =============================================================================
-// Puzzle Flow
+// Puzzle Flow (using pre-built content)
 // =============================================================================
 
-async function checkForReunion(chatId: number, state: UserState): Promise<string | null> {
-  const now = new Date();
-  const awayMinutes = (now.getTime() - state.lastSeen.getTime()) / 1000 / 60;
+/**
+ * Format the daily puzzle for display
+ */
+function formatPuzzle(content: DayContent): string {
+  const lines = [
+    `📰 *DAY ${content.day}*`,
+    '',
+    content.digest,
+    '',
+    '---',
+    '',
+    '🔍 *SPOT THE LIE*',
+    '',
+    'One of these statements is FALSE. Which one?',
+    '',
+  ];
 
-  // Check if puzzle is available
-  if (awayMinutes >= CONFIG.minAwayForDigest && puzzleEngine.isPuzzleAvailable(state.caseProgress)) {
-    // Generate what happened while away
-    const digest = await generateDigest(state);
-    state.pendingDigest = digest;
-    state.currentPuzzle = digest.puzzle;
-    saveState(chatId);
+  content.statements.forEach((s, i) => {
+    lines.push(`${i + 1}. ${s.speakerEmoji} *${s.speakerName}*: "${s.statement}"`);
+  });
 
-    // Format the reunion message
-    let message = puzzleFormatter.formatDigestSummary(digest);
-    message += puzzleFormatter.formatForChat(digest.puzzle);
+  lines.push('');
+  lines.push('Reply with *1*, *2*, or *3*');
 
-    return message;
-  }
-
-  return null;
+  return lines.join('\n');
 }
 
-async function generateDigest(state: UserState): Promise<DailyDigest> {
-  // Setup story generator with NPC knowledge
-  storyGenerator.setupCast(getAllNPCKnowledge());
-
-  // Generate fake events (in production, these would come from the idle engine)
-  const { conversations, activities } = storyGenerator.generateFakeEvents(5);
-
-  // Record them in digest generator
-  for (const knowledge of getAllNPCKnowledge()) {
-    digestGenerator.registerNPC(knowledge);
-  }
-  for (const conv of conversations) {
-    digestGenerator.recordConversation(conv);
-  }
-  for (const act of activities) {
-    digestGenerator.recordActivity(act);
-  }
-
-  // Generate the digest with puzzle
-  const digest = digestGenerator.generateDigest(state.lastSeen, puzzleEngine);
-
-  // Clear processed events
-  digestGenerator.clearProcessedEvents(new Date());
-
-  return digest;
-}
-
+/**
+ * Handle puzzle answer
+ */
 function handlePuzzleAnswer(chatId: number, state: UserState, answer: string): string {
-  if (!state.currentPuzzle) {
-    return "There's no puzzle to solve right now. Come back later!";
+  if (!state.awaitingPuzzleAnswer || !state.currentPuzzleContent) {
+    return "There's no puzzle to solve right now.";
   }
 
-  // Check if answer is valid (1, 2, or 3)
   const num = parseInt(answer);
   if (isNaN(num) || num < 1 || num > 3) {
-    return "Reply with 1, 2, or 3 to choose which statement is the lie.";
+    return "Reply with *1*, *2*, or *3* to choose which statement is the lie.";
   }
 
-  // Solve the puzzle
-  const { puzzle, progress, result } = puzzleEngine.solvePuzzle(
-    state.currentPuzzle,
-    answer,
-    state.caseProgress
-  );
+  const content = state.currentPuzzleContent;
+  const correct = num === content.correctAnswer;
 
-  state.currentPuzzle = undefined;
-  state.caseProgress = progress;
-  state.pendingDigest = undefined;
+  // Update progress
+  let pointsEarned = 0;
+  if (correct) {
+    pointsEarned = 1;
+    // Streak bonus
+    if (state.caseProgress.currentStreak >= 2) {
+      pointsEarned = 2;
+    }
+    state.caseProgress.progressPoints += pointsEarned;
+    state.caseProgress.puzzlesSolved++;
+    state.caseProgress.currentStreak++;
+    state.caseProgress.longestStreak = Math.max(
+      state.caseProgress.longestStreak,
+      state.caseProgress.currentStreak
+    );
+  } else {
+    state.caseProgress.puzzlesFailed++;
+    state.caseProgress.currentStreak = 0;
+  }
+
+  // Mark puzzle as done for today
+  state.todayPuzzleAttempted = true;
+  state.lastPuzzleDate = getTodayString();
+  state.awaitingPuzzleAnswer = false;
+  state.currentPuzzleContent = undefined;
+
+  // Advance to next day for tomorrow
+  if (correct) {
+    state.currentDay = Math.min(state.currentDay + 1, CASE_CONTENT.length);
+  }
+
+  // Check if case is solved
+  const caseSolved = state.caseProgress.progressPoints >= state.caseProgress.pointsToSolve;
+  if (caseSolved) {
+    state.caseProgress.status = 'solved';
+  }
+
   state.lastSeen = new Date();
   saveState(chatId);
 
-  // Format result
-  return puzzleFormatter.formatResult(result, puzzle);
+  // Trigger background generation of next case if player is close to solving
+  // This runs async in background - doesn't block the response
+  const currentCaseNumber = 1; // TODO: Track actual case number in state
+  caseGenerationManager.onPlayerProgress(
+    String(chatId),
+    currentCaseNumber,
+    state.caseProgress.progressPoints,
+    state.caseProgress.pointsToSolve
+  );
+
+  // Build result message
+  const lieStatement = content.statements[content.correctAnswer - 1];
+  let msg = '';
+
+  if (correct) {
+    msg += '✅ *CORRECT!*\n\n';
+    msg += `+${pointsEarned} point${pointsEarned > 1 ? 's' : ''}${pointsEarned > 1 ? ' (streak bonus!)' : ''}\n\n`;
+    msg += `💡 ${content.revelation}\n`;
+  } else {
+    msg += '❌ *WRONG*\n\n';
+    msg += `The lie was #${content.correctAnswer}:\n`;
+    msg += `${lieStatement.speakerEmoji} ${lieStatement.speakerName}: "${lieStatement.statement}"\n`;
+  }
+
+  msg += getPostPuzzleMessage(
+    correct,
+    pointsEarned,
+    state.caseProgress.progressPoints,
+    state.caseProgress.pointsToSolve
+  );
+
+  if (caseSolved) {
+    msg += '\n\n' + getCaseSolvedMessage();
+  }
+
+  return msg;
+}
+
+/**
+ * Get today's puzzle if available
+ */
+function presentPuzzle(chatId: number, state: UserState): string | null {
+  // Already did puzzle today
+  if (state.todayPuzzleAttempted) {
+    return null;
+  }
+
+  // Get content for current day
+  const content = getDayContent(state.currentDay);
+  if (!content) {
+    return null;
+  }
+
+  // Set up puzzle state
+  state.awaitingPuzzleAnswer = true;
+  state.currentPuzzleContent = content;
+  saveState(chatId);
+
+  return formatPuzzle(content);
 }
 
 // =============================================================================
@@ -330,84 +424,126 @@ function handlePuzzleAnswer(chatId: number, state: UserState, answer: string): s
 
 const COMMANDS: Record<string, (chatId: number, state: UserState, args?: string) => Promise<string>> = {
   async START(chatId, state) {
-    state.isNewUser = false;
+    // FTUE: Show welcome + first puzzle
+    if (!state.hasSeenWelcome) {
+      state.hasSeenWelcome = true;
+      state.isNewUser = false;
+      saveState(chatId);
+
+      let msg = WELCOME_MESSAGE;
+
+      // Present first puzzle immediately
+      const puzzle = presentPuzzle(chatId, state);
+      if (puzzle) {
+        msg += puzzle;
+      }
+
+      return msg;
+    }
+
+    // Returning user - check for puzzle
     state.sessionCount++;
+
+    if (state.todayPuzzleAttempted) {
+      saveState(chatId);
+      const p = state.caseProgress;
+      const percent = Math.round((p.progressPoints / p.pointsToSolve) * 100);
+      const bar = '▓'.repeat(Math.round(percent / 10)) + '░'.repeat(10 - Math.round(percent / 10));
+
+      return `Welcome back to *Wanderer's Rest*.
+
+You've already done today's puzzle.
+
+*Progress:* ${p.progressPoints}/${p.pointsToSolve} points
+${bar} ${percent}%
+
+Come back tomorrow for the next clue.
+
+In the meantime, talk to the regulars: MAREN, KIRA, ALDRIC, ELENA, THOM`;
+    }
+
+    // Present puzzle
+    const puzzle = presentPuzzle(chatId, state);
+    if (puzzle) {
+      return `Welcome back to *Wanderer's Rest*.\n\n${puzzle}`;
+    }
+
     saveState(chatId);
-    return tavernWelcome;
+    return `Welcome back to *Wanderer's Rest*.\n\nTalk to the regulars: MAREN, KIRA, ALDRIC, ELENA, THOM`;
   },
 
   async HELP(chatId, state) {
-    return `**Wanderer's Rest Commands**
+    return `*Wanderer's Rest Commands*
 
-Talk to the regulars to build trust and gather clues.
-
-**Talk to someone:**
+*Talk to someone:*
 MAREN, KIRA, ALDRIC, ELENA, THOM
 
-**Game:**
-PUZZLE - Get today's puzzle (if available)
+*Game:*
+PUZZLE - Get today's puzzle
 PROGRESS - See your case progress
-STATUS - Who's in the tavern
 
-**Other:**
-RESET - Start over
-`;
+*Other:*
+RESET - Start over`;
   },
 
   async STATUS(chatId, state) {
-    let status = `**Wanderer's Rest**\n\n`;
-    status += `**Current case:** ${harrenCase.name}\n`;
-    status += `**Progress:** ${state.caseProgress.progressPoints}/${state.caseProgress.pointsToSolve} points\n`;
-    status += `**Puzzles solved:** ${state.caseProgress.puzzlesSolved}\n`;
-    status += `**Current streak:** ${state.caseProgress.currentStreak}\n\n`;
-    status += `**In the tavern:**\n`;
-    status += coreCast.map(n => `${n.emoji} ${n.name} - ${n.role}`).join('\n');
-    return status;
-  },
-
-  async PROGRESS(chatId, state) {
     const p = state.caseProgress;
     const percent = Math.round((p.progressPoints / p.pointsToSolve) * 100);
     const bar = '▓'.repeat(Math.round(percent / 10)) + '░'.repeat(10 - Math.round(percent / 10));
 
-    let msg = `**Case: ${harrenCase.name}**\n\n`;
-    msg += `Progress: ${percent}%\n`;
-    msg += `${bar}\n\n`;
-    msg += `Points: ${p.progressPoints}/${p.pointsToSolve}\n`;
-    msg += `Puzzles solved: ${p.puzzlesSolved}\n`;
-    msg += `Puzzles failed: ${p.puzzlesFailed}\n`;
-    msg += `Current streak: ${p.currentStreak}\n`;
-    msg += `Best streak: ${p.longestStreak}\n`;
+    let msg = `*Wanderer's Rest*\n`;
+    msg += `Day ${state.currentDay} of the investigation\n\n`;
+    msg += `*Case:* ${harrenCase.name}\n`;
+    msg += `*Progress:* ${p.progressPoints}/${p.pointsToSolve}\n`;
+    msg += `${bar} ${percent}%\n\n`;
+    msg += `Puzzles: ${p.puzzlesSolved} solved, ${p.puzzlesFailed} failed\n`;
+    msg += `Streak: ${p.currentStreak} (best: ${p.longestStreak})\n`;
+    msg += `Today's puzzle: ${state.todayPuzzleAttempted ? '✅ Done' : '⏳ Available'}`;
 
     if (p.status === 'solved') {
-      msg += `\n🎉 **CASE SOLVED!**`;
+      msg += `\n\n🎉 *CASE SOLVED!*`;
     }
 
     return msg;
   },
 
+  async PROGRESS(chatId, state) {
+    return COMMANDS.STATUS(chatId, state);
+  },
+
   async PUZZLE(chatId, state) {
-    if (state.currentPuzzle) {
-      return puzzleFormatter.formatForChat(state.currentPuzzle);
+    // Check if already awaiting answer
+    if (state.awaitingPuzzleAnswer && state.currentPuzzleContent) {
+      return formatPuzzle(state.currentPuzzleContent);
     }
 
-    if (puzzleEngine.isPuzzleAvailable(state.caseProgress)) {
-      const digest = await generateDigest(state);
-      state.currentPuzzle = digest.puzzle;
-      saveState(chatId);
+    // Check if already done today
+    if (state.todayPuzzleAttempted) {
+      const p = state.caseProgress;
+      const percent = Math.round((p.progressPoints / p.pointsToSolve) * 100);
+      const bar = '▓'.repeat(Math.round(percent / 10)) + '░'.repeat(10 - Math.round(percent / 10));
 
-      let msg = puzzleFormatter.formatDigestSummary(digest);
-      msg += puzzleFormatter.formatForChat(digest.puzzle);
-      return msg;
+      return `You've already done today's puzzle.
+
+*Progress:* ${p.progressPoints}/${p.pointsToSolve} points
+${bar} ${percent}%
+
+Come back tomorrow for the next clue.`;
     }
 
-    return "No puzzle available yet. Come back after some time has passed!";
+    // Present puzzle
+    const puzzle = presentPuzzle(chatId, state);
+    if (puzzle) {
+      return puzzle;
+    }
+
+    return "Something went wrong. Try RESET to start over.";
   },
 
   async RESET(chatId, state) {
     userStates.delete(chatId);
     persistence.delete(chatId);
-    return "The tavern fades from memory. When you return, it will be as if for the first time.";
+    return "The tavern fades from memory.\n\nSend START to begin again.";
   },
 
   // Talk to NPCs
@@ -439,8 +575,13 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
   const trimmed = text.trim();
   const upper = trimmed.toUpperCase();
 
-  // Check for puzzle answer (1, 2, or 3) if puzzle is pending
-  if (state.currentPuzzle && /^[123]$/.test(trimmed)) {
+  // FTUE: First message triggers START
+  if (!state.hasSeenWelcome) {
+    return COMMANDS.START(chatId, state);
+  }
+
+  // Check for puzzle answer (1, 2, or 3) if awaiting answer
+  if (state.awaitingPuzzleAnswer && /^[123]$/.test(trimmed)) {
     return handlePuzzleAnswer(chatId, state, trimmed);
   }
 
@@ -449,12 +590,9 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
     return COMMANDS[upper](chatId, state);
   }
 
-  // Check if returning after being away
-  if (state.history.length > 0) {
-    const reunion = await checkForReunion(chatId, state);
-    if (reunion) {
-      return reunion;
-    }
+  // Check for /start (telegram format)
+  if (upper === '/START') {
+    return COMMANDS.START(chatId, state);
   }
 
   // Check for NPC name mentions
@@ -471,6 +609,11 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
     } else {
       return startConversation(chatId, state, npcMention.id);
     }
+  }
+
+  // If awaiting puzzle answer, remind them
+  if (state.awaitingPuzzleAnswer) {
+    return "Reply with *1*, *2*, or *3* to answer the puzzle.\n\nOr type PUZZLE to see it again.";
   }
 
   // If already talking to someone, continue that conversation
@@ -558,11 +701,18 @@ async function main() {
 
   // Initialize puzzle system
   puzzleEngine = new PuzzleEngine({ pointsToSolve: CONFIG.puzzlePointsToSolve });
-  puzzleFormatter = new PuzzleFormatter();
-  digestGenerator = new DigestGenerator();
-  storyGenerator = new StoryGenerator();
+  console.log(`✓ Puzzle engine ready (${CASE_CONTENT.length} days of content)`);
 
-  console.log('✓ Puzzle engine ready');
+  // Initialize case generator for auto-generating next mysteries
+  const caseGenerator = new CaseGenerator({
+    provider,
+    outputDir: resolve(saveDir, 'generated-cases'),
+    existingNPCs: coreCast.map(n => ({ id: n.id, name: n.name, emoji: n.emoji, role: n.role })),
+    previousCases: [{ id: harrenCase.id, name: harrenCase.name, resolution: harrenCase.revelation }],
+    worldContext: WANDERERS_REST_CONTEXT,
+  });
+  caseGenerationManager = new CaseGenerationManager(caseGenerator);
+  console.log(`✓ Case generator ready (auto-generates at 80% progress)`);
 
   // Create bot
   bot = new Bot(botToken);

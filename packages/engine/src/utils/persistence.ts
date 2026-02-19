@@ -4,7 +4,7 @@
  * Save/load game state to JSON files.
  */
 
-import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync } from 'fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync, readdirSync, unlinkSync } from 'fs';
 import { join, dirname } from 'path';
 
 export interface SavedNPCState {
@@ -84,8 +84,7 @@ export class Persistence {
   delete(chatId: number): void {
     const path = this.getPath(chatId);
     if (existsSync(path)) {
-      const fs = require('fs');
-      fs.unlinkSync(path);
+      unlinkSync(path);
     }
   }
 
