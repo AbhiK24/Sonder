@@ -3,102 +3,100 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Wanderer's Rest - Dashboard</title>
+  <title>Sonder</title>
   <link rel="stylesheet" href="style.css">
-  <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Crimson+Text:ital,wght@0,400;0,600;1,400&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="container">
-    <!-- Header -->
-    <header class="tavern-header">
+    <header class="tavern-header sonder-header">
       <div class="tavern-sign">
-        <h1>Wanderer's Rest</h1>
-        <p class="tagline">Where secrets find their keepers</p>
-      </div>
-      <div class="day-counter">
-        <span class="label">Day</span>
-        <span class="day-number" id="currentDay">1</span>
+        <h1>Sonder</h1>
+        <p class="tagline">AI companions that live while you're away</p>
       </div>
     </header>
 
-    <!-- Tavern Atmosphere -->
-    <section class="atmosphere" id="atmosphere">
-      <p>The fire crackles. Shadows dance on old wood. The tavern waits.</p>
+    <section class="atmosphere">
+      <p>The realization that each random passerby is living a life as vivid and complex as your own.</p>
     </section>
 
-    <!-- NPCs Grid -->
     <section class="section">
-      <h2 class="section-title">Souls of the Tavern</h2>
-      <div class="npc-grid" id="npcGrid">
-        <!-- NPCs will be inserted here -->
+      <h2 class="section-title">Active Plays</h2>
+      <div class="plays-grid" id="playsGrid">
+        <!-- Loaded via JS -->
       </div>
     </section>
 
-    <!-- Active Case -->
     <section class="section">
-      <h2 class="section-title">The Mystery</h2>
-      <div class="case-board" id="caseBoard">
-        <!-- Case info will be inserted here -->
-      </div>
-    </section>
-
-    <!-- Clues & Facts -->
-    <section class="section">
-      <h2 class="section-title">Your Journal</h2>
-      <div class="journal">
-        <div class="journal-column">
-          <h3>Clues Discovered</h3>
-          <ul class="clue-list" id="clueList">
-            <!-- Clues will be inserted here -->
-          </ul>
-        </div>
-        <div class="journal-column">
-          <h3>Known Facts</h3>
-          <ul class="fact-list" id="factList">
-            <!-- Facts will be inserted here -->
-          </ul>
-        </div>
-      </div>
-    </section>
-
-    <!-- Suspicions -->
-    <section class="section">
-      <h2 class="section-title">Suspicions</h2>
-      <div class="suspicions" id="suspicions">
-        <p class="empty-state">Your gut tells you nothing seems off... yet.</p>
-      </div>
-    </section>
-
-    <!-- Stats -->
-    <section class="section stats-section">
-      <div class="stats-grid">
+      <h2 class="section-title">Engine Stats</h2>
+      <div class="stats-grid" id="statsGrid">
         <div class="stat-box">
-          <span class="stat-label">Conversations</span>
-          <span class="stat-value" id="totalConvos">0</span>
+          <span class="stat-label">Active Sessions</span>
+          <span class="stat-value" id="statSessions">0</span>
         </div>
         <div class="stat-box">
-          <span class="stat-label">Facts Learned</span>
-          <span class="stat-value" id="totalFacts">0</span>
+          <span class="stat-label">Total Agents</span>
+          <span class="stat-value" id="statAgents">0</span>
         </div>
         <div class="stat-box">
-          <span class="stat-label">Clues Found</span>
-          <span class="stat-value" id="totalClues">0</span>
+          <span class="stat-label">Messages Today</span>
+          <span class="stat-value" id="statMessages">-</span>
         </div>
         <div class="stat-box">
-          <span class="stat-label">Tokens Used</span>
-          <span class="stat-value" id="totalTokens">0</span>
+          <span class="stat-label">Puzzles Solved</span>
+          <span class="stat-value" id="statPuzzles">-</span>
         </div>
       </div>
     </section>
 
-    <!-- Footer -->
+    <section class="section">
+      <h2 class="section-title">What is Sonder?</h2>
+      <div class="intro-card">
+        <p>Sonder is an engine for AI companions that feel alive. Not chatbots you summon, but presences that persist.</p>
+        <ul class="feature-list">
+          <li><strong>Plays</strong> — Themed experiences with distinct casts and mechanics</li>
+          <li><strong>Agents</strong> — Characters with personality, memory, and relationships</li>
+          <li><strong>Idle Loop</strong> — The world moves while you're away</li>
+          <li><strong>Reunion</strong> — Come back to find things have happened</li>
+        </ul>
+      </div>
+    </section>
+
     <footer class="footer">
-      <p>Sonder &mdash; Every soul has a story</p>
-      <p class="last-updated">Last updated: <span id="lastUpdated">Never</span></p>
+      <p>Sonder</p>
+      <p class="last-updated">Every soul has a story</p>
     </footer>
   </div>
 
-  <script src="dashboard.js"></script>
+  <script>
+    async function load() {
+      // Load plays
+      const res = await fetch('/api/plays');
+      const { plays } = await res.json();
+
+      document.getElementById('playsGrid').innerHTML = plays.map(play => `
+        <a href="/play.html?id=${play.id}" class="play-card">
+          <h3>${play.name}</h3>
+          <p class="play-tagline">${play.tagline}</p>
+          <div class="play-agents">
+            ${play.agents.map(a => `<span class="agent-emoji" title="${a.name}">${a.emoji}</span>`).join('')}
+          </div>
+        </a>
+      `).join('');
+
+      // Update stats
+      document.getElementById('statAgents').textContent = plays.reduce((sum, p) => sum + p.agents.length, 0);
+
+      // Load sessions count
+      try {
+        const gamesRes = await fetch('/api/games');
+        const { games } = await gamesRes.json();
+        document.getElementById('statSessions').textContent = games.length;
+      } catch (e) {
+        document.getElementById('statSessions').textContent = '-';
+      }
+    }
+    load();
+  </script>
 </body>
 </html>

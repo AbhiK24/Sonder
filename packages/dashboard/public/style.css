@@ -535,6 +535,44 @@ body {
   font-style: italic;
 }
 
+/* Intro Card */
+.intro-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  padding: 1.5rem;
+}
+
+.intro-card p {
+  font-size: 1.1rem;
+  margin-bottom: 1rem;
+}
+
+.feature-list {
+  list-style: none;
+  margin-top: 1rem;
+}
+
+.feature-list li {
+  padding: 0.5rem 0;
+  border-bottom: 1px solid var(--border-color);
+  color: var(--text-secondary);
+}
+
+.feature-list li:last-child {
+  border-bottom: none;
+}
+
+.feature-list strong {
+  color: var(--accent-copper);
+}
+
+/* Sonder Header */
+.sonder-header {
+  justify-content: center;
+  text-align: center;
+}
+
 /* Back Link */
 .back-link {
   color: var(--text-secondary);
