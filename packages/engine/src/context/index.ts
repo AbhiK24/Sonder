@@ -276,9 +276,9 @@ export class EngineContext {
     });
     parts.push(`## Current Time\n${timeStr} (${timezone})`);
 
-    // Calendar summary
-    const todayEvents = this.getTodayEvents();
+    // Calendar summary - ALWAYS include to prevent hallucination
     const upcomingEvents = this.getUpcomingEvents(48); // Next 48 hours
+    const hasCalendar = this.config.calendarAdapter?.isConnected();
 
     if (upcomingEvents.length > 0) {
       const eventLines = upcomingEvents.slice(0, 10).map(e => {
@@ -287,13 +287,17 @@ export class EngineContext {
         const calName = e.calendarName ? ` [${e.calendarName}]` : '';
         return `- ${dateStr} ${timeStr}: ${e.title}${calName}`;
       });
-
       parts.push(`## Calendar (next 48h)\n${eventLines.join('\n')}`);
+    } else if (hasCalendar) {
+      parts.push(`## Calendar\nNo events in the next 48 hours. Calendar is connected but empty for this period.`);
+    } else {
+      parts.push(`## Calendar\nNo calendar connected. If user asks about calendar/meetings, tell them to connect one in settings.`);
     }
 
-    // Tasks summary
+    // Tasks summary - ALWAYS include to prevent hallucination
     const todayTasks = this.getTodayTasks();
     const overdueTasks = this.getOverdueTasks();
+    const hasTasks = this.config.taskAdapter?.isConnected();
 
     if (overdueTasks.length > 0 || todayTasks.length > 0) {
       const taskLines: string[] = [];
@@ -313,6 +317,10 @@ export class EngineContext {
       }
 
       parts.push(`## Tasks\n${taskLines.join('\n')}`);
+    } else if (hasTasks) {
+      parts.push(`## Tasks\nNo tasks due today or overdue. Task manager is connected.`);
+    } else {
+      parts.push(`## Tasks\nNo task manager connected.`);
     }
 
     return parts.join('\n\n');
