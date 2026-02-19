@@ -36,14 +36,11 @@ import type {
 import type {
   Play,
   Agent,
-  AgentRelationship,
-  WorldState,
-  WorldRules,
-  IdleBehavior,
-  TriggerDefinition,
-  ToolPermissions,
-  PlayChannels,
+  PlayCapabilities,
 } from '../../engine/src/plays/types.js';
+import { getDefaultCapabilities } from '../../engine/src/plays/types.js';
+import { chorusOrchestratorConfig } from '../../engine/src/plays/chorus/orchestrator.js';
+import { chorusFTUE } from '../../engine/src/plays/chorus/ftue.js';
 
 // =============================================================================
 // Play Definition (Full Play interface)
@@ -95,7 +92,7 @@ export const CHORUS_PLAY: Play = {
     They reach out when you need them. They're rooting for you.
   `.trim(),
   version: '0.1.0',
-  type: 'companion',
+  archetype: 'support_crew',
 
   // Cast
   agents: agentList.map(toEngineAgent),
@@ -285,6 +282,18 @@ export const CHORUS_PLAY: Play = {
     web: {
       enabled: true,
     },
+  },
+
+  // Orchestrator - who speaks when
+  orchestrator: chorusOrchestratorConfig,
+
+  // FTUE - first time user experience
+  ftue: chorusFTUE,
+
+  // Capabilities - what engine features this play uses
+  capabilities: {
+    ...getDefaultCapabilities('support_crew'),
+    // All support_crew defaults are good for Chorus
   },
 };
 
