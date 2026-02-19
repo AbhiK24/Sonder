@@ -81,7 +81,7 @@ pnpm chorus
 You inherit a tavern. The previous owner died mysteriously. NPCs remember what you say. Evidence contradicts. Solve it through conversation.
 
 ```bash
-pnpm telegram
+pnpm tavern
 ```
 
 ---
@@ -194,7 +194,7 @@ The only cloud calls are to your LLM provider (and you can use local Ollama).
 ```bash
 pnpm onboard           # Setup wizard
 pnpm chorus            # Run Chorus (ADHD support)
-pnpm telegram          # Run Wanderer's Rest
+pnpm tavern            # Run Wanderer's Rest (mystery game)
 pnpm dashboard         # Visual interface
 pnpm typecheck         # Type check
 ```
