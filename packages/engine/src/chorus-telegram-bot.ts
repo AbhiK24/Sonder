@@ -611,50 +611,55 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
   // Record activity for idle engine
   idleEngine.recordActivity(String(chatId));
 
-  // Handle FTUE for new users
+  // ============================================================
+  // COMMANDS - Check these FIRST, even during FTUE
+  // ============================================================
+
+  // RESET always works
+  if (upper === 'RESET') {
+    return COMMANDS.RESET(chatId, state);
+  }
+
+  // START command
+  if (upper === 'START' || upper === '/START') {
+    if (needsFTUE(state.profile)) {
+      await startFTUE(chatId, state, state.savedFtueProgress);
+      state.savedFtueProgress = undefined;
+      return '';
+    }
+    return COMMANDS.START(chatId, state);
+  }
+
+  // Other commands (but not during FTUE - we want those as responses)
+  if (!state.inFTUE && COMMANDS[upper]) {
+    return COMMANDS[upper](chatId, state);
+  }
+
+  // ============================================================
+  // FTUE - Handle onboarding flow
+  // ============================================================
+
   if (state.inFTUE) {
     // Check if we need to start/resume FTUE
     if (!state.ftueRunner) {
       await startFTUE(chatId, state, state.savedFtueProgress);
-      state.savedFtueProgress = undefined; // Clear after using
+      state.savedFtueProgress = undefined;
       return ''; // Messages sent by FTUE runner
     }
 
     // If it looks like an off-topic question, answer it without breaking FTUE
     if (looksLikeQuestion(trimmed)) {
       const answer = await answerOffTopicDuringFTUE(chatId, state, trimmed);
-      saveState(chatId); // Save progress
+      saveState(chatId);
       return answer;
     }
 
     // Process FTUE response
     const handled = await processFTUEResponse(chatId, state, trimmed);
     if (handled) {
-      saveState(chatId); // Save progress after each FTUE step
+      saveState(chatId);
       return ''; // Messages sent by FTUE runner
     }
-  }
-
-  // Check for commands (but allow RESET even during FTUE)
-  if (upper === 'RESET') {
-    return COMMANDS.RESET(chatId, state);
-  }
-
-  // Check for commands (skip START for returning users)
-  if (COMMANDS[upper] && upper !== 'START') {
-    return COMMANDS[upper](chatId, state);
-  }
-
-  // Handle START command specially
-  if (upper === 'START') {
-    // If new user, start FTUE
-    if (needsFTUE(state.profile)) {
-      await startFTUE(chatId, state, state.savedFtueProgress);
-      state.savedFtueProgress = undefined;
-      return '';
-    }
-    // Otherwise, welcome back
-    return COMMANDS.START(chatId, state);
   }
 
   // Check for agent name mentions (switch + respond)
