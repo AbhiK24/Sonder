@@ -3,15 +3,28 @@
  *
  * A Play is the core unit of Sonder — a complete multi-agent experience.
  *
- * Supports three modes:
- * - Companion: Agents help you (Chorus)
- * - Game: Agents have secrets, you investigate (Wanderer's Rest)
- * - Simulation: Agents interact, you observe (The Office)
+ * THREE ARCHETYPES:
  *
- * Key concepts:
- * - Orchestrator: The brain that decides which agent speaks
- * - FTUE: First Time User Experience flow
- * - Goals: User goals gathered during FTUE, drive proactive behavior
+ * 1. SUPPORT_CREW (Chorus)
+ *    - Agents talk TO you
+ *    - You are the focus
+ *    - Goal-driven, proactive check-ins
+ *    - Uses: orchestrator, goals, idle (thinks about you), triggers
+ *
+ * 2. SIMULATION (The Office, Ant Farm)
+ *    - Agents talk to EACH OTHER
+ *    - You are a viewer, occasional participant
+ *    - World evolves independently
+ *    - Uses: agent-to-agent messaging, world state, spectate mode
+ *
+ * 3. NARRATIVE_GAME (Wanderer's Rest)
+ *    - Agents have secrets, puzzles to solve
+ *    - You are an investigator/player
+ *    - Plot advances while you're away
+ *    - Uses: secrets, puzzles, world events, discovery
+ *
+ * All abstractions are available to all plays.
+ * Each play chooses which to enable.
  */
 
 import type { OrchestratorConfig } from '../orchestrator/types.js';
@@ -21,7 +34,29 @@ import type { FTUEFlow } from '../ftue/types.js';
 // Play Definition
 // =============================================================================
 
-export type PlayType = 'companion' | 'game' | 'simulation' | 'hybrid';
+export type PlayArchetype = 'support_crew' | 'simulation' | 'narrative_game';
+
+/**
+ * What each archetype typically enables:
+ *
+ * support_crew:
+ *   userRole: 'subject'
+ *   idleBehavior: thinkAboutUser, discussUser
+ *   interactionModes: direct_chat, check_in, notification
+ *   worldRules: agentsCanLie=false, agentsCanHide=false
+ *
+ * simulation:
+ *   userRole: 'observer'
+ *   idleBehavior: continueActivities, agentToAgent
+ *   interactionModes: observation, discussion
+ *   worldRules: agentsCanLie=true (to each other)
+ *
+ * narrative_game:
+ *   userRole: 'investigator'
+ *   idleBehavior: advanceWorld, plotAdvance
+ *   interactionModes: interrogation, direct_chat
+ *   worldRules: agentsCanLie=true, agentsCanHide=true, hasWinCondition=true
+ */
 
 /**
  * When an agent shines - used by orchestrator for speaker selection
@@ -50,7 +85,7 @@ export interface Play {
   tagline: string;
   description: string;
   version: string;
-  type: PlayType;
+  archetype: PlayArchetype;
 
   // The cast
   agents: Agent[];
@@ -84,6 +119,40 @@ export interface Play {
 
   // FTUE: First Time User Experience flow
   ftue: FTUEFlow;
+
+  // Which engine capabilities this play uses
+  capabilities: PlayCapabilities;
+}
+
+// =============================================================================
+// Play Capabilities - What engine features this play uses
+// =============================================================================
+
+export interface PlayCapabilities {
+  // User-focused features (Support Crew)
+  goals: boolean;                    // Track user goals, follow up
+  checkIns: boolean;                 // Scheduled check-ins
+  celebrations: boolean;             // Celebrate wins
+  patterns: boolean;                 // Detect user patterns
+
+  // Agent-to-agent features (Simulation)
+  agentToAgentChat: boolean;         // Agents talk to each other
+  agentRelationships: boolean;       // Track relationships between agents
+  spectateMode: boolean;             // User can watch agent conversations
+
+  // Narrative features (Game)
+  secrets: boolean;                  // Agents have secrets
+  puzzles: boolean;                  // Puzzles to solve
+  worldProgression: boolean;         // World/plot advances
+  discovery: boolean;                // User discovers things
+
+  // Common features
+  calendar: boolean;                 // Use calendar context
+  tasks: boolean;                    // Use tasks context
+  email: boolean;                    // Send emails
+  whatsapp: boolean;                 // Send WhatsApp
+  idleThinking: boolean;             // Generate thoughts while away
+  reunion: boolean;                  // Reunion moment on return
 }
 
 // =============================================================================
@@ -502,4 +571,69 @@ export interface AccumulatedContent {
   type: IdleContentType;
   content: string;
   shared: boolean;
+}
+
+// =============================================================================
+// Capability Presets
+// =============================================================================
+
+/**
+ * Default capabilities for each archetype.
+ * Plays can override any of these.
+ */
+export function getDefaultCapabilities(archetype: PlayArchetype): PlayCapabilities {
+  const base: PlayCapabilities = {
+    goals: false,
+    checkIns: false,
+    celebrations: false,
+    patterns: false,
+    agentToAgentChat: false,
+    agentRelationships: false,
+    spectateMode: false,
+    secrets: false,
+    puzzles: false,
+    worldProgression: false,
+    discovery: false,
+    calendar: true,
+    tasks: true,
+    email: false,
+    whatsapp: false,
+    idleThinking: true,
+    reunion: true,
+  };
+
+  switch (archetype) {
+    case 'support_crew':
+      return {
+        ...base,
+        goals: true,
+        checkIns: true,
+        celebrations: true,
+        patterns: true,
+        email: true,
+        whatsapp: true,
+      };
+
+    case 'simulation':
+      return {
+        ...base,
+        agentToAgentChat: true,
+        agentRelationships: true,
+        spectateMode: true,
+        worldProgression: true,
+      };
+
+    case 'narrative_game':
+      return {
+        ...base,
+        secrets: true,
+        puzzles: true,
+        worldProgression: true,
+        discovery: true,
+        agentRelationships: true,
+      };
+
+    default:
+      return base;
+  }
 }
