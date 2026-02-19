@@ -10,30 +10,35 @@ Sonder uses **two separate identities**:
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│                         SONDER (System)                         │
+│                      AGENTS (Their Identity)                    │
 │                                                                 │
-│  Email: angels@yourdomain.com (or sonder.angels@gmail.com)     │
+│  Email: luna+wanderers-rest@sonder.ai (Resend + Mailgun)       │
 │  WhatsApp: +1-415-555-0123 (Twilio number)                     │
-│  Telegram: @SonderAngelsBot                                     │
+│  Telegram: @WanderersRestBot                                    │
 │                                                                 │
-│  → This is WHO SENDS messages/invites                          │
-│  → Angels speak through this identity                          │
+│  → Agents SEND from these addresses                            │
+│  → Each agent+play has unique email                            │
+│  → Simple API key setup (no OAuth)                             │
 └─────────────────────────────────────────────────────────────────┘
                               │
-                              │ sends to
+                              │ sends to / helps with
                               ▼
 ┌─────────────────────────────────────────────────────────────────┐
 │                          USER (You)                             │
 │                                                                 │
-│  Email: you@gmail.com (your personal email)                    │
+│  Email: you@gmail.com (agents read + draft here)               │
+│  Calendar: your Google Calendar (agents read + create events)  │
 │  WhatsApp: +1-555-123-4567 (your phone)                        │
-│  Telegram: your chat with @SonderAngelsBot                     │
-│  Calendar: your Google Calendar                                 │
+│  Tasks: your Todoist                                            │
 │                                                                 │
-│  → This is WHO RECEIVES messages/invites                       │
-│  → Your calendar, your tasks, your inbox                       │
+│  → Agents READ your calendar and inbox (Google OAuth)          │
+│  → Agents HELP you manage your accounts                        │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+**Two email systems:**
+- **Agent emails** (Resend/Mailgun) — Agents send AS themselves: `luna@sonder.ai → you@gmail.com`
+- **User Gmail** (Google OAuth) — Agents read/draft IN your inbox: help you reply to Sarah
 
 ### Example: Calendar Time Block
 
@@ -296,17 +301,17 @@ TWILIO_WHATSAPP_NUMBER=+1234567890  # Your purchased number
 
 These connect to YOUR accounts so agents can help you.
 
-### 3.1 Google Calendar + Gmail (Your Account) — Optional
+### 3.1 Google Calendar + Gmail (Your Account)
 
-**Note:** This is for reading YOUR inbox and calendar. Agent emails use Resend/Mailgun (Section 2.1).
+This lets agents:
+- **READ your calendar** — Know when you're busy, upcoming events
+- **CREATE events** — Schedule focus blocks, send invites
+- **READ your email** — Know what needs attention, who's waiting
+- **DRAFT emails** — Help you write responses (in YOUR drafts)
 
-If you want agents to:
-- READ your calendar (know when you're busy)
-- CREATE events (schedule focus blocks)
-- READ your email subjects (know what needs attention)
-- DRAFT emails in your account (help you write responses)
-
-Then set up Google OAuth. Otherwise, skip this section.
+**Note:** This is separate from agent emails (Resend/Mailgun).
+- Agent emails = agents send/receive AS themselves (`luna+play@sonder.ai`)
+- User Gmail = agents help WITH your inbox (`you@gmail.com`)
 
 #### Step 1: Create Google Cloud Project
 
@@ -546,12 +551,12 @@ USER_WHATSAPP=+15551234567
 TODOIST_API_KEY=0123456789abcdef01234567
 
 # =============================================================================
-# USER'S GOOGLE (Optional - for reading YOUR calendar/inbox)
+# USER'S GOOGLE (For reading YOUR calendar and inbox)
 # =============================================================================
-# Only needed if you want agents to read your calendar or draft in your Gmail
-# USER_GOOGLE_CLIENT_ID=1234567890-xxxxx.apps.googleusercontent.com
-# USER_GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxx
-# USER_GOOGLE_REDIRECT_URI=http://localhost:3000/auth/user/callback
+# Agents read your calendar (know when you're busy) and inbox (what needs attention)
+GOOGLE_CLIENT_ID=1234567890-xxxxx.apps.googleusercontent.com
+GOOGLE_CLIENT_SECRET=GOCSPX-xxxxxxxxxxxxx
+GOOGLE_REDIRECT_URI=http://localhost:3000/auth/google/callback
 
 # =============================================================================
 # SETTINGS
@@ -617,9 +622,9 @@ TIMEZONE=America/Los_Angeles
 
 1. ✅ Set up LLM + Telegram (required)
 2. Set up Resend + Mailgun (agent emails)
-3. Set up Twilio (for WhatsApp proactive messages)
-4. Connect Todoist (task tracking)
-5. Optionally: Connect your Google (calendar + gmail access)
+3. Set up Google OAuth (read your calendar + inbox)
+4. Set up Twilio (for WhatsApp proactive messages)
+5. Connect Todoist (task tracking)
 
 Run:
 ```bash
