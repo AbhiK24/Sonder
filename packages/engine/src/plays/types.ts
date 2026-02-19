@@ -7,13 +7,35 @@
  * - Companion: Agents help you (Chorus)
  * - Game: Agents have secrets, you investigate (Wanderer's Rest)
  * - Simulation: Agents interact, you observe (The Office)
+ *
+ * Key concepts:
+ * - Orchestrator: The brain that decides which agent speaks
+ * - FTUE: First Time User Experience flow
+ * - Goals: User goals gathered during FTUE, drive proactive behavior
  */
+
+import type { OrchestratorConfig } from '../orchestrator/types.js';
+import type { FTUEFlow } from '../ftue/types.js';
 
 // =============================================================================
 // Play Definition
 // =============================================================================
 
 export type PlayType = 'companion' | 'game' | 'simulation' | 'hybrid';
+
+/**
+ * When an agent shines - used by orchestrator for speaker selection
+ */
+export type AgentStrength =
+  | 'routine'       // Good at daily check-ins, memory, continuity (Luna)
+  | 'activation'    // Good at energy, motivation, getting started (Ember)
+  | 'wisdom'        // Good at calm, perspective, grounding (Sage)
+  | 'celebration'   // Good at joy, wins, positive moments (Joy)
+  | 'reflection'    // Good at emotions, validation, mirroring (Echo)
+  | 'hospitality'   // Good at welcome, comfort, belonging (Maera)
+  | 'adventure'     // Good at action, stories, excitement (Roderick)
+  | 'knowledge'     // Good at lore, information, teaching (Elara)
+  | 'mischief';     // Good at humor, lightness, play (Pip)
 
 export type UserRole =
   | 'subject'       // User is the subject of agent attention (Companion)
@@ -56,6 +78,12 @@ export interface Play {
 
   // Channels this play supports
   channels: PlayChannels;
+
+  // Orchestrator: decides which agent speaks, synthesizes perspectives
+  orchestrator: OrchestratorConfig;
+
+  // FTUE: First Time User Experience flow
+  ftue: FTUEFlow;
 }
 
 // =============================================================================
@@ -71,6 +99,10 @@ export interface Agent {
 
   // The core prompt that defines this agent
   systemPrompt: string;
+
+  // Orchestrator properties: when this agent should speak
+  strength: AgentStrength;       // When this agent shines
+  voiceStyle: string;            // How they speak: "warm", "energetic", "thoughtful"
 
   // Personality traits
   personality: AgentPersonality;
