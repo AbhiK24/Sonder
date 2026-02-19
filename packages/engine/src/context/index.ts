@@ -289,10 +289,13 @@ export class EngineContext {
       });
       parts.push(`## Calendar (next 48h)\n${eventLines.join('\n')}`);
     } else if (hasCalendar) {
-      parts.push(`## Calendar\nNo events in the next 48 hours. Calendar is connected but empty for this period.`);
+      parts.push(`## Calendar\nNo events in the next 48 hours. Calendar is connected but empty for this period.\n\nIMPORTANT: You can ONLY see the next 48 hours. If user asks about dates beyond that, say "I can only see your calendar for the next 48 hours. I don't have visibility into [date they asked about]."`);
     } else {
       parts.push(`## Calendar\nNo calendar connected. If user asks about calendar/meetings, tell them to connect one in settings.`);
     }
+
+    // Add general grounding instruction
+    parts.push(`\n## CRITICAL: Never hallucinate data\nOnly state facts from the context above. If you don't have information about something (calendar events, tasks, etc.), say "I don't have that information" - NEVER make up data.`);
 
     // Tasks summary - ALWAYS include to prevent hallucination
     const todayTasks = this.getTodayTasks();
