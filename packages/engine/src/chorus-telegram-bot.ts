@@ -20,6 +20,12 @@ import { WhatsAppAdapter, createWhatsAppAdapter } from './integrations/whatsapp.
 import { Persistence } from './utils/persistence.js';
 import type { ModelConfig, LLMProvider } from './types/index.js';
 
+// FTUE & User Profile
+import { FTUERunner, createFTUEState, needsFTUE } from './ftue/index.js';
+import { chorusFTUE } from './plays/chorus/ftue.js';
+import type { UserProfile, Goal } from './user/types.js';
+import { createUserProfile } from './user/types.js';
+
 // Chorus play imports
 import {
   agents as chorusAgents,
@@ -62,6 +68,11 @@ interface UserState {
   taskContext?: 'planning' | 'starting' | 'working' | 'completing' | 'reflecting';
   userEmail?: string;
   userName?: string;
+
+  // FTUE & User Profile
+  profile: UserProfile;
+  ftueRunner?: FTUERunner;
+  inFTUE: boolean;
 }
 
 // =============================================================================
@@ -94,6 +105,27 @@ function getState(chatId: number): UserState {
     const saved = persistence.load(chatId);
 
     if (saved) {
+      // Load existing user
+      const profile: UserProfile = saved.profile || createUserProfile(CONFIG.timezone);
+      if (saved.profile) {
+        // Restore dates
+        profile.createdAt = new Date(profile.createdAt);
+        profile.updatedAt = new Date(profile.updatedAt);
+        if (profile.ftueCompletedAt) profile.ftueCompletedAt = new Date(profile.ftueCompletedAt);
+        profile.goals = (profile.goals || []).map(g => ({
+          ...g,
+          createdAt: new Date(g.createdAt),
+          targetDate: g.targetDate ? new Date(g.targetDate) : undefined,
+          lastCheckedIn: g.lastCheckedIn ? new Date(g.lastCheckedIn) : undefined,
+          nextCheckIn: g.nextCheckIn ? new Date(g.nextCheckIn) : undefined,
+          milestones: (g.milestones || []).map(m => ({
+            ...m,
+            sharedAt: new Date(m.sharedAt),
+            achievedAt: m.achievedAt ? new Date(m.achievedAt) : undefined,
+          })),
+        }));
+      }
+
       userStates.set(chatId, {
         id: chatId,
         lastAgent: saved.lastAgent || 'luna',
@@ -105,9 +137,13 @@ function getState(chatId: number): UserState {
         taskContext: saved.taskContext,
         userEmail: saved.userEmail,
         userName: saved.userName,
+        profile,
+        inFTUE: needsFTUE(profile),
       });
-      console.log(`[${chatId}] Loaded save (session ${saved.sessionCount})`);
+      console.log(`[${chatId}] Loaded save (session ${saved.sessionCount}, ftue: ${profile.ftueCompleted ? 'done' : 'pending'})`);
     } else {
+      // New user - will need FTUE
+      const profile = createUserProfile(CONFIG.timezone);
       userStates.set(chatId, {
         id: chatId,
         lastAgent: 'luna',
@@ -115,7 +151,10 @@ function getState(chatId: number): UserState {
         lastSeen: new Date(),
         sessionCount: 1,
         isNewUser: true,
+        profile,
+        inFTUE: true,
       });
+      console.log(`[${chatId}] New user - starting FTUE`);
     }
   }
 
@@ -126,6 +165,9 @@ function saveState(chatId: number): void {
   const state = userStates.get(chatId);
   if (!state) return;
 
+  // Update profile timestamp
+  state.profile.updatedAt = new Date();
+
   persistence.save(chatId, {
     lastAgent: state.lastAgent,
     history: state.history.slice(-100), // Keep last 100 messages
@@ -135,6 +177,7 @@ function saveState(chatId: number): void {
     taskContext: state.taskContext,
     userEmail: state.userEmail,
     userName: state.userName,
+    profile: state.profile,
   });
 }
 
@@ -389,6 +432,74 @@ async function switchAgent(chatId: number, state: UserState, agentId: ChorusAgen
 }
 
 // =============================================================================
+// FTUE Handling
+// =============================================================================
+
+/**
+ * Start FTUE for a new user
+ */
+async function startFTUE(chatId: number, state: UserState): Promise<void> {
+  console.log(`[${chatId}] Starting FTUE flow`);
+
+  const ftueState = createFTUEState(chorusFTUE, String(chatId), state.profile);
+
+  const runner = new FTUERunner(ftueState, {
+    getAgentDisplay: (agentId: string) => {
+      const agent = chorusAgents[agentId as ChorusAgentId];
+      return agent
+        ? { name: agent.name, emoji: agent.emoji }
+        : { name: 'Luna', emoji: '🌙' };
+    },
+    onMessage: async (message: string, agentId: string) => {
+      await bot.api.sendMessage(chatId, message, { parse_mode: 'Markdown' });
+      // Small delay between messages for natural feel
+      await new Promise(resolve => setTimeout(resolve, 500));
+    },
+  });
+
+  state.ftueRunner = runner;
+  state.inFTUE = true;
+
+  // Start the flow
+  await runner.start();
+}
+
+/**
+ * Process FTUE response
+ */
+async function processFTUEResponse(chatId: number, state: UserState, text: string): Promise<boolean> {
+  if (!state.ftueRunner || !state.inFTUE) {
+    return false;
+  }
+
+  const runner = state.ftueRunner;
+
+  if (!runner.isWaitingForResponse()) {
+    return false;
+  }
+
+  // Process the user's response
+  await runner.processResponse(text);
+
+  // Check if FTUE is complete
+  if (runner.isComplete()) {
+    state.inFTUE = false;
+    state.profile = runner.getUserProfile();
+    state.ftueRunner = undefined;
+    saveState(chatId);
+
+    console.log(`[${chatId}] FTUE complete, goals: ${state.profile.goals.length}`);
+
+    // Log goals gathered
+    state.profile.goals.forEach(g => {
+      console.log(`  - [${g.domain}] ${g.statement}`);
+    });
+  }
+
+  return true;
+}
+
+// =============================================================================
 // Message Handling
 // =============================================================================
 
@@ -400,9 +511,40 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
   // Record activity for idle engine
   idleEngine.recordActivity(String(chatId));
 
-  // Check for commands
-  if (COMMANDS[upper]) {
+  // Handle FTUE for new users
+  if (state.inFTUE) {
+    // Check if we need to start FTUE
+    if (!state.ftueRunner) {
+      await startFTUE(chatId, state);
+      return ''; // Messages sent by FTUE runner
+    }
+
+    // Process FTUE response
+    const handled = await processFTUEResponse(chatId, state, trimmed);
+    if (handled) {
+      return ''; // Messages sent by FTUE runner
+    }
+  }
+
+  // Check for commands (but allow RESET even during FTUE)
+  if (upper === 'RESET') {
+    return COMMANDS.RESET(chatId, state);
+  }
+
+  // Check for commands (skip START for returning users)
+  if (COMMANDS[upper] && upper !== 'START') {
     return COMMANDS[upper](chatId, state);
+  }
+
+  // Handle START command specially
+  if (upper === 'START') {
+    // If new user, start FTUE
+    if (needsFTUE(state.profile)) {
+      await startFTUE(chatId, state);
+      return '';
+    }
+    // Otherwise, welcome back
+    return COMMANDS.START(chatId, state);
   }
 
   // Check for agent name mentions (switch + respond)
@@ -746,7 +888,10 @@ async function main() {
 
     try {
       const response = await handleMessage(chatId, text);
-      await ctx.reply(response, { parse_mode: 'Markdown' });
+      // Only reply if there's a response (FTUE sends messages directly)
+      if (response) {
+        await ctx.reply(response, { parse_mode: 'Markdown' });
+      }
     } catch (error) {
       console.error(`[${chatId}] Error:`, error);
       await ctx.reply("Something went wrong. I'm still here though. Try again? 💫");
