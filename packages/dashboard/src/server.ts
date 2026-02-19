@@ -17,7 +17,7 @@ import { spawn } from 'child_process';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const publicDir = resolve(__dirname, '../public');
 const assetsDir = resolve(__dirname, '../assets');
-const rootDir = resolve(__dirname, '../../../..');
+const rootDir = resolve(__dirname, '../../..');
 const envPath = resolve(rootDir, '.env');
 
 // Load .env
