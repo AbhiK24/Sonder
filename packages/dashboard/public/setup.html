@@ -535,6 +535,39 @@
     a:hover {
       text-decoration: underline;
     }
+
+    /* Help boxes */
+    .help-box {
+      background: var(--accent-dim);
+      border: 1px solid rgba(167, 139, 250, 0.3);
+      border-radius: 8px;
+      padding: 16px;
+      margin-bottom: 16px;
+      font-size: 0.9rem;
+    }
+
+    .help-box strong {
+      display: block;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    .help-box ol {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--text-muted);
+    }
+
+    .help-box li {
+      margin-bottom: 4px;
+    }
+
+    .help-box code {
+      background: rgba(255,255,255,0.1);
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-family: monospace;
+    }
   </style>
 </head>
 <body>
@@ -618,6 +651,16 @@
           </select>
         </div>
 
+        <div class="help-box" id="llm-help">
+          <strong>How to get your API key:</strong>
+          <ol id="llm-help-steps">
+            <li>Go to <a href="https://platform.moonshot.cn/console/api-keys" target="_blank">platform.moonshot.cn</a></li>
+            <li>Sign up or log in</li>
+            <li>Click "Create API Key"</li>
+            <li>Copy and paste it below</li>
+          </ol>
+        </div>
+
         <div class="form-group" id="llm-key-group">
           <label>API Key</label>
           <div class="input-row">
@@ -636,14 +679,21 @@
           <span class="section-badge">Required</span>
         </div>
 
-        <p style="margin-bottom: 16px;">
-          Create a bot via <a href="https://t.me/BotFather" target="_blank">@BotFather</a> on Telegram.
-        </p>
+        <div class="help-box">
+          <strong>How to create your bot:</strong>
+          <ol>
+            <li>Open Telegram and search for <a href="https://t.me/BotFather" target="_blank">@BotFather</a></li>
+            <li>Send <code>/newbot</code></li>
+            <li>Choose a name (e.g., "My Sonder")</li>
+            <li>Choose a username ending in "bot" (e.g., "mysonder_bot")</li>
+            <li>Copy the token BotFather gives you</li>
+          </ol>
+        </div>
 
         <div class="form-group">
           <label>Bot Token</label>
           <div class="input-row">
-            <input type="password" id="telegram-token" placeholder="123456789:ABC...">
+            <input type="password" id="telegram-token" placeholder="123456789:ABCdefGHI...">
             <button class="test-btn" onclick="testTelegram()">Test</button>
           </div>
           <div class="status-msg" id="telegram-status"></div>
@@ -949,7 +999,30 @@
     function updateLLMFields() {
       const provider = document.getElementById('llm-provider').value;
       const keyGroup = document.getElementById('llm-key-group');
+      const helpBox = document.getElementById('llm-help');
+      const helpSteps = document.getElementById('llm-help-steps');
+
       keyGroup.style.display = provider === 'ollama' ? 'none' : 'block';
+      helpBox.style.display = provider === 'ollama' ? 'none' : 'block';
+
+      const instructions = {
+        kimi: `<li>Go to <a href="https://platform.moonshot.cn/console/api-keys" target="_blank">platform.moonshot.cn</a></li>
+               <li>Sign up or log in</li>
+               <li>Click "Create API Key"</li>
+               <li>Copy and paste it below</li>`,
+        openai: `<li>Go to <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></li>
+                 <li>Sign up or log in</li>
+                 <li>Click "Create new secret key"</li>
+                 <li>Copy and paste it below</li>`,
+        anthropic: `<li>Go to <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a></li>
+                    <li>Sign up or log in</li>
+                    <li>Click "Create Key"</li>
+                    <li>Copy and paste it below</li>`,
+      };
+
+      if (instructions[provider]) {
+        helpSteps.innerHTML = instructions[provider];
+      }
     }
 
     async function testLLM() {
