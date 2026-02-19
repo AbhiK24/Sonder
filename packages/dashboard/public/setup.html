@@ -536,37 +536,104 @@
       text-decoration: underline;
     }
 
-    /* Help boxes */
-    .help-box {
-      background: var(--accent-dim);
-      border: 1px solid rgba(167, 139, 250, 0.3);
-      border-radius: 8px;
-      padding: 16px;
-      margin-bottom: 16px;
-      font-size: 0.9rem;
+    /* Info button & popup */
+    .info-btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: var(--border);
+      color: var(--text-muted);
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      margin-left: 8px;
+      border: none;
+      transition: all 0.2s;
     }
 
-    .help-box strong {
+    .info-btn:hover {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .info-popup {
+      display: none;
+      position: fixed;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      max-width: 400px;
+      width: 90%;
+      z-index: 1000;
+      box-shadow: 0 20px 40px rgba(0,0,0,0.5);
+    }
+
+    .info-popup.active {
       display: block;
-      margin-bottom: 8px;
-      color: var(--text);
+      animation: fadeIn 0.2s ease;
     }
 
-    .help-box ol {
+    .info-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.6);
+      z-index: 999;
+    }
+
+    .info-overlay.active {
+      display: block;
+    }
+
+    .info-popup h3 {
+      margin-bottom: 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .info-popup ol {
       margin: 0;
       padding-left: 20px;
       color: var(--text-muted);
+      line-height: 1.8;
     }
 
-    .help-box li {
-      margin-bottom: 4px;
+    .info-popup li {
+      margin-bottom: 8px;
     }
 
-    .help-box code {
+    .info-popup code {
       background: rgba(255,255,255,0.1);
       padding: 2px 6px;
       border-radius: 4px;
       font-family: monospace;
+      font-size: 0.9em;
+    }
+
+    .info-popup .close-btn {
+      position: absolute;
+      top: 12px;
+      right: 12px;
+      background: none;
+      border: none;
+      color: var(--text-muted);
+      font-size: 20px;
+      cursor: pointer;
+    }
+
+    .info-popup .close-btn:hover {
+      color: var(--text);
     }
   </style>
 </head>
@@ -651,18 +718,8 @@
           </select>
         </div>
 
-        <div class="help-box" id="llm-help">
-          <strong>How to get your API key:</strong>
-          <ol id="llm-help-steps">
-            <li>Go to <a href="https://platform.moonshot.cn/console/api-keys" target="_blank">platform.moonshot.cn</a></li>
-            <li>Sign up or log in</li>
-            <li>Click "Create API Key"</li>
-            <li>Copy and paste it below</li>
-          </ol>
-        </div>
-
         <div class="form-group" id="llm-key-group">
-          <label>API Key</label>
+          <label>API Key <button class="info-btn" onclick="showInfo('llm')">?</button></label>
           <div class="input-row">
             <input type="password" id="llm-key" placeholder="Enter API key...">
             <button class="test-btn" onclick="testLLM()">Test</button>
@@ -679,19 +736,8 @@
           <span class="section-badge">Required</span>
         </div>
 
-        <div class="help-box">
-          <strong>How to create your bot:</strong>
-          <ol>
-            <li>Open Telegram and search for <a href="https://t.me/BotFather" target="_blank">@BotFather</a></li>
-            <li>Send <code>/newbot</code></li>
-            <li>Choose a name (e.g., "My Sonder")</li>
-            <li>Choose a username ending in "bot" (e.g., "mysonder_bot")</li>
-            <li>Copy the token BotFather gives you</li>
-          </ol>
-        </div>
-
         <div class="form-group">
-          <label>Bot Token</label>
+          <label>Bot Token <button class="info-btn" onclick="showInfo('telegram')">?</button></label>
           <div class="input-row">
             <input type="password" id="telegram-token" placeholder="123456789:ABCdefGHI...">
             <button class="test-btn" onclick="testTelegram()">Test</button>
@@ -709,11 +755,8 @@
           <span class="collapsible-arrow">▼</span>
         </div>
         <div class="collapsible-content">
-          <p style="margin-bottom: 16px; font-size: 0.9rem;">
-            Let agents send you emails. Get API key from <a href="https://resend.com" target="_blank">resend.com</a>
-          </p>
           <div class="form-group">
-            <label>Resend API Key</label>
+            <label>Resend API Key <button class="info-btn" onclick="showInfo('resend')">?</button></label>
             <input type="password" id="resend-key" placeholder="re_...">
           </div>
           <div class="form-group">
@@ -738,11 +781,8 @@
           <span class="collapsible-arrow">▼</span>
         </div>
         <div class="collapsible-content">
-          <p style="margin-bottom: 16px; font-size: 0.9rem;">
-            Reach you on WhatsApp. Get credentials from <a href="https://console.twilio.com" target="_blank">Twilio Console</a>
-          </p>
           <div class="form-group">
-            <label>Account SID</label>
+            <label>Account SID <button class="info-btn" onclick="showInfo('twilio')">?</button></label>
             <input type="text" id="twilio-sid" placeholder="AC...">
           </div>
           <div class="form-group">
@@ -771,11 +811,8 @@
           <span class="collapsible-arrow">▼</span>
         </div>
         <div class="collapsible-content">
-          <p style="margin-bottom: 16px; font-size: 0.9rem;">
-            Let agents help with task management. Get key from Settings → Integrations → Developer.
-          </p>
           <div class="form-group">
-            <label>API Key</label>
+            <label>API Key <button class="info-btn" onclick="showInfo('todoist')">?</button></label>
             <div class="input-row">
               <input type="password" id="todoist-key" placeholder="...">
               <button class="test-btn" onclick="testTodoist()">Test</button>
@@ -795,11 +832,8 @@
         </div>
         <div class="collapsible-content">
           <p style="margin-bottom: 16px; font-size: 0.9rem;">
-            Let agents see your schedule. No OAuth needed—just paste your calendar's ICS feed URL.
-            <br><br>
-            <strong>Google Calendar:</strong> Settings → Calendar → Integrate → Secret address in iCal format
-            <br>
-            <strong>Apple Calendar:</strong> Share → Public Calendar → Copy Link
+            Let agents see your schedule. No OAuth needed.
+            <button class="info-btn" onclick="event.stopPropagation(); showInfo('calendar')">?</button>
           </p>
 
           <div id="ics-feeds-container">
@@ -999,30 +1033,7 @@
     function updateLLMFields() {
       const provider = document.getElementById('llm-provider').value;
       const keyGroup = document.getElementById('llm-key-group');
-      const helpBox = document.getElementById('llm-help');
-      const helpSteps = document.getElementById('llm-help-steps');
-
       keyGroup.style.display = provider === 'ollama' ? 'none' : 'block';
-      helpBox.style.display = provider === 'ollama' ? 'none' : 'block';
-
-      const instructions = {
-        kimi: `<li>Go to <a href="https://platform.moonshot.cn/console/api-keys" target="_blank">platform.moonshot.cn</a></li>
-               <li>Sign up or log in</li>
-               <li>Click "Create API Key"</li>
-               <li>Copy and paste it below</li>`,
-        openai: `<li>Go to <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a></li>
-                 <li>Sign up or log in</li>
-                 <li>Click "Create new secret key"</li>
-                 <li>Copy and paste it below</li>`,
-        anthropic: `<li>Go to <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a></li>
-                    <li>Sign up or log in</li>
-                    <li>Click "Create Key"</li>
-                    <li>Copy and paste it below</li>`,
-      };
-
-      if (instructions[provider]) {
-        helpSteps.innerHTML = instructions[provider];
-      }
     }
 
     async function testLLM() {
@@ -1535,6 +1546,121 @@
 
     // Initialize
     loadExistingConfig();
+
+    // Info popup system
+    const infoContent = {
+      llm: {
+        title: '🧠 Getting an LLM API Key',
+        steps: {
+          kimi: [
+            'Go to <a href="https://platform.moonshot.ai/console/api-keys" target="_blank">platform.moonshot.ai</a>',
+            'Sign up or log in with your account',
+            'Click "Create API Key"',
+            'Copy the key and paste it below'
+          ],
+          openai: [
+            'Go to <a href="https://platform.openai.com/api-keys" target="_blank">platform.openai.com/api-keys</a>',
+            'Sign up or log in with your account',
+            'Click "Create new secret key"',
+            'Give it a name and copy the key'
+          ],
+          anthropic: [
+            'Go to <a href="https://console.anthropic.com/settings/keys" target="_blank">console.anthropic.com</a>',
+            'Sign up or log in with your account',
+            'Click "Create Key"',
+            'Copy the key and paste it below'
+          ]
+        }
+      },
+      telegram: {
+        title: '💬 Creating a Telegram Bot',
+        steps: [
+          'Open Telegram and search for <code>@BotFather</code>',
+          'Start a chat and send <code>/newbot</code>',
+          'Choose a name for your bot (e.g., "My Sonder Bot")',
+          'Choose a username ending in "bot" (e.g., "mysonder_bot")',
+          'Copy the token BotFather gives you'
+        ]
+      },
+      resend: {
+        title: '📧 Setting up Resend Email',
+        steps: [
+          'Go to <a href="https://resend.com" target="_blank">resend.com</a> and sign up',
+          'Add and verify your domain in Settings → Domains',
+          'Go to API Keys and click "Create API Key"',
+          'Copy the key (starts with <code>re_</code>)'
+        ]
+      },
+      twilio: {
+        title: '📱 Setting up Twilio WhatsApp',
+        steps: [
+          'Go to <a href="https://console.twilio.com" target="_blank">console.twilio.com</a> and sign up',
+          'Find your Account SID and Auth Token on the dashboard',
+          'Go to Messaging → Try it out → Send a WhatsApp message',
+          'Follow steps to connect your WhatsApp to the Twilio sandbox',
+          'Use the sandbox number (usually +14155238886) as Twilio WhatsApp Number'
+        ]
+      },
+      todoist: {
+        title: '✅ Getting a Todoist API Key',
+        steps: [
+          'Go to <a href="https://todoist.com/app/settings/integrations/developer" target="_blank">Todoist Settings → Integrations → Developer</a>',
+          'Scroll down to "API token"',
+          'Copy your token'
+        ]
+      },
+      calendar: {
+        title: '📅 Adding Calendar Feeds',
+        steps: [
+          '<strong>Google Calendar:</strong> Settings (gear) → Select calendar → Integrate calendar → "Secret address in iCal format"',
+          '<strong>Apple Calendar:</strong> Right-click calendar → Share → Public Calendar → Copy Link',
+          '<strong>Outlook:</strong> Settings → Calendar → Shared calendars → Publish a calendar → ICS link',
+          'Paste the URL and give it a name to identify it'
+        ]
+      }
+    };
+
+    function showInfo(type) {
+      const info = infoContent[type];
+      if (!info) return;
+
+      let steps = info.steps;
+
+      // For LLM, get provider-specific steps
+      if (type === 'llm') {
+        const provider = document.getElementById('llm-provider').value;
+        if (provider === 'ollama') {
+          alert('Ollama runs locally - no API key needed! Just make sure Ollama is running.');
+          return;
+        }
+        steps = info.steps[provider] || info.steps.openai;
+      }
+
+      const stepsHtml = steps.map(s => `<li>${s}</li>`).join('');
+
+      document.getElementById('info-popup-title').innerHTML = info.title;
+      document.getElementById('info-popup-steps').innerHTML = stepsHtml;
+      document.getElementById('info-overlay').classList.add('active');
+      document.getElementById('info-popup').classList.add('active');
+    }
+
+    function closeInfo() {
+      document.getElementById('info-overlay').classList.remove('active');
+      document.getElementById('info-popup').classList.remove('active');
+    }
+
+    // Close on overlay click
+    document.addEventListener('DOMContentLoaded', () => {
+      document.getElementById('info-overlay')?.addEventListener('click', closeInfo);
+    });
   </script>
+
+  <!-- Info popup -->
+  <div class="info-overlay" id="info-overlay"></div>
+  <div class="info-popup" id="info-popup">
+    <button class="close-btn" onclick="closeInfo()">&times;</button>
+    <h3 id="info-popup-title"></h3>
+    <ol id="info-popup-steps"></ol>
+  </div>
 </body>
 </html>
