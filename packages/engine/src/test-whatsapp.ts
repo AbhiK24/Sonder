@@ -12,6 +12,9 @@ const storageDir = process.env.HOME + '/.sonder';
 const userPhone = '+919209872088';
 const qrPath = '/tmp/whatsapp-qr.png';
 
+// Message to send (can override via command line)
+const message = process.argv[2] || 'haha yeah fair point, no more emojis then. whats up with you today?';
+
 async function main() {
   console.log('Starting Baileys WhatsApp test...');
 
@@ -25,11 +28,11 @@ async function main() {
       console.log(`   Open it with: open ${qrPath}\n`);
     },
     onReady: async () => {
-      console.log('\n✓ Connected! Sending test message...\n');
+      console.log('\n✓ Connected! Sending message...\n');
 
       const result = await adapter.sendMessage(
         userPhone,
-        `Hey! How's your day going? 😊`,
+        message,
       );
 
       if (result.success) {
