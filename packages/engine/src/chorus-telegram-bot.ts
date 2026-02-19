@@ -35,6 +35,15 @@ import { createMemory, Memory } from './memory/index.js';
 // Action logging for transparency
 import { actionLog } from './action-log.js';
 
+// Tools for agent actions
+import {
+  formatToolsForPrompt,
+  parseToolCalls,
+  removeToolCallsFromResponse,
+  executeTool,
+  ToolContext,
+} from './tools/index.js';
+
 // Chorus play imports
 import {
   agents as chorusAgents,
@@ -299,6 +308,9 @@ ${extraContext.reunionContext}`;
     systemPrompt += `\n\n${contextSummary}`;
   }
 
+  // Add available tools
+  systemPrompt += `\n\n${formatToolsForPrompt()}`;
+
   // Build conversation prompt
   const prompt = `${systemPrompt}
 
@@ -309,14 +321,57 @@ ${recentHistory || '(This is the start of the conversation)'}
 ${userMessage}
 
 ## Your Response
-Respond as ${agent.name}. Be warm, supportive, and true to your role. Keep responses concise (1-3 sentences unless more is needed). Don't be overly effusive.`;
+Respond as ${agent.name}. Be warm, supportive, and true to your role. Keep responses concise (1-3 sentences unless more is needed). Don't be overly effusive.
+If the user asks you to take an action (send email, etc.), use the appropriate tool.`;
 
   try {
     const response = await provider.generate(prompt, {
       temperature: 0.8,
-      maxTokens: 300,
+      maxTokens: 500,
     });
-    return response.trim();
+
+    // Check for tool calls
+    const toolCalls = parseToolCalls(response);
+
+    if (toolCalls.length > 0) {
+      // Execute tools
+      const toolContext: ToolContext = {
+        userId: String(state.profile.id),
+        agentId: agent.id,
+        agentName: agent.name,
+        emailAdapter: emailAdapter || undefined,
+        whatsappAdapter: whatsappAdapter || undefined,
+      };
+
+      const toolResults: string[] = [];
+      for (const toolCall of toolCalls) {
+        const result = await executeTool(toolCall, toolContext);
+        toolResults.push(
+          result.success
+            ? `✓ ${toolCall.name}: ${result.result}`
+            : `✗ ${toolCall.name} failed: ${result.error}`
+        );
+      }
+
+      // Generate follow-up response with tool results
+      const followUpPrompt = `${prompt}
+
+## Tool Results
+${toolResults.join('\n')}
+
+## Your Follow-up Response
+Based on the tool results above, give a brief response confirming what happened. Be honest about failures.`;
+
+      const followUp = await provider.generate(followUpPrompt, {
+        temperature: 0.7,
+        maxTokens: 200,
+      });
+
+      return followUp.trim();
+    }
+
+    // No tool calls - return cleaned response
+    return removeToolCallsFromResponse(response).trim();
   } catch (error) {
     console.error('[Chorus] LLM error:', error);
     return `*${agent.name} pauses thoughtfully* I'm here for you. What's on your mind?`;
