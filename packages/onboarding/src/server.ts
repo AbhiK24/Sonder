@@ -31,6 +31,12 @@ app.use(express.static(publicDir));
 // Config Management
 // =============================================================================
 
+interface ICSFeed {
+  id: string;
+  name: string;
+  url: string;
+}
+
 interface SonderConfig {
   play?: string;
   llmProvider?: string;
@@ -47,6 +53,7 @@ interface SonderConfig {
   googleClientId?: string;
   googleClientSecret?: string;
   timezone?: string;
+  icsFeeds?: ICSFeed[];
 }
 
 function getEnvValue(key: string): string {
@@ -54,6 +61,17 @@ function getEnvValue(key: string): string {
 }
 
 function getCurrentConfig(): SonderConfig {
+  // Parse ICS feeds from env (stored as JSON)
+  let icsFeeds: ICSFeed[] | undefined;
+  const icsFeedsJson = getEnvValue('ICS_FEEDS');
+  if (icsFeedsJson) {
+    try {
+      icsFeeds = JSON.parse(icsFeedsJson);
+    } catch (e) {
+      // Invalid JSON, ignore
+    }
+  }
+
   return {
     play: getEnvValue('PLAY') || undefined,
     llmProvider: getEnvValue('LLM_PROVIDER') || undefined,
@@ -70,6 +88,7 @@ function getCurrentConfig(): SonderConfig {
     googleClientId: getEnvValue('GOOGLE_CLIENT_ID') || undefined,
     googleClientSecret: getEnvValue('GOOGLE_CLIENT_SECRET') || undefined,
     timezone: getEnvValue('TIMEZONE') || 'UTC',
+    icsFeeds,
   };
 }
 
@@ -115,7 +134,7 @@ app.get('/api/config', (req, res) => {
 
 // Save config values
 app.post('/api/config', (req, res) => {
-  const updates = req.body as Record<string, string>;
+  const updates = req.body as Record<string, unknown>;
 
   const keyMap: Record<string, string> = {
     play: 'PLAY',
@@ -139,8 +158,14 @@ app.post('/api/config', (req, res) => {
   };
 
   for (const [key, value] of Object.entries(updates)) {
+    // Handle ICS feeds specially (stored as JSON)
+    if (key === 'icsFeeds' && Array.isArray(value)) {
+      saveToEnv('ICS_FEEDS', JSON.stringify(value));
+      continue;
+    }
+
     const envKey = keyMap[key];
-    if (envKey && value) {
+    if (envKey && typeof value === 'string' && value) {
       saveToEnv(envKey, value);
     }
   }
@@ -263,6 +288,34 @@ app.post('/api/test/todoist', async (req, res) => {
     }
   } catch (error) {
     res.json({ success: false, message: 'Connection failed' });
+  }
+});
+
+// Test ICS feed
+app.post('/api/test/ics', async (req, res) => {
+  const { url } = req.body;
+
+  try {
+    const response = await fetch(url, {
+      headers: { 'Accept': 'text/calendar' }
+    });
+
+    if (!response.ok) {
+      return res.json({ success: false, message: `HTTP ${response.status}` });
+    }
+
+    const text = await response.text();
+
+    // Basic ICS validation
+    if (text.includes('BEGIN:VCALENDAR') && text.includes('END:VCALENDAR')) {
+      // Count events
+      const eventCount = (text.match(/BEGIN:VEVENT/g) || []).length;
+      res.json({ success: true, message: `Found ${eventCount} events` });
+    } else {
+      res.json({ success: false, message: 'Not a valid ICS feed' });
+    }
+  } catch (error) {
+    res.json({ success: false, message: error instanceof Error ? error.message : 'Failed to fetch' });
   }
 });
 

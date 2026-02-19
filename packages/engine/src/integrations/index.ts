@@ -9,7 +9,7 @@
 export * from './types.js';
 
 // Adapters
-export { GoogleCalendarAdapter, createCalendarAdapter } from './calendar.js';
+export { GoogleCalendarAdapter, ICSFeedAdapter, createCalendarAdapter, createICSAdapter } from './calendar.js';
 export { TodoistAdapter, createTaskAdapter } from './tasks.js';
 export { GmailAdapter, createEmailAdapter } from './email.js';
 export { RSSAdapter, createContentAdapter, POPULAR_FEEDS } from './content.js';

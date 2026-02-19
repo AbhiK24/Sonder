@@ -12,6 +12,7 @@
 export type IntegrationType =
   | 'google_calendar'
   | 'apple_calendar'
+  | 'ics_feed'
   | 'todoist'
   | 'notion'
   | 'gmail'
@@ -83,6 +84,9 @@ export interface CalendarEvent {
   attendees?: string[];
   isAllDay?: boolean;
   reminders?: CalendarReminder[];
+  // For multi-calendar support
+  calendarId?: string;
+  calendarName?: string;
 }
 
 export interface CalendarReminder {
@@ -91,17 +95,28 @@ export interface CalendarReminder {
 }
 
 export interface CalendarAdapter extends BaseIntegrationAdapter {
-  type: 'google_calendar' | 'apple_calendar';
+  type: 'google_calendar' | 'apple_calendar' | 'ics_feed';
 
   // Read
   getEvents(startDate: Date, endDate: Date): Promise<IntegrationResult<CalendarEvent[]>>;
   getUpcoming(hours: number): Promise<IntegrationResult<CalendarEvent[]>>;
 
-  // Create (never delete)
-  createEvent(event: CalendarEvent): Promise<IntegrationResult<CalendarEvent>>;
+  // Create (never delete) - not available for ICS
+  createEvent?(event: CalendarEvent): Promise<IntegrationResult<CalendarEvent>>;
 
-  // Update (careful)
-  updateEvent(eventId: string, updates: Partial<CalendarEvent>): Promise<IntegrationResult<CalendarEvent>>;
+  // Update (careful) - not available for ICS
+  updateEvent?(eventId: string, updates: Partial<CalendarEvent>): Promise<IntegrationResult<CalendarEvent>>;
+}
+
+/**
+ * ICS Feed configuration - supports multiple calendars
+ */
+export interface ICSFeedConfig {
+  id: string;
+  name: string;       // "Work", "Personal", etc.
+  url: string;        // ICS feed URL
+  color?: string;     // For display
+  refreshMinutes?: number;  // How often to refetch (default 15)
 }
 
 // =============================================================================

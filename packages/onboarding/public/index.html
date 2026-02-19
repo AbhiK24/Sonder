@@ -735,6 +735,34 @@
         </div>
       </div>
 
+      <!-- Optional: Calendar (ICS) -->
+      <div class="collapsible" id="calendar-section">
+        <div class="collapsible-header" onclick="toggleCollapsible('calendar-section')">
+          <span class="collapsible-icon">📅</span>
+          <span class="collapsible-title">Calendar (ICS)</span>
+          <span class="collapsible-status" id="calendar-collapsible-status">Optional</span>
+          <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content">
+          <p style="margin-bottom: 16px; font-size: 0.9rem;">
+            Let agents see your schedule. No OAuth needed—just paste your calendar's ICS feed URL.
+            <br><br>
+            <strong>Google Calendar:</strong> Settings → Calendar → Integrate → Secret address in iCal format
+            <br>
+            <strong>Apple Calendar:</strong> Share → Public Calendar → Copy Link
+          </p>
+
+          <div id="ics-feeds-container">
+            <!-- Dynamic feed entries go here -->
+          </div>
+
+          <button class="test-btn" onclick="addICSFeed()" style="width: 100%; margin-top: 12px;">
+            + Add Calendar
+          </button>
+          <div class="status-msg" id="calendar-status"></div>
+        </div>
+      </div>
+
       <!-- Timezone -->
       <div class="section" style="padding: 16px 20px;">
         <div class="form-group" style="margin: 0;">
@@ -856,6 +884,10 @@
         <div class="summary-item">
           <span class="summary-label">Todoist</span>
           <span class="summary-value" id="summary-todoist">—</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Calendar</span>
+          <span class="summary-value" id="summary-calendar">—</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Timezone</span>
@@ -1104,6 +1136,106 @@
       }, 3000);
     }
 
+    // ICS Feeds
+    let icsFeeds = [];
+    let icsFeedCounter = 0;
+
+    function addICSFeed(name = '', url = '') {
+      icsFeedCounter++;
+      const id = `ics-feed-${icsFeedCounter}`;
+
+      const container = document.getElementById('ics-feeds-container');
+      const feedDiv = document.createElement('div');
+      feedDiv.id = id;
+      feedDiv.className = 'ics-feed-entry';
+      feedDiv.style.cssText = 'background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px;';
+
+      feedDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-weight: 500; font-size: 0.9rem;">Calendar ${icsFeedCounter}</span>
+          <button onclick="removeICSFeed('${id}')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem;">×</button>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="font-size: 0.8rem;">Name</label>
+          <input type="text" id="${id}-name" placeholder="e.g., Work, Personal" value="${name}" onchange="updateICSFeeds()">
+        </div>
+        <div class="form-group" style="margin-bottom: 8px;">
+          <label style="font-size: 0.8rem;">ICS URL</label>
+          <input type="url" id="${id}-url" placeholder="https://calendar.google.com/...ics" value="${url}" onchange="updateICSFeeds()">
+        </div>
+        <button class="test-btn" onclick="testICSFeed('${id}')" style="width: 100%; font-size: 0.8rem; padding: 8px;">Test Feed</button>
+        <div class="status-msg" id="${id}-status" style="font-size: 0.8rem;"></div>
+      `;
+
+      container.appendChild(feedDiv);
+      updateICSFeeds();
+      updateCalendarStatus();
+    }
+
+    function removeICSFeed(id) {
+      document.getElementById(id).remove();
+      updateICSFeeds();
+      updateCalendarStatus();
+    }
+
+    function updateICSFeeds() {
+      icsFeeds = [];
+      document.querySelectorAll('.ics-feed-entry').forEach((entry, index) => {
+        const id = entry.id;
+        const name = document.getElementById(`${id}-name`).value;
+        const url = document.getElementById(`${id}-url`).value;
+        if (name && url) {
+          icsFeeds.push({ id: `feed-${index}`, name, url });
+        }
+      });
+    }
+
+    function updateCalendarStatus() {
+      const status = document.getElementById('calendar-collapsible-status');
+      const count = document.querySelectorAll('.ics-feed-entry').length;
+      if (count > 0) {
+        status.textContent = `${count} calendar${count > 1 ? 's' : ''}`;
+        status.classList.add('configured');
+      } else {
+        status.textContent = 'Optional';
+        status.classList.remove('configured');
+      }
+    }
+
+    async function testICSFeed(id) {
+      const url = document.getElementById(`${id}-url`).value;
+      const status = document.getElementById(`${id}-status`);
+
+      if (!url) {
+        status.textContent = 'Enter a URL first';
+        status.className = 'status-msg error';
+        return;
+      }
+
+      status.textContent = 'Testing...';
+      status.className = 'status-msg';
+
+      try {
+        const res = await fetch('/api/test/ics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          status.textContent = data.message;
+          status.className = 'status-msg success';
+        } else {
+          status.textContent = data.message;
+          status.className = 'status-msg error';
+        }
+      } catch (e) {
+        status.textContent = 'Failed to test feed';
+        status.className = 'status-msg error';
+      }
+    }
+
     // Play selection
     function selectPlay(play) {
       selectedPlay = play;
@@ -1155,6 +1287,12 @@
       const todoistKey = document.getElementById('todoist-key').value;
       if (todoistKey) config.todoistApiKey = todoistKey;
 
+      // ICS Calendars
+      updateICSFeeds();
+      if (icsFeeds.length > 0) {
+        config.icsFeeds = icsFeeds;
+      }
+
       config.timezone = document.getElementById('timezone').value;
 
       await fetch('/api/config', {
@@ -1200,6 +1338,12 @@
       document.getElementById('summary-todoist').textContent = todoist ? 'Configured' : 'Skipped';
       document.getElementById('summary-todoist').classList.toggle('configured', !!todoist);
       document.getElementById('summary-todoist').classList.toggle('missing', !todoist);
+
+      updateICSFeeds();
+      const calCount = icsFeeds.length;
+      document.getElementById('summary-calendar').textContent = calCount > 0 ? `${calCount} calendar${calCount > 1 ? 's' : ''}` : 'Skipped';
+      document.getElementById('summary-calendar').classList.toggle('configured', calCount > 0);
+      document.getElementById('summary-calendar').classList.toggle('missing', calCount === 0);
 
       document.getElementById('summary-timezone').textContent = document.getElementById('timezone').value;
     }
@@ -1301,6 +1445,13 @@
 
         if (config.play) {
           selectPlay(config.play);
+        }
+
+        // Load ICS feeds
+        if (config.icsFeeds && Array.isArray(config.icsFeeds)) {
+          config.icsFeeds.forEach(feed => {
+            addICSFeed(feed.name, feed.url);
+          });
         }
 
         updateLLMFields();

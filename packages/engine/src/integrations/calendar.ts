@@ -10,8 +10,10 @@ import {
   CalendarEvent,
   IntegrationCredentials,
   IntegrationResult,
-  IntegrationStatus
+  IntegrationStatus,
+  ICSFeedConfig
 } from './types.js';
+import ical from 'node-ical';
 
 // =============================================================================
 // Google Calendar Adapter
@@ -392,16 +394,276 @@ export class GoogleCalendarAdapter implements CalendarAdapter {
 }
 
 // =============================================================================
+// ICS Feed Adapter (Read-Only, Multiple Calendars)
+// =============================================================================
+
+interface CachedFeed {
+  events: CalendarEvent[];
+  fetchedAt: Date;
+}
+
+export class ICSFeedAdapter implements CalendarAdapter {
+  type = 'ics_feed' as const;
+  status: IntegrationStatus = 'disconnected';
+
+  private feeds: Map<string, ICSFeedConfig> = new Map();
+  private cache: Map<string, CachedFeed> = new Map();
+  private defaultRefreshMinutes = 15;
+
+  // ---------------------------------------------------------------------------
+  // Lifecycle
+  // ---------------------------------------------------------------------------
+
+  async connect(credentials: IntegrationCredentials): Promise<IntegrationResult<void>> {
+    try {
+      this.status = 'connecting';
+
+      // Credentials metadata contains feed configs
+      const feedConfigs = credentials.metadata?.feeds as ICSFeedConfig[] | undefined;
+
+      if (!feedConfigs || feedConfigs.length === 0) {
+        this.status = 'error';
+        return { success: false, error: 'No ICS feeds configured' };
+      }
+
+      // Store feeds
+      for (const feed of feedConfigs) {
+        this.feeds.set(feed.id, feed);
+      }
+
+      // Verify at least one feed works
+      const check = await this.healthCheck();
+      if (!check.success) {
+        this.status = 'error';
+        return check;
+      }
+
+      this.status = 'connected';
+      console.log(`[ICS] Connected with ${this.feeds.size} calendar(s)`);
+      return { success: true };
+    } catch (error) {
+      this.status = 'error';
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Connection failed'
+      };
+    }
+  }
+
+  async disconnect(): Promise<void> {
+    this.feeds.clear();
+    this.cache.clear();
+    this.status = 'disconnected';
+  }
+
+  isConnected(): boolean {
+    return this.status === 'connected' && this.feeds.size > 0;
+  }
+
+  async healthCheck(): Promise<IntegrationResult<void>> {
+    if (this.feeds.size === 0) {
+      return { success: false, error: 'No feeds configured' };
+    }
+
+    // Try to fetch the first feed
+    const firstFeed = this.feeds.values().next().value;
+    if (!firstFeed) {
+      return { success: false, error: 'No feeds available' };
+    }
+
+    try {
+      await this.fetchFeed(firstFeed);
+      return { success: true };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch feed'
+      };
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // Feed Management
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Add a new ICS feed
+   */
+  addFeed(config: ICSFeedConfig): void {
+    this.feeds.set(config.id, config);
+    this.cache.delete(config.id); // Clear any stale cache
+  }
+
+  /**
+   * Remove a feed
+   */
+  removeFeed(feedId: string): void {
+    this.feeds.delete(feedId);
+    this.cache.delete(feedId);
+  }
+
+  /**
+   * Get all configured feeds
+   */
+  getFeeds(): ICSFeedConfig[] {
+    return Array.from(this.feeds.values());
+  }
+
+  // ---------------------------------------------------------------------------
+  // Read Operations
+  // ---------------------------------------------------------------------------
+
+  async getEvents(startDate: Date, endDate: Date): Promise<IntegrationResult<CalendarEvent[]>> {
+    if (!this.isConnected()) {
+      return { success: false, error: 'Not connected' };
+    }
+
+    try {
+      const allEvents: CalendarEvent[] = [];
+
+      // Fetch from all feeds
+      for (const feed of this.feeds.values()) {
+        const events = await this.getEventsFromFeed(feed, startDate, endDate);
+        allEvents.push(...events);
+      }
+
+      // Sort by start time
+      allEvents.sort((a, b) => a.startTime.getTime() - b.startTime.getTime());
+
+      return { success: true, data: allEvents };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Failed to fetch events'
+      };
+    }
+  }
+
+  async getUpcoming(hours: number = 24): Promise<IntegrationResult<CalendarEvent[]>> {
+    const now = new Date();
+    const endDate = new Date(now.getTime() + hours * 60 * 60 * 1000);
+    return this.getEvents(now, endDate);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Internal: Fetch & Parse
+  // ---------------------------------------------------------------------------
+
+  private async getEventsFromFeed(
+    feed: ICSFeedConfig,
+    startDate: Date,
+    endDate: Date
+  ): Promise<CalendarEvent[]> {
+    // Check cache
+    const cached = this.cache.get(feed.id);
+    const refreshMs = (feed.refreshMinutes || this.defaultRefreshMinutes) * 60 * 1000;
+
+    let events: CalendarEvent[];
+
+    if (cached && Date.now() - cached.fetchedAt.getTime() < refreshMs) {
+      events = cached.events;
+    } else {
+      events = await this.fetchFeed(feed);
+      this.cache.set(feed.id, { events, fetchedAt: new Date() });
+    }
+
+    // Filter by date range
+    return events.filter(event => {
+      return event.startTime >= startDate && event.startTime <= endDate;
+    });
+  }
+
+  private async fetchFeed(feed: ICSFeedConfig): Promise<CalendarEvent[]> {
+    console.log(`[ICS] Fetching: ${feed.name} (${feed.url.slice(0, 50)}...)`);
+
+    const data = await ical.async.fromURL(feed.url);
+    const events: CalendarEvent[] = [];
+
+    for (const key in data) {
+      const item = data[key];
+      if (!item || item.type !== 'VEVENT') continue;
+
+      const event = this.parseICSEvent(item as ical.VEvent, feed);
+      if (event) {
+        events.push(event);
+      }
+    }
+
+    console.log(`[ICS] Found ${events.length} events in ${feed.name}`);
+    return events;
+  }
+
+  /**
+   * Extract string value from ICS field (handles both string and ParameterValue types)
+   */
+  private getStringValue(value: unknown): string | undefined {
+    if (!value) return undefined;
+    if (typeof value === 'string') return value;
+    if (typeof value === 'object' && 'val' in (value as object)) {
+      return (value as { val: string }).val;
+    }
+    return String(value);
+  }
+
+  private parseICSEvent(item: ical.VEvent, feed: ICSFeedConfig): CalendarEvent | null {
+    try {
+      const startTime = item.start ? new Date(item.start) : null;
+      const endTime = item.end ? new Date(item.end) : null;
+
+      if (!startTime || !endTime) return null;
+
+      // Skip events too far in the past (> 1 year)
+      const oneYearAgo = new Date();
+      oneYearAgo.setFullYear(oneYearAgo.getFullYear() - 1);
+      if (startTime < oneYearAgo) return null;
+
+      // Determine if all-day
+      const isAllDay = item.datetype === 'date';
+
+      return {
+        id: this.getStringValue(item.uid) || `${feed.id}-${startTime.getTime()}`,
+        title: this.getStringValue(item.summary) || 'Untitled Event',
+        description: this.getStringValue(item.description),
+        startTime,
+        endTime,
+        location: this.getStringValue(item.location),
+        isAllDay,
+        calendarId: feed.id,
+        calendarName: feed.name,
+      };
+    } catch (error) {
+      console.warn(`[ICS] Failed to parse event:`, error);
+      return null;
+    }
+  }
+}
+
+// =============================================================================
 // Factory
 // =============================================================================
 
-export function createCalendarAdapter(type: 'google_calendar' | 'apple_calendar'): CalendarAdapter {
+export function createCalendarAdapter(
+  type: 'google_calendar' | 'apple_calendar' | 'ics_feed'
+): CalendarAdapter {
   switch (type) {
     case 'google_calendar':
       return new GoogleCalendarAdapter();
+    case 'ics_feed':
+      return new ICSFeedAdapter();
     case 'apple_calendar':
       throw new Error('Apple Calendar adapter not yet implemented');
     default:
       throw new Error(`Unknown calendar type: ${type}`);
   }
+}
+
+/**
+ * Create an ICS adapter with feeds pre-configured
+ */
+export function createICSAdapter(feeds: ICSFeedConfig[]): ICSFeedAdapter {
+  const adapter = new ICSFeedAdapter();
+  for (const feed of feeds) {
+    adapter.addFeed(feed);
+  }
+  return adapter;
 }
