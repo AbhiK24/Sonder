@@ -51,6 +51,7 @@ export interface ToolContext {
     sendEmail: (opts: {
       from?: string;
       to: string[];
+      cc?: string[];
       subject: string;
       body: string;
     }, confirmed: boolean) => Promise<{ success: boolean; data?: { messageId: string }; error?: string }>;
@@ -88,7 +89,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
     parameters: {
       type: 'object',
       properties: {
-        to: { type: 'string', description: 'Recipient email address(es), comma-separated' },
+        to: { type: 'string', description: 'Recipient email(s), comma-separated' },
+        cc: { type: 'string', description: 'CC email(s), comma-separated (optional)' },
         subject: { type: 'string', description: 'Clear subject line (40-50 chars). Be specific.' },
         body: { type: 'string', description: 'Complete email body. NO placeholders. Sign with user\'s actual name.' },
       },
@@ -215,7 +217,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 const toolExecutors: Record<string, ToolExecutor> = {
   // === Communication ===
   async send_email(args, context): Promise<ToolResult> {
-    const { to, subject, body } = args as { to: string; subject: string; body: string };
+    const { to, cc, subject, body } = args as { to: string; cc?: string; subject: string; body: string };
 
     if (!context.emailAdapter) {
       return { success: false, error: 'Email not configured. Ask user to set up RESEND_API_KEY.' };
@@ -223,6 +225,7 @@ const toolExecutors: Record<string, ToolExecutor> = {
 
     // Parse multiple emails (comma or semicolon separated)
     const toList = to.split(/[,;]/).map(e => e.trim()).filter(e => e.includes('@'));
+    const ccList = cc ? cc.split(/[,;]/).map(e => e.trim()).filter(e => e.includes('@')) : [];
 
     if (toList.length === 0) {
       return { success: false, error: 'No valid email addresses provided' };
@@ -240,6 +243,7 @@ const toolExecutors: Record<string, ToolExecutor> = {
       const result = await context.emailAdapter.sendEmail({
         from: fromAddress,
         to: toList,
+        cc: ccList.length > 0 ? ccList : undefined,
         subject,
         body,
       }, true);
@@ -254,7 +258,8 @@ const toolExecutors: Record<string, ToolExecutor> = {
           userRequested: true,
           userConfirmed: true,
         });
-        return { success: true, result: `Email sent to ${toList.join(', ')}` };
+        const ccMsg = ccList.length > 0 ? ` (CC: ${ccList.join(', ')})` : '';
+        return { success: true, result: `Email sent to ${toList.join(', ')}${ccMsg}` };
       }
       return { success: false, error: result.error || 'Failed to send' };
     } catch (error) {
