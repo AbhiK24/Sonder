@@ -23,14 +23,31 @@ Every AI tool works the same way:
 
 ## What if AI had a life?
 
-Sonder agents:
+Sonder agents don't wait for you. They:
 
-- **Think while you're away** — Generating reflections, forming questions, discussing you with each other
-- **Remember everything** — Not just this conversation. Every conversation. Your patterns. Your wins. Your struggles.
-- **Reach out first** — Morning check-ins. Goal follow-ups. "Hey, how did that thing go?"
-- **Work as a swarm** — Multiple agents, different perspectives, one mission: you
+- **Think about you while you're away** — reflecting on your goals, forming questions, discussing you with each other
+- **Remember everything** — not just this conversation, but every conversation. Your patterns. Your wins. Your struggles.
+- **Reach out first** — morning check-ins, goal follow-ups, "Hey, how did that interview go?"
+- **Take action for you** — send you reminder emails, check your calendar, read your tasks, nudge you at the right moment
+
+Multiple agents. Different perspectives. One mission: *you*.
 
 And it all runs **locally on your machine**. Your data stays yours.
+
+---
+
+## What They Can Do
+
+| Capability | Impact |
+|------------|--------|
+| **Send you emails** | Wake up to a thoughtful check-in about your goals |
+| **Message you on WhatsApp** | Get nudged before that deadline you mentioned |
+| **Read your Todoist** | They know what's on your plate without you telling them |
+| **Check your calendar** | "You have that meeting in an hour — how are you feeling about it?" |
+| **Remember your goals** | Follow up on that promotion, that habit, that relationship |
+| **Coordinate with each other** | The right voice speaks at the right moment |
+
+They're not waiting for commands. They're *paying attention*.
 
 ---
 
@@ -56,19 +73,15 @@ A **Play** is a complete multi-agent experience — a cast of characters designe
 
 *Five voices harmonizing for your ADHD brain.*
 
-| Agent | Role | When They Speak |
-|-------|------|-----------------|
-| 🌙 Luna | The Keeper | Remembers what you forget |
-| 🔥 Ember | The Spark | Gets you started when you're stuck |
-| 🌿 Sage | The Guide | Calms you when you're overwhelmed |
-| ✨ Joy | The Light | Celebrates wins you dismiss |
-| 🪞 Echo | The Mirror | Reflects what you're really feeling |
+| Agent | What They Do For You |
+|-------|---------------------|
+| 🌙 Luna | Remembers what you forget. Keeps track of everything. |
+| 🔥 Ember | Gets you started when you're stuck. Pushes gently. |
+| 🌿 Sage | Calms you when you're overwhelmed. Finds perspective. |
+| ✨ Joy | Celebrates wins you dismiss. Notices the good. |
+| 🪞 Echo | Reflects what you're really feeling. Holds up the mirror. |
 
-**How it works:**
-- You share your goals during onboarding
-- Agents check in based on your timelines
-- The *right* agent speaks for the moment (stressed → Sage, excited → Joy)
-- They speak on behalf of each other — one voice, five perspectives
+You share your goals. They check in. The *right* agent speaks for the moment — stressed gets Sage, excited gets Joy. One voice, five perspectives.
 
 ```bash
 pnpm chorus
@@ -86,47 +99,6 @@ pnpm tavern
 
 ---
 
-## How Sonder Works
-
-```
-You message → Orchestrator picks the right agent → Agent responds for everyone
-                    ↓
-            While you're away:
-                    ↓
-         Agents generate thoughts
-         Agents discuss you
-         Goals timelines tick
-                    ↓
-            You return → Reunion moment
-```
-
-### The Orchestrator
-
-Not a chatbot. A *brain* that decides:
-- **Who speaks?** Match your mood to agent strengths
-- **What perspectives?** Gather views from all agents
-- **One voice** — Speaker delivers on behalf of everyone
-
-### Goals That Drive Behavior
-
-During onboarding, you share goals:
-- *"Get promoted by next month"*
-- *"Exercise more consistently"*
-- *"Reconnect with old friends"*
-
-Agents remember. Agents follow up. Agents care.
-
-### Idle Engine
-
-When you're away, agents don't sleep:
-- Generate reflections about you
-- Form questions to ask later
-- Discuss your situation with each other
-
-When you return, they have something to say.
-
----
-
 ## Local-First. Always.
 
 Your data never leaves your machine:
@@ -134,70 +106,30 @@ Your data never leaves your machine:
 - Goals and patterns
 - Personal context
 
-The only cloud calls are to your LLM provider (and you can use local Ollama).
-
----
-
-## Architecture
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                     SONDER ENGINE                           │
-├─────────────────────────────────────────────────────────────┤
-│  User Profile        │  Goals across all plays              │
-├──────────────────────┼──────────────────────────────────────┤
-│  FTUE                │  First-time onboarding flow          │
-│  Orchestrator        │  Picks who speaks, synthesizes       │
-│  Idle Engine         │  Thinks while you're away            │
-│  Insight Engine      │  Detects patterns, fires triggers    │
-├──────────────────────┼──────────────────────────────────────┤
-│  Integrations        │  Telegram, Email, WhatsApp, Todoist  │
-└─────────────────────────────────────────────────────────────┘
-                            │
-              ┌─────────────┴─────────────┐
-              ▼                           ▼
-        ┌───────────┐               ┌───────────┐
-        │  Chorus   │               │ Wanderer's│
-        │           │               │   Rest    │
-        │  ADHD     │               │  Mystery  │
-        │  Support  │               │   Game    │
-        └───────────┘               └───────────┘
-```
+The only cloud calls are to your LLM provider (and you can use local Ollama for full privacy).
 
 ---
 
 ## Integrations
 
-| Channel | Status | What It Does |
-|---------|--------|--------------|
-| Telegram | ✅ | Primary chat interface |
-| Email (Resend) | ✅ | Agents send check-ins |
-| WhatsApp (Twilio) | ✅ | Proactive messages |
-| Todoist | ✅ | Read your tasks |
-| Google Calendar | 🔜 | Schedule awareness |
+| Integration | What It Enables |
+|-------------|-----------------|
+| Telegram | Chat with your agents anywhere |
+| Email (Resend) | Agents send you thoughtful check-ins |
+| WhatsApp (Twilio) | Proactive nudges to your phone |
+| Todoist | Agents see your tasks, understand your load |
+| Google Calendar | Schedule-aware check-ins (coming soon) |
 
 ---
 
 ## LLM Providers
 
-| Provider | Setup | Notes |
-|----------|-------|-------|
-| Kimi (Moonshot) | `KIMI_API_KEY` | Cheap, good for long context |
-| OpenAI | `OPENAI_API_KEY` | GPT-4 |
-| Anthropic | `ANTHROPIC_API_KEY` | Claude |
-| Ollama | Local install | Free, private |
-
----
-
-## Development
-
-```bash
-pnpm onboard           # Setup wizard
-pnpm chorus            # Run Chorus (ADHD support)
-pnpm tavern            # Run Wanderer's Rest (mystery game)
-pnpm dashboard         # Visual interface
-pnpm typecheck         # Type check
-```
+| Provider | Notes |
+|----------|-------|
+| Kimi (Moonshot) | Cheap, good for long context |
+| OpenAI | GPT-4 |
+| Anthropic | Claude |
+| Ollama | Free, fully private |
 
 ---
 
@@ -209,7 +141,7 @@ Most AI is a vending machine. Insert prompt, receive response.
 
 Sonder agents have opinions. Preferences. Relationships with each other. They discuss you when you're not there.
 
-### The simulation is the product
+### They exist even when you don't look
 
 The value isn't just what agents *do* for you.
 The value is that they *exist* — thinking, remembering, caring.
@@ -220,12 +152,14 @@ Local-first isn't a feature. It's a principle. Your conversations, your goals, y
 
 ---
 
-## Inspiration
+## Development
 
-- [Stanford Generative Agents](https://arxiv.org/abs/2304.03442) — Memory architecture
-- Disco Elysium — Internal voices as characters
-- Her Story — Investigation through conversation
-- The feeling of being *thought about*
+```bash
+pnpm onboard           # Setup wizard
+pnpm chorus            # Run Chorus (ADHD support)
+pnpm tavern            # Run Wanderer's Rest
+pnpm dashboard         # Visual interface
+```
 
 ---
 
@@ -235,7 +169,7 @@ Sonder is early. Build with us:
 
 - **New Plays** — Design agent experiences
 - **Integrations** — More channels, more context
-- **Engine features** — Better orchestration, richer idle behavior
+- **Engine features** — Better orchestration, richer behavior
 
 ---
 
