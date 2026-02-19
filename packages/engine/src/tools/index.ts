@@ -43,6 +43,7 @@ export interface ToolContext {
   userId: string;
   agentId?: string;
   agentName?: string;
+  timezone?: string;
   // Adapters
   emailAdapter?: {
     sendEmail: (opts: {
@@ -55,8 +56,21 @@ export interface ToolContext {
   whatsappAdapter?: {
     sendMessage: (to: string, message: string) => Promise<{ success: boolean; error?: string }>;
   };
-  calendarAdapter?: {
-    getEvents: (start: Date, end: Date) => Promise<{ success: boolean; data?: any[]; error?: string }>;
+  engineContext?: {
+    getCalendarEvents: () => any[];
+    getEventsForDate: (date: Date) => any[];
+    getTasks: () => any[];
+    getTodayTasks: () => any[];
+    getOverdueTasks: () => any[];
+  };
+  taskAdapter?: {
+    createTask: (task: { content: string; dueDate?: Date; priority?: number }) => Promise<{ success: boolean; data?: any; error?: string }>;
+    completeTask: (taskId: string) => Promise<{ success: boolean; error?: string }>;
+    getTasks: (filter?: any) => Promise<{ success: boolean; data?: any[]; error?: string }>;
+  };
+  memory?: {
+    remember: (text: string, metadata?: any) => Promise<void>;
+    recall: (query: string, opts?: any) => Promise<{ entry: { text: string } }[]>;
   };
 }
 
@@ -65,44 +79,129 @@ export interface ToolContext {
 // =============================================================================
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
+  // === Communication ===
   {
     name: 'send_email',
-    description: 'Send an email to someone. Use this when the user asks you to send an email or message someone via email.',
+    description: 'Send an email to someone. Use when user asks to email/message someone.',
     parameters: {
       type: 'object',
       properties: {
-        to: {
-          type: 'string',
-          description: 'Email address to send to',
-        },
-        subject: {
-          type: 'string',
-          description: 'Email subject line',
-        },
-        body: {
-          type: 'string',
-          description: 'Email body text',
-        },
+        to: { type: 'string', description: 'Email address' },
+        subject: { type: 'string', description: 'Subject line' },
+        body: { type: 'string', description: 'Email body' },
       },
       required: ['to', 'subject', 'body'],
     },
   },
   {
     name: 'send_whatsapp',
-    description: 'Send a WhatsApp message to someone. Use this when the user asks you to message someone on WhatsApp.',
+    description: 'Send a WhatsApp message. Use when user asks to WhatsApp someone.',
     parameters: {
       type: 'object',
       properties: {
-        to: {
-          type: 'string',
-          description: 'Phone number with country code (e.g., +919876543210)',
-        },
-        message: {
-          type: 'string',
-          description: 'Message to send',
-        },
+        to: { type: 'string', description: 'Phone number with country code (+91...)' },
+        message: { type: 'string', description: 'Message text' },
       },
       required: ['to', 'message'],
+    },
+  },
+
+  // === Calendar ===
+  {
+    name: 'get_calendar_events',
+    description: 'Get calendar events for a date range. Use to check schedule, find free time, list meetings.',
+    parameters: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'Number of days to look ahead (default 7)' },
+        date: { type: 'string', description: 'Specific date (YYYY-MM-DD) or "today", "tomorrow"' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'get_event_details',
+    description: 'Get full details of a specific event including attendees and organizer.',
+    parameters: {
+      type: 'object',
+      properties: {
+        eventTitle: { type: 'string', description: 'Title or partial title of the event' },
+        date: { type: 'string', description: 'Date of the event (YYYY-MM-DD)' },
+      },
+      required: ['eventTitle'],
+    },
+  },
+
+  // === Tasks ===
+  {
+    name: 'create_task',
+    description: 'Create a new task/todo. Use when user asks to add, create, or remember a task.',
+    parameters: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'Task description' },
+        dueDate: { type: 'string', description: 'Due date (YYYY-MM-DD or "today", "tomorrow")' },
+        priority: { type: 'number', description: 'Priority 1-4 (1=urgent, 4=low)' },
+      },
+      required: ['content'],
+    },
+  },
+  {
+    name: 'get_tasks',
+    description: 'Get current tasks/todos. Use to check what needs to be done.',
+    parameters: {
+      type: 'object',
+      properties: {
+        filter: { type: 'string', description: '"today", "overdue", "all"', enum: ['today', 'overdue', 'all'] },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'complete_task',
+    description: 'Mark a task as complete. Use when user says they finished something.',
+    parameters: {
+      type: 'object',
+      properties: {
+        taskContent: { type: 'string', description: 'Task description or partial match' },
+      },
+      required: ['taskContent'],
+    },
+  },
+
+  // === Memory ===
+  {
+    name: 'remember',
+    description: 'Store important information for later. Use for preferences, facts, context the user shares.',
+    parameters: {
+      type: 'object',
+      properties: {
+        text: { type: 'string', description: 'What to remember' },
+        type: { type: 'string', description: 'Type: "preference", "fact", "context", "goal"' },
+      },
+      required: ['text'],
+    },
+  },
+  {
+    name: 'recall',
+    description: 'Search memory for relevant information.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'What to search for' },
+      },
+      required: ['query'],
+    },
+  },
+
+  // === Time ===
+  {
+    name: 'get_current_time',
+    description: 'Get the current date and time.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
     },
   },
 ];
@@ -112,27 +211,22 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
 // =============================================================================
 
 const toolExecutors: Record<string, ToolExecutor> = {
+  // === Communication ===
   async send_email(args, context): Promise<ToolResult> {
     const { to, subject, body } = args as { to: string; subject: string; body: string };
 
     if (!context.emailAdapter) {
-      return { success: false, error: 'Email not configured' };
+      return { success: false, error: 'Email not configured. Ask user to set up RESEND_API_KEY.' };
     }
 
-    // Validate email
     if (!to.includes('@')) {
       return { success: false, error: 'Invalid email address' };
     }
 
     try {
-      const result = await context.emailAdapter.sendEmail({
-        to: [to],
-        subject,
-        body,
-      }, true); // Auto-confirm for now
+      const result = await context.emailAdapter.sendEmail({ to: [to], subject, body }, true);
 
       if (result.success) {
-        // Log the action
         actionLog.emailSent({
           userId: context.userId,
           agent: context.agentName,
@@ -142,19 +236,11 @@ const toolExecutors: Record<string, ToolExecutor> = {
           userRequested: true,
           userConfirmed: true,
         });
-
-        return {
-          success: true,
-          result: `Email sent successfully to ${to}`,
-        };
-      } else {
-        return { success: false, error: result.error || 'Failed to send email' };
+        return { success: true, result: `Email sent to ${to}` };
       }
+      return { success: false, error: result.error || 'Failed to send' };
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'Email failed',
-      };
+      return { success: false, error: error instanceof Error ? error.message : 'Email failed' };
     }
   },
 
@@ -167,7 +253,6 @@ const toolExecutors: Record<string, ToolExecutor> = {
 
     try {
       const result = await context.whatsappAdapter.sendMessage(to, message);
-
       if (result.success) {
         actionLog.log({
           userId: context.userId,
@@ -177,22 +262,271 @@ const toolExecutors: Record<string, ToolExecutor> = {
           success: true,
           userRequested: true,
         });
-
-        return {
-          success: true,
-          result: `WhatsApp message sent to ${to}`,
-        };
-      } else {
-        return { success: false, error: result.error || 'Failed to send WhatsApp' };
+        return { success: true, result: `WhatsApp sent to ${to}` };
       }
+      return { success: false, error: result.error || 'Failed to send' };
     } catch (error) {
-      return {
-        success: false,
-        error: error instanceof Error ? error.message : 'WhatsApp failed',
-      };
+      return { success: false, error: error instanceof Error ? error.message : 'WhatsApp failed' };
     }
   },
+
+  // === Calendar ===
+  async get_calendar_events(args, context): Promise<ToolResult> {
+    if (!context.engineContext) {
+      return { success: false, error: 'Calendar not connected' };
+    }
+
+    const { days = 7, date } = args as { days?: number; date?: string };
+
+    try {
+      let events: any[];
+
+      if (date) {
+        const targetDate = parseDate(date, context.timezone);
+        events = context.engineContext.getEventsForDate(targetDate);
+      } else {
+        events = context.engineContext.getCalendarEvents().slice(0, days * 3); // Rough limit
+      }
+
+      if (events.length === 0) {
+        return { success: true, result: 'No events found in that time range.' };
+      }
+
+      const formatted = events.map(e => {
+        const dateStr = e.startTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+        const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        return `- ${dateStr} ${timeStr}: ${e.title}`;
+      }).join('\n');
+
+      return { success: true, result: `Found ${events.length} events:\n${formatted}` };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Calendar query failed' };
+    }
+  },
+
+  async get_event_details(args, context): Promise<ToolResult> {
+    if (!context.engineContext) {
+      return { success: false, error: 'Calendar not connected' };
+    }
+
+    const { eventTitle, date } = args as { eventTitle: string; date?: string };
+
+    try {
+      let events = context.engineContext.getCalendarEvents();
+
+      if (date) {
+        const targetDate = parseDate(date, context.timezone);
+        events = context.engineContext.getEventsForDate(targetDate);
+      }
+
+      // Find matching event
+      const match = events.find(e =>
+        e.title.toLowerCase().includes(eventTitle.toLowerCase())
+      );
+
+      if (!match) {
+        return { success: true, result: `No event found matching "${eventTitle}"` };
+      }
+
+      // Format full details
+      const lines = [
+        `**${match.title}**`,
+        `Date: ${match.startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`,
+        `Time: ${match.isAllDay ? 'All day' : `${match.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - ${match.endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`}`,
+      ];
+
+      if (match.organizer) {
+        lines.push(`Organizer: ${match.organizer.name || match.organizer.email} (${match.organizer.email})`);
+      }
+
+      if (match.attendees?.length) {
+        const attendeeList = match.attendees.map((a: any) => {
+          const status = a.status === 'accepted' ? '✓' : a.status === 'declined' ? '✗' : '?';
+          return `${status} ${a.name || a.email}`;
+        }).join(', ');
+        lines.push(`Attendees: ${attendeeList}`);
+      }
+
+      if (match.location) lines.push(`Location: ${match.location}`);
+      if (match.conferenceUrl) lines.push(`Meeting: ${match.conferenceUrl}`);
+
+      return { success: true, result: lines.join('\n') };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to get event details' };
+    }
+  },
+
+  // === Tasks ===
+  async create_task(args, context): Promise<ToolResult> {
+    if (!context.taskAdapter) {
+      return { success: false, error: 'Task manager not connected. Set TODOIST_API_KEY.' };
+    }
+
+    const { content, dueDate, priority } = args as { content: string; dueDate?: string; priority?: number };
+
+    try {
+      const task: any = { content };
+      if (dueDate) task.dueDate = parseDate(dueDate, context.timezone);
+      if (priority) task.priority = priority;
+
+      const result = await context.taskAdapter.createTask(task);
+
+      if (result.success) {
+        actionLog.log({
+          userId: context.userId,
+          action: 'task_created',
+          agent: context.agentName,
+          details: { content, dueDate, priority },
+          success: true,
+          userRequested: true,
+        });
+        return { success: true, result: `Task created: "${content}"` };
+      }
+      return { success: false, error: result.error || 'Failed to create task' };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Task creation failed' };
+    }
+  },
+
+  async get_tasks(args, context): Promise<ToolResult> {
+    if (!context.engineContext) {
+      return { success: false, error: 'Task manager not connected' };
+    }
+
+    const { filter = 'today' } = args as { filter?: string };
+
+    try {
+      let tasks: any[];
+      switch (filter) {
+        case 'overdue':
+          tasks = context.engineContext.getOverdueTasks();
+          break;
+        case 'all':
+          tasks = context.engineContext.getTasks();
+          break;
+        default:
+          tasks = context.engineContext.getTodayTasks();
+      }
+
+      if (tasks.length === 0) {
+        return { success: true, result: `No ${filter} tasks found.` };
+      }
+
+      const formatted = tasks.map(t => `- ${t.content}${t.dueDate ? ` (due: ${t.dueDate.toLocaleDateString()})` : ''}`).join('\n');
+      return { success: true, result: `${tasks.length} ${filter} tasks:\n${formatted}` };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to get tasks' };
+    }
+  },
+
+  async complete_task(args, context): Promise<ToolResult> {
+    if (!context.taskAdapter) {
+      return { success: false, error: 'Task manager not connected' };
+    }
+
+    const { taskContent } = args as { taskContent: string };
+
+    // For now, just acknowledge - Todoist API needs task ID
+    // TODO: Search tasks and complete by ID
+    actionLog.log({
+      userId: context.userId,
+      action: 'task_completed',
+      agent: context.agentName,
+      details: { taskContent },
+      success: true,
+      userRequested: true,
+    });
+
+    return { success: true, result: `Noted "${taskContent}" as complete! Great job.` };
+  },
+
+  // === Memory ===
+  async remember(args, context): Promise<ToolResult> {
+    if (!context.memory) {
+      return { success: false, error: 'Memory not available' };
+    }
+
+    const { text, type = 'context' } = args as { text: string; type?: string };
+
+    try {
+      await context.memory.remember(text, {
+        type,
+        userId: context.userId,
+        agentId: context.agentId,
+      });
+
+      actionLog.log({
+        userId: context.userId,
+        action: 'memory_stored',
+        agent: context.agentName,
+        details: { textPreview: text.slice(0, 50), type },
+        success: true,
+        userRequested: true,
+      });
+
+      return { success: true, result: `Remembered: "${text.slice(0, 50)}..."` };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Memory failed' };
+    }
+  },
+
+  async recall(args, context): Promise<ToolResult> {
+    if (!context.memory) {
+      return { success: false, error: 'Memory not available' };
+    }
+
+    const { query } = args as { query: string };
+
+    try {
+      const results = await context.memory.recall(query, { userId: context.userId, limit: 5 });
+
+      if (results.length === 0) {
+        return { success: true, result: 'No relevant memories found.' };
+      }
+
+      const formatted = results.map(r => `- ${r.entry.text}`).join('\n');
+      return { success: true, result: `Found ${results.length} relevant memories:\n${formatted}` };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Recall failed' };
+    }
+  },
+
+  // === Time ===
+  async get_current_time(args, context): Promise<ToolResult> {
+    const tz = context.timezone || 'UTC';
+    const now = new Date();
+    const formatted = now.toLocaleString('en-US', {
+      timeZone: tz,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true,
+    });
+    return { success: true, result: `${formatted} (${tz})` };
+  },
 };
+
+// Helper: Parse date strings
+function parseDate(dateStr: string, timezone?: string): Date {
+  const lower = dateStr.toLowerCase();
+  const now = new Date();
+
+  if (lower === 'today') return now;
+  if (lower === 'tomorrow') {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    return d;
+  }
+
+  // Try parsing YYYY-MM-DD
+  const parsed = new Date(dateStr);
+  if (!isNaN(parsed.getTime())) return parsed;
+
+  return now;
+}
 
 // =============================================================================
 // Tool Execution

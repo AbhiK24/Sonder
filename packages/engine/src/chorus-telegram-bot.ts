@@ -339,8 +339,30 @@ If the user asks you to take an action (send email, etc.), use the appropriate t
         userId: String(state.profile.id),
         agentId: agent.id,
         agentName: agent.name,
+        timezone: process.env.TIMEZONE || 'UTC',
         emailAdapter: emailAdapter || undefined,
-        whatsappAdapter: whatsappAdapter || undefined,
+        whatsappAdapter: whatsappAdapter ? {
+          sendMessage: async (to: string, message: string) => {
+            const result = await whatsappAdapter.sendAsAgent(agent.id, 'chorus', to, message, true);
+            return result;
+          }
+        } : undefined,
+        engineContext: {
+          getCalendarEvents: () => engineContext.getCalendarEvents(),
+          getEventsForDate: (date: Date) => engineContext.getEventsForDate(date),
+          getTasks: () => engineContext.getTasks(),
+          getTodayTasks: () => engineContext.getTodayTasks(),
+          getOverdueTasks: () => engineContext.getOverdueTasks(),
+        },
+        taskAdapter: taskAdapter ? {
+          createTask: async (task: any) => taskAdapter.createTask(task),
+          completeTask: async (taskId: string) => taskAdapter.completeTask(taskId),
+          getTasks: async (filter?: any) => taskAdapter.getTasks(filter),
+        } : undefined,
+        memory: {
+          remember: async (text: string, metadata?: any) => { await memory.remember(text, metadata); },
+          recall: async (query: string, opts?: any) => memory.recall(query, opts),
+        },
       };
 
       const toolResults: string[] = [];
