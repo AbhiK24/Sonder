@@ -41,6 +41,7 @@ export type ToolExecutor = (
 
 export interface ToolContext {
   userId: string;
+  userName?: string;  // User's actual name for emails
   agentId?: string;
   agentName?: string;
   timezone?: string;
@@ -83,13 +84,13 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   // === Communication ===
   {
     name: 'send_email',
-    description: 'Send an email to someone. Use when user asks to email/message someone.',
+    description: 'Send an email. IMPORTANT: Write the actual email body - no placeholders like [Name]. Use the user\'s real name from context.',
     parameters: {
       type: 'object',
       properties: {
-        to: { type: 'string', description: 'Email address' },
-        subject: { type: 'string', description: 'Subject line' },
-        body: { type: 'string', description: 'Email body' },
+        to: { type: 'string', description: 'Recipient email address(es), comma-separated' },
+        subject: { type: 'string', description: 'Clear subject line (40-50 chars). Be specific.' },
+        body: { type: 'string', description: 'Complete email body. NO placeholders. Sign with user\'s actual name.' },
       },
       required: ['to', 'subject', 'body'],
     },
@@ -575,20 +576,24 @@ export async function executeTool(
 /**
  * Format tools for LLM prompt (for models that don't support native tool calling)
  */
-export function formatToolsForPrompt(): string {
+export function formatToolsForPrompt(userName?: string): string {
   return `## Available Tools
 You can use these tools by responding with a JSON tool call. Format:
 \`\`\`tool
 {"name": "tool_name", "arguments": {...}}
 \`\`\`
 
+${userName ? `## User Info\nUser's name: ${userName} (use this in emails, not placeholders!)` : ''}
+
 Tools:
 ${TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description}
   Parameters: ${Object.entries(t.parameters.properties).map(([k, v]) => `${k} (${v.type}): ${v.description}`).join(', ')}`).join('\n\n')}
 
-IMPORTANT: Only use tools when the user explicitly asks you to take an action (send email, message someone, etc.).
-If you use a tool, wait for the result before confirming the action to the user.
-Do NOT claim to have done something unless you actually called the tool and got a success result.`;
+## CRITICAL Rules:
+1. Only use tools when user explicitly asks for an action
+2. Wait for tool result before confirming to user
+3. NEVER claim to have done something without calling the tool
+4. For emails: Write complete body with NO placeholders. Sign with "${userName || 'user\'s actual name'}"`;
 }
 
 /**

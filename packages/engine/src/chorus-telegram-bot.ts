@@ -308,8 +308,9 @@ ${extraContext.reunionContext}`;
     systemPrompt += `\n\n${contextSummary}`;
   }
 
-  // Add available tools
-  systemPrompt += `\n\n${formatToolsForPrompt()}`;
+  // Add available tools (with user's name for proper email composition)
+  const userName = state.profile.name || 'the user';
+  systemPrompt += `\n\n${formatToolsForPrompt(userName)}`;
 
   // Build conversation prompt
   const prompt = `${systemPrompt}
@@ -337,6 +338,7 @@ If the user asks you to take an action (send email, etc.), use the appropriate t
       // Execute tools
       const toolContext: ToolContext = {
         userId: String(state.profile.id),
+        userName: state.profile.name,
         agentId: agent.id,
         agentName: agent.name,
         timezone: process.env.TIMEZONE || 'UTC',
