@@ -1,0 +1,1467 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sonder</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    :root {
+      --bg: #0a0a0b;
+      --surface: #141416;
+      --surface-hover: #1a1a1d;
+      --border: #2a2a2d;
+      --text: #fafafa;
+      --text-muted: #888;
+      --accent: #a78bfa;
+      --accent-dim: rgba(167, 139, 250, 0.1);
+      --success: #4ade80;
+      --error: #f87171;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+      line-height: 1.6;
+    }
+
+    .container {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 60px 24px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Steps */
+    .step {
+      display: none;
+      flex-direction: column;
+      flex: 1;
+      animation: fadeIn 0.4s ease;
+    }
+
+    .step.active {
+      display: flex;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    /* Typography */
+    h1 {
+      font-size: 2.5rem;
+      font-weight: 600;
+      letter-spacing: -0.03em;
+      margin-bottom: 16px;
+    }
+
+    h2 {
+      font-size: 1.75rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+      margin-bottom: 12px;
+    }
+
+    h3 {
+      font-size: 1.25rem;
+      font-weight: 500;
+      margin-bottom: 8px;
+    }
+
+    .subtitle {
+      font-size: 1.125rem;
+      color: var(--text-muted);
+      margin-bottom: 40px;
+    }
+
+    p {
+      color: var(--text-muted);
+      margin-bottom: 16px;
+    }
+
+    .highlight {
+      color: var(--accent);
+    }
+
+    /* Intro Page */
+    .intro-content {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+    }
+
+    .intro-content h1 {
+      font-size: 3rem;
+      margin-bottom: 24px;
+    }
+
+    .intro-content .lead {
+      font-size: 1.25rem;
+      color: var(--text);
+      margin-bottom: 32px;
+      line-height: 1.7;
+    }
+
+    .feature-list {
+      margin: 32px 0;
+    }
+
+    .feature-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 16px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .feature-item:last-child {
+      border-bottom: none;
+    }
+
+    .feature-icon {
+      font-size: 1.5rem;
+      width: 40px;
+      text-align: center;
+    }
+
+    .feature-text h4 {
+      font-weight: 500;
+      margin-bottom: 4px;
+    }
+
+    .feature-text p {
+      font-size: 0.9rem;
+      margin: 0;
+    }
+
+    /* Forms */
+    .form-group {
+      margin-bottom: 24px;
+    }
+
+    label {
+      display: block;
+      font-size: 0.875rem;
+      font-weight: 500;
+      margin-bottom: 8px;
+      color: var(--text);
+    }
+
+    label small {
+      color: var(--text-muted);
+      font-weight: 400;
+    }
+
+    input, select {
+      width: 100%;
+      padding: 12px 16px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 1rem;
+      transition: border-color 0.2s, box-shadow 0.2s;
+    }
+
+    input:focus, select:focus {
+      outline: none;
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px var(--accent-dim);
+    }
+
+    input::placeholder {
+      color: var(--text-muted);
+    }
+
+    input.configured {
+      border-color: var(--success);
+      background: rgba(74, 222, 128, 0.05);
+    }
+
+    .input-row {
+      display: flex;
+      gap: 12px;
+    }
+
+    .input-row input {
+      flex: 1;
+    }
+
+    .test-btn {
+      padding: 12px 20px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 0.875rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .test-btn:hover {
+      background: var(--surface-hover);
+      border-color: var(--accent);
+    }
+
+    .test-btn.success {
+      border-color: var(--success);
+      color: var(--success);
+    }
+
+    .test-btn.error {
+      border-color: var(--error);
+      color: var(--error);
+    }
+
+    /* Sections */
+    .section {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+
+    .section-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 20px;
+    }
+
+    .section-icon {
+      font-size: 1.5rem;
+    }
+
+    .section-title {
+      font-weight: 500;
+    }
+
+    .section-badge {
+      margin-left: auto;
+      font-size: 0.75rem;
+      padding: 4px 10px;
+      border-radius: 20px;
+      background: var(--accent-dim);
+      color: var(--accent);
+    }
+
+    .section-badge.optional {
+      background: rgba(136, 136, 136, 0.1);
+      color: var(--text-muted);
+    }
+
+    /* Play Cards */
+    .plays-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+      margin: 32px 0;
+    }
+
+    .play-card {
+      background: var(--surface);
+      border: 2px solid var(--border);
+      border-radius: 16px;
+      padding: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .play-card:hover {
+      border-color: var(--accent);
+      transform: translateY(-2px);
+    }
+
+    .play-card.selected {
+      border-color: var(--accent);
+      background: var(--accent-dim);
+    }
+
+    .play-header {
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      margin-bottom: 16px;
+    }
+
+    .play-icon {
+      font-size: 2.5rem;
+    }
+
+    .play-name {
+      font-size: 1.5rem;
+      font-weight: 600;
+    }
+
+    .play-tagline {
+      color: var(--text-muted);
+      font-size: 0.9rem;
+    }
+
+    .play-description {
+      color: var(--text-muted);
+      font-size: 0.95rem;
+      line-height: 1.6;
+      margin-bottom: 16px;
+    }
+
+    .play-agents {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .agent-tag {
+      font-size: 0.8rem;
+      padding: 4px 12px;
+      background: rgba(255,255,255,0.05);
+      border-radius: 20px;
+      color: var(--text-muted);
+    }
+
+    /* Buttons */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: 8px;
+      font-size: 1rem;
+      font-weight: 500;
+      cursor: pointer;
+      transition: all 0.2s;
+      border: none;
+    }
+
+    .btn-primary {
+      background: var(--accent);
+      color: #000;
+    }
+
+    .btn-primary:hover {
+      filter: brightness(1.1);
+      transform: translateY(-1px);
+    }
+
+    .btn-primary:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .btn-secondary {
+      background: transparent;
+      color: var(--text-muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-secondary:hover {
+      background: var(--surface);
+      color: var(--text);
+    }
+
+    .btn-large {
+      padding: 18px 40px;
+      font-size: 1.125rem;
+    }
+
+    .nav-buttons {
+      display: flex;
+      justify-content: space-between;
+      margin-top: auto;
+      padding-top: 40px;
+    }
+
+    /* Progress indicator */
+    .progress {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 40px;
+    }
+
+    .progress-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: var(--border);
+      transition: all 0.3s;
+    }
+
+    .progress-dot.active {
+      background: var(--accent);
+      width: 24px;
+      border-radius: 4px;
+    }
+
+    .progress-dot.done {
+      background: var(--success);
+    }
+
+    /* Collapsible */
+    .collapsible {
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      margin-bottom: 12px;
+      overflow: hidden;
+    }
+
+    .collapsible-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 16px 20px;
+      cursor: pointer;
+      transition: background 0.2s;
+    }
+
+    .collapsible-header:hover {
+      background: var(--surface);
+    }
+
+    .collapsible-icon {
+      font-size: 1.25rem;
+    }
+
+    .collapsible-title {
+      flex: 1;
+      font-weight: 500;
+    }
+
+    .collapsible-status {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+    }
+
+    .collapsible-status.configured {
+      color: var(--success);
+    }
+
+    .collapsible-arrow {
+      transition: transform 0.2s;
+    }
+
+    .collapsible.open .collapsible-arrow {
+      transform: rotate(180deg);
+    }
+
+    .collapsible-content {
+      display: none;
+      padding: 0 20px 20px;
+    }
+
+    .collapsible.open .collapsible-content {
+      display: block;
+    }
+
+    /* Status */
+    .status-msg {
+      font-size: 0.875rem;
+      margin-top: 8px;
+    }
+
+    .status-msg.success {
+      color: var(--success);
+    }
+
+    .status-msg.error {
+      color: var(--error);
+    }
+
+    /* Summary */
+    .summary-item {
+      display: flex;
+      justify-content: space-between;
+      padding: 12px 0;
+      border-bottom: 1px solid var(--border);
+    }
+
+    .summary-item:last-child {
+      border-bottom: none;
+    }
+
+    .summary-label {
+      color: var(--text-muted);
+    }
+
+    .summary-value {
+      font-weight: 500;
+    }
+
+    .summary-value.configured {
+      color: var(--success);
+    }
+
+    .summary-value.missing {
+      color: var(--text-muted);
+    }
+
+    /* Launch */
+    .launch-section {
+      text-align: center;
+      padding: 40px 0;
+    }
+
+    .launch-icon {
+      font-size: 4rem;
+      margin-bottom: 24px;
+    }
+
+    .launch-message {
+      font-size: 1.125rem;
+      color: var(--text-muted);
+      margin-bottom: 32px;
+    }
+
+    a {
+      color: var(--accent);
+      text-decoration: none;
+    }
+
+    a:hover {
+      text-decoration: underline;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <!-- Step 1: Intro -->
+    <div class="step active" id="step-intro">
+      <div class="intro-content">
+        <h1>Sonder</h1>
+        <p class="lead">
+          An engine for creating <span class="highlight">AI companions</span> that feel genuinely alive.
+          Not assistants that wait for commands—<em>presences</em> that think, remember, and grow alongside you.
+        </p>
+
+        <div class="feature-list">
+          <div class="feature-item">
+            <div class="feature-icon">🧠</div>
+            <div class="feature-text">
+              <h4>They think while you're away</h4>
+              <p>Companions generate thoughts, reflections, and conversations even when you're not looking.</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">💭</div>
+            <div class="feature-text">
+              <h4>They remember everything</h4>
+              <p>Every conversation builds shared history. They learn your patterns, preferences, and rhythms.</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🎭</div>
+            <div class="feature-text">
+              <h4>Multiple personalities, one experience</h4>
+              <p>Each "Play" is a complete cast of characters designed for a specific purpose.</p>
+            </div>
+          </div>
+          <div class="feature-item">
+            <div class="feature-icon">🏠</div>
+            <div class="feature-text">
+              <h4>Runs entirely on your machine</h4>
+              <p>Local-first. Your data stays yours. Connect your own LLM API.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <div></div>
+        <button class="btn btn-primary btn-large" onclick="nextStep()">
+          Get Started
+        </button>
+      </div>
+    </div>
+
+    <!-- Step 2: Configuration -->
+    <div class="step" id="step-config">
+      <div class="progress">
+        <div class="progress-dot done"></div>
+        <div class="progress-dot active"></div>
+        <div class="progress-dot"></div>
+        <div class="progress-dot"></div>
+      </div>
+
+      <h2>Connect your services</h2>
+      <p class="subtitle">Sonder needs a few things to run. We'll test each connection as you go.</p>
+
+      <!-- LLM -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-icon">🧠</span>
+          <span class="section-title">Language Model</span>
+          <span class="section-badge">Required</span>
+        </div>
+
+        <div class="form-group">
+          <label>Provider</label>
+          <select id="llm-provider" onchange="updateLLMFields()">
+            <option value="kimi">Kimi (Moonshot AI)</option>
+            <option value="openai">OpenAI</option>
+            <option value="anthropic">Anthropic</option>
+            <option value="ollama">Ollama (Local)</option>
+          </select>
+        </div>
+
+        <div class="form-group" id="llm-key-group">
+          <label>API Key</label>
+          <div class="input-row">
+            <input type="password" id="llm-key" placeholder="Enter API key...">
+            <button class="test-btn" onclick="testLLM()">Test</button>
+          </div>
+          <div class="status-msg" id="llm-status"></div>
+        </div>
+      </div>
+
+      <!-- Telegram -->
+      <div class="section">
+        <div class="section-header">
+          <span class="section-icon">💬</span>
+          <span class="section-title">Telegram Bot</span>
+          <span class="section-badge">Required</span>
+        </div>
+
+        <p style="margin-bottom: 16px;">
+          Create a bot via <a href="https://t.me/BotFather" target="_blank">@BotFather</a> on Telegram.
+        </p>
+
+        <div class="form-group">
+          <label>Bot Token</label>
+          <div class="input-row">
+            <input type="password" id="telegram-token" placeholder="123456789:ABC...">
+            <button class="test-btn" onclick="testTelegram()">Test</button>
+          </div>
+          <div class="status-msg" id="telegram-status"></div>
+        </div>
+      </div>
+
+      <!-- Optional: Email -->
+      <div class="collapsible" id="email-section">
+        <div class="collapsible-header" onclick="toggleCollapsible('email-section')">
+          <span class="collapsible-icon">📧</span>
+          <span class="collapsible-title">Email (Resend)</span>
+          <span class="collapsible-status" id="email-collapsible-status">Optional</span>
+          <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content">
+          <p style="margin-bottom: 16px; font-size: 0.9rem;">
+            Let agents send you emails. Get API key from <a href="https://resend.com" target="_blank">resend.com</a>
+          </p>
+          <div class="form-group">
+            <label>Resend API Key</label>
+            <input type="password" id="resend-key" placeholder="re_...">
+          </div>
+          <div class="form-group">
+            <label>Your Email</label>
+            <input type="email" id="user-email" placeholder="you@example.com">
+          </div>
+          <div class="form-group">
+            <label>Sending Domain <small>(verified in Resend)</small></label>
+            <input type="text" id="email-domain" placeholder="yourdomain.com">
+          </div>
+          <button class="test-btn" onclick="testResend()" style="width: 100%;">Test Connection</button>
+          <div class="status-msg" id="email-status"></div>
+        </div>
+      </div>
+
+      <!-- Optional: WhatsApp -->
+      <div class="collapsible" id="whatsapp-section">
+        <div class="collapsible-header" onclick="toggleCollapsible('whatsapp-section')">
+          <span class="collapsible-icon">📱</span>
+          <span class="collapsible-title">WhatsApp (Twilio)</span>
+          <span class="collapsible-status" id="whatsapp-collapsible-status">Optional</span>
+          <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content">
+          <p style="margin-bottom: 16px; font-size: 0.9rem;">
+            Reach you on WhatsApp. Get credentials from <a href="https://console.twilio.com" target="_blank">Twilio Console</a>
+          </p>
+          <div class="form-group">
+            <label>Account SID</label>
+            <input type="text" id="twilio-sid" placeholder="AC...">
+          </div>
+          <div class="form-group">
+            <label>Auth Token</label>
+            <input type="password" id="twilio-token" placeholder="...">
+          </div>
+          <div class="form-group">
+            <label>Twilio WhatsApp Number</label>
+            <input type="text" id="twilio-whatsapp" placeholder="+14155238886">
+          </div>
+          <div class="form-group">
+            <label>Your WhatsApp Number</label>
+            <input type="text" id="user-whatsapp" placeholder="+1234567890">
+          </div>
+          <button class="test-btn" onclick="testTwilio()" style="width: 100%;">Test Connection</button>
+          <div class="status-msg" id="whatsapp-status"></div>
+        </div>
+      </div>
+
+      <!-- Optional: Todoist -->
+      <div class="collapsible" id="todoist-section">
+        <div class="collapsible-header" onclick="toggleCollapsible('todoist-section')">
+          <span class="collapsible-icon">✅</span>
+          <span class="collapsible-title">Todoist</span>
+          <span class="collapsible-status" id="todoist-collapsible-status">Optional</span>
+          <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content">
+          <p style="margin-bottom: 16px; font-size: 0.9rem;">
+            Let agents help with task management. Get key from Settings → Integrations → Developer.
+          </p>
+          <div class="form-group">
+            <label>API Key</label>
+            <div class="input-row">
+              <input type="password" id="todoist-key" placeholder="...">
+              <button class="test-btn" onclick="testTodoist()">Test</button>
+            </div>
+            <div class="status-msg" id="todoist-status"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Optional: Calendar (ICS) -->
+      <div class="collapsible" id="calendar-section">
+        <div class="collapsible-header" onclick="toggleCollapsible('calendar-section')">
+          <span class="collapsible-icon">📅</span>
+          <span class="collapsible-title">Calendar (ICS)</span>
+          <span class="collapsible-status" id="calendar-collapsible-status">Optional</span>
+          <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content">
+          <p style="margin-bottom: 16px; font-size: 0.9rem;">
+            Let agents see your schedule. No OAuth needed—just paste your calendar's ICS feed URL.
+            <br><br>
+            <strong>Google Calendar:</strong> Settings → Calendar → Integrate → Secret address in iCal format
+            <br>
+            <strong>Apple Calendar:</strong> Share → Public Calendar → Copy Link
+          </p>
+
+          <div id="ics-feeds-container">
+            <!-- Dynamic feed entries go here -->
+          </div>
+
+          <button class="test-btn" onclick="addICSFeed()" style="width: 100%; margin-top: 12px;">
+            + Add Calendar
+          </button>
+          <div class="status-msg" id="calendar-status"></div>
+        </div>
+      </div>
+
+      <!-- Timezone -->
+      <div class="section" style="padding: 16px 20px;">
+        <div class="form-group" style="margin: 0;">
+          <label>Your Timezone</label>
+          <select id="timezone">
+            <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
+            <option value="America/New_York">America/New_York (EST)</option>
+            <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
+            <option value="Europe/London">Europe/London (GMT)</option>
+            <option value="Europe/Paris">Europe/Paris (CET)</option>
+            <option value="Asia/Tokyo">Asia/Tokyo (JST)</option>
+            <option value="Asia/Shanghai">Asia/Shanghai (CST)</option>
+            <option value="Australia/Sydney">Australia/Sydney (AEDT)</option>
+            <option value="UTC">UTC</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+        <button class="btn btn-primary" onclick="saveConfigAndNext()">Continue</button>
+      </div>
+    </div>
+
+    <!-- Step 3: Plays Explanation -->
+    <div class="step" id="step-plays">
+      <div class="progress">
+        <div class="progress-dot done"></div>
+        <div class="progress-dot done"></div>
+        <div class="progress-dot active"></div>
+        <div class="progress-dot"></div>
+      </div>
+
+      <h2>Choose your Play</h2>
+      <p class="subtitle">A Play is a complete multi-agent experience—a cast of characters designed for a purpose.</p>
+
+      <div class="plays-grid">
+        <div class="play-card" id="play-chorus" onclick="selectPlay('chorus')">
+          <div class="play-header">
+            <div class="play-icon">🎵</div>
+            <div>
+              <div class="play-name">Chorus</div>
+              <div class="play-tagline">Five voices harmonizing for your ADHD brain</div>
+            </div>
+          </div>
+          <p class="play-description">
+            A support system of five distinct companions, each bringing a different kind of help.
+            They coordinate to catch you when you're struggling, celebrate your wins, and gently guide you through difficult moments.
+          </p>
+          <div class="play-agents">
+            <span class="agent-tag">🌙 Luna - The Keeper</span>
+            <span class="agent-tag">🔥 Ember - The Spark</span>
+            <span class="agent-tag">🌿 Sage - The Guide</span>
+            <span class="agent-tag">✨ Joy - The Light</span>
+            <span class="agent-tag">🪞 Echo - The Mirror</span>
+          </div>
+        </div>
+
+        <div class="play-card" id="play-wanderers-rest" onclick="selectPlay('wanderers-rest')">
+          <div class="play-header">
+            <div class="play-icon">🏰</div>
+            <div>
+              <div class="play-name">Wanderer's Rest</div>
+              <div class="play-tagline">A cozy fantasy tavern to call home</div>
+            </div>
+          </div>
+          <p class="play-description">
+            Step into a warm tavern where the innkeeper remembers your name, mysterious travelers share stories,
+            and something magical might be brewing in the cellar. A gentle, ongoing narrative experience.
+          </p>
+          <div class="play-agents">
+            <span class="agent-tag">🍺 Maera - The Innkeeper</span>
+            <span class="agent-tag">🗡️ Roderick - The Sellsword</span>
+            <span class="agent-tag">📚 Elara - The Scholar</span>
+            <span class="agent-tag">🎭 Pip - The Trickster</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+        <button class="btn btn-primary" onclick="nextStep()" id="play-continue-btn" disabled>Select a Play to continue</button>
+      </div>
+    </div>
+
+    <!-- Step 4: Launch -->
+    <div class="step" id="step-launch">
+      <div class="progress">
+        <div class="progress-dot done"></div>
+        <div class="progress-dot done"></div>
+        <div class="progress-dot done"></div>
+        <div class="progress-dot active"></div>
+      </div>
+
+      <h2>Ready to launch</h2>
+      <p class="subtitle">Here's what you've configured:</p>
+
+      <div class="section">
+        <div class="summary-item">
+          <span class="summary-label">Play</span>
+          <span class="summary-value" id="summary-play">—</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">LLM Provider</span>
+          <span class="summary-value" id="summary-llm">—</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Telegram</span>
+          <span class="summary-value" id="summary-telegram">—</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Email</span>
+          <span class="summary-value" id="summary-email">—</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">WhatsApp</span>
+          <span class="summary-value" id="summary-whatsapp">—</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Todoist</span>
+          <span class="summary-value" id="summary-todoist">—</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Calendar</span>
+          <span class="summary-value" id="summary-calendar">—</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Timezone</span>
+          <span class="summary-value" id="summary-timezone">—</span>
+        </div>
+      </div>
+
+      <div class="launch-section">
+        <div class="launch-icon" id="launch-icon">🚀</div>
+        <p class="launch-message" id="launch-message">
+          Configuration saved. Click below to start your companions.
+        </p>
+        <button class="btn btn-primary btn-large" onclick="launchPlay()" id="launch-btn">
+          Launch
+        </button>
+      </div>
+
+      <div class="nav-buttons">
+        <button class="btn btn-secondary" onclick="prevStep()">Back</button>
+        <div></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentStep = 0;
+    let selectedPlay = null;
+    const steps = ['step-intro', 'step-config', 'step-plays', 'step-launch'];
+
+    // Navigation
+    function showStep(index) {
+      steps.forEach((id, i) => {
+        document.getElementById(id).classList.toggle('active', i === index);
+      });
+      currentStep = index;
+      if (currentStep === steps.length - 1) {
+        updateSummary();
+      }
+    }
+
+    function nextStep() {
+      if (currentStep < steps.length - 1) {
+        showStep(currentStep + 1);
+      }
+    }
+
+    function prevStep() {
+      if (currentStep > 0) {
+        showStep(currentStep - 1);
+      }
+    }
+
+    // Collapsible sections
+    function toggleCollapsible(id) {
+      document.getElementById(id).classList.toggle('open');
+    }
+
+    // LLM
+    function updateLLMFields() {
+      const provider = document.getElementById('llm-provider').value;
+      const keyGroup = document.getElementById('llm-key-group');
+      keyGroup.style.display = provider === 'ollama' ? 'none' : 'block';
+    }
+
+    async function testLLM() {
+      const provider = document.getElementById('llm-provider').value;
+      const apiKey = document.getElementById('llm-key').value;
+      const btn = event.target;
+      const status = document.getElementById('llm-status');
+
+      btn.textContent = '...';
+
+      try {
+        const res = await fetch('/api/test/llm', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider, apiKey })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          btn.textContent = '✓';
+          btn.classList.add('success');
+          status.textContent = data.message;
+          status.className = 'status-msg success';
+        } else {
+          btn.textContent = '✗';
+          btn.classList.add('error');
+          status.textContent = data.message;
+          status.className = 'status-msg error';
+        }
+      } catch (e) {
+        btn.textContent = '✗';
+        status.textContent = 'Connection failed';
+        status.className = 'status-msg error';
+      }
+
+      setTimeout(() => {
+        btn.textContent = 'Test';
+        btn.classList.remove('success', 'error');
+      }, 3000);
+    }
+
+    async function testTelegram() {
+      const token = document.getElementById('telegram-token').value;
+      const btn = event.target;
+      const status = document.getElementById('telegram-status');
+
+      btn.textContent = '...';
+
+      try {
+        const res = await fetch('/api/test/telegram', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ token })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          btn.textContent = '✓';
+          btn.classList.add('success');
+          status.textContent = data.message;
+          status.className = 'status-msg success';
+        } else {
+          btn.textContent = '✗';
+          btn.classList.add('error');
+          status.textContent = data.message;
+          status.className = 'status-msg error';
+        }
+      } catch (e) {
+        btn.textContent = '✗';
+        status.textContent = 'Connection failed';
+        status.className = 'status-msg error';
+      }
+
+      setTimeout(() => {
+        btn.textContent = 'Test';
+        btn.classList.remove('success', 'error');
+      }, 3000);
+    }
+
+    async function testResend() {
+      const apiKey = document.getElementById('resend-key').value;
+      const btn = event.target;
+      const status = document.getElementById('email-status');
+
+      btn.textContent = 'Testing...';
+
+      try {
+        const res = await fetch('/api/test/resend', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          btn.textContent = '✓ Connected';
+          status.textContent = data.message;
+          status.className = 'status-msg success';
+          document.getElementById('email-collapsible-status').textContent = 'Configured';
+          document.getElementById('email-collapsible-status').classList.add('configured');
+        } else {
+          btn.textContent = 'Test Connection';
+          status.textContent = data.message;
+          status.className = 'status-msg error';
+        }
+      } catch (e) {
+        btn.textContent = 'Test Connection';
+        status.textContent = 'Connection failed';
+        status.className = 'status-msg error';
+      }
+    }
+
+    async function testTwilio() {
+      const accountSid = document.getElementById('twilio-sid').value;
+      const authToken = document.getElementById('twilio-token').value;
+      const btn = event.target;
+      const status = document.getElementById('whatsapp-status');
+
+      btn.textContent = 'Testing...';
+
+      try {
+        const res = await fetch('/api/test/twilio', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ accountSid, authToken })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          btn.textContent = '✓ Connected';
+          status.textContent = data.message;
+          status.className = 'status-msg success';
+          document.getElementById('whatsapp-collapsible-status').textContent = 'Configured';
+          document.getElementById('whatsapp-collapsible-status').classList.add('configured');
+        } else {
+          btn.textContent = 'Test Connection';
+          status.textContent = data.message;
+          status.className = 'status-msg error';
+        }
+      } catch (e) {
+        btn.textContent = 'Test Connection';
+        status.textContent = 'Connection failed';
+        status.className = 'status-msg error';
+      }
+    }
+
+    async function testTodoist() {
+      const apiKey = document.getElementById('todoist-key').value;
+      const btn = event.target;
+      const status = document.getElementById('todoist-status');
+
+      btn.textContent = '...';
+
+      try {
+        const res = await fetch('/api/test/todoist', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ apiKey })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          btn.textContent = '✓';
+          btn.classList.add('success');
+          status.textContent = data.message;
+          status.className = 'status-msg success';
+          document.getElementById('todoist-collapsible-status').textContent = 'Configured';
+          document.getElementById('todoist-collapsible-status').classList.add('configured');
+        } else {
+          btn.textContent = '✗';
+          btn.classList.add('error');
+          status.textContent = data.message;
+          status.className = 'status-msg error';
+        }
+      } catch (e) {
+        btn.textContent = '✗';
+        status.textContent = 'Connection failed';
+        status.className = 'status-msg error';
+      }
+
+      setTimeout(() => {
+        btn.textContent = 'Test';
+        btn.classList.remove('success', 'error');
+      }, 3000);
+    }
+
+    // ICS Feeds
+    let icsFeeds = [];
+    let icsFeedCounter = 0;
+
+    function addICSFeed(name = '', url = '') {
+      icsFeedCounter++;
+      const id = `ics-feed-${icsFeedCounter}`;
+
+      const container = document.getElementById('ics-feeds-container');
+      const feedDiv = document.createElement('div');
+      feedDiv.id = id;
+      feedDiv.className = 'ics-feed-entry';
+      feedDiv.style.cssText = 'background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px;';
+
+      feedDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-weight: 500; font-size: 0.9rem;">Calendar ${icsFeedCounter}</span>
+          <button onclick="removeICSFeed('${id}')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem;">×</button>
+        </div>
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label style="font-size: 0.8rem;">Name</label>
+          <input type="text" id="${id}-name" placeholder="e.g., Work, Personal" value="${name}" onchange="updateICSFeeds()">
+        </div>
+        <div class="form-group" style="margin-bottom: 8px;">
+          <label style="font-size: 0.8rem;">ICS URL</label>
+          <input type="url" id="${id}-url" placeholder="https://calendar.google.com/...ics" value="${url}" onchange="updateICSFeeds()">
+        </div>
+        <button class="test-btn" onclick="testICSFeed('${id}')" style="width: 100%; font-size: 0.8rem; padding: 8px;">Test Feed</button>
+        <div class="status-msg" id="${id}-status" style="font-size: 0.8rem;"></div>
+      `;
+
+      container.appendChild(feedDiv);
+      updateICSFeeds();
+      updateCalendarStatus();
+    }
+
+    function removeICSFeed(id) {
+      document.getElementById(id).remove();
+      updateICSFeeds();
+      updateCalendarStatus();
+    }
+
+    function updateICSFeeds() {
+      icsFeeds = [];
+      document.querySelectorAll('.ics-feed-entry').forEach((entry, index) => {
+        const id = entry.id;
+        const name = document.getElementById(`${id}-name`).value;
+        const url = document.getElementById(`${id}-url`).value;
+        if (name && url) {
+          icsFeeds.push({ id: `feed-${index}`, name, url });
+        }
+      });
+    }
+
+    function updateCalendarStatus() {
+      const status = document.getElementById('calendar-collapsible-status');
+      const count = document.querySelectorAll('.ics-feed-entry').length;
+      if (count > 0) {
+        status.textContent = `${count} calendar${count > 1 ? 's' : ''}`;
+        status.classList.add('configured');
+      } else {
+        status.textContent = 'Optional';
+        status.classList.remove('configured');
+      }
+    }
+
+    async function testICSFeed(id) {
+      const url = document.getElementById(`${id}-url`).value;
+      const status = document.getElementById(`${id}-status`);
+
+      if (!url) {
+        status.textContent = 'Enter a URL first';
+        status.className = 'status-msg error';
+        return;
+      }
+
+      status.textContent = 'Testing...';
+      status.className = 'status-msg';
+
+      try {
+        const res = await fetch('/api/test/ics', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ url })
+        });
+        const data = await res.json();
+
+        if (data.success) {
+          status.textContent = data.message;
+          status.className = 'status-msg success';
+        } else {
+          status.textContent = data.message;
+          status.className = 'status-msg error';
+        }
+      } catch (e) {
+        status.textContent = 'Failed to test feed';
+        status.className = 'status-msg error';
+      }
+    }
+
+    // Play selection
+    function selectPlay(play) {
+      selectedPlay = play;
+      document.querySelectorAll('.play-card').forEach(c => c.classList.remove('selected'));
+      document.getElementById('play-' + play).classList.add('selected');
+
+      const btn = document.getElementById('play-continue-btn');
+      btn.disabled = false;
+      btn.textContent = 'Continue';
+    }
+
+    // Save config
+    async function saveConfigAndNext() {
+      const config = {
+        llmProvider: document.getElementById('llm-provider').value,
+      };
+
+      const provider = config.llmProvider;
+      const apiKey = document.getElementById('llm-key').value;
+
+      if (provider === 'kimi' && apiKey) config.kimiApiKey = apiKey;
+      if (provider === 'openai' && apiKey) config.openaiApiKey = apiKey;
+      if (provider === 'anthropic' && apiKey) config.anthropicApiKey = apiKey;
+
+      const telegramToken = document.getElementById('telegram-token').value;
+      if (telegramToken) config.chorusTelegramToken = telegramToken;
+
+      const resendKey = document.getElementById('resend-key').value;
+      if (resendKey) config.resendApiKey = resendKey;
+
+      const userEmail = document.getElementById('user-email').value;
+      if (userEmail) config.userEmail = userEmail;
+
+      const emailDomain = document.getElementById('email-domain').value;
+      if (emailDomain) config.emailDomain = emailDomain;
+
+      const twilioSid = document.getElementById('twilio-sid').value;
+      if (twilioSid) config.twilioSid = twilioSid;
+
+      const twilioToken = document.getElementById('twilio-token').value;
+      if (twilioToken) config.twilioToken = twilioToken;
+
+      const twilioWhatsApp = document.getElementById('twilio-whatsapp').value;
+      if (twilioWhatsApp) config.twilioWhatsApp = twilioWhatsApp;
+
+      const userWhatsApp = document.getElementById('user-whatsapp').value;
+      if (userWhatsApp) config.userWhatsApp = userWhatsApp;
+
+      const todoistKey = document.getElementById('todoist-key').value;
+      if (todoistKey) config.todoistApiKey = todoistKey;
+
+      // ICS Calendars
+      updateICSFeeds();
+      if (icsFeeds.length > 0) {
+        config.icsFeeds = icsFeeds;
+      }
+
+      config.timezone = document.getElementById('timezone').value;
+
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(config)
+      });
+
+      nextStep();
+    }
+
+    // Summary
+    function updateSummary() {
+      const playNames = {
+        'chorus': '🎵 Chorus',
+        'wanderers-rest': '🏰 Wanderer\'s Rest'
+      };
+
+      document.getElementById('summary-play').textContent = playNames[selectedPlay] || '—';
+      document.getElementById('summary-play').classList.add('configured');
+
+      const provider = document.getElementById('llm-provider').value;
+      const providers = { kimi: 'Kimi', openai: 'OpenAI', anthropic: 'Anthropic', ollama: 'Ollama' };
+      document.getElementById('summary-llm').textContent = providers[provider] || provider;
+      document.getElementById('summary-llm').classList.add('configured');
+
+      const telegram = document.getElementById('telegram-token').value;
+      document.getElementById('summary-telegram').textContent = telegram ? 'Configured' : 'Not configured';
+      document.getElementById('summary-telegram').classList.toggle('configured', !!telegram);
+      document.getElementById('summary-telegram').classList.toggle('missing', !telegram);
+
+      const email = document.getElementById('resend-key').value;
+      document.getElementById('summary-email').textContent = email ? 'Configured' : 'Skipped';
+      document.getElementById('summary-email').classList.toggle('configured', !!email);
+      document.getElementById('summary-email').classList.toggle('missing', !email);
+
+      const whatsapp = document.getElementById('twilio-sid').value;
+      document.getElementById('summary-whatsapp').textContent = whatsapp ? 'Configured' : 'Skipped';
+      document.getElementById('summary-whatsapp').classList.toggle('configured', !!whatsapp);
+      document.getElementById('summary-whatsapp').classList.toggle('missing', !whatsapp);
+
+      const todoist = document.getElementById('todoist-key').value;
+      document.getElementById('summary-todoist').textContent = todoist ? 'Configured' : 'Skipped';
+      document.getElementById('summary-todoist').classList.toggle('configured', !!todoist);
+      document.getElementById('summary-todoist').classList.toggle('missing', !todoist);
+
+      updateICSFeeds();
+      const calCount = icsFeeds.length;
+      document.getElementById('summary-calendar').textContent = calCount > 0 ? `${calCount} calendar${calCount > 1 ? 's' : ''}` : 'Skipped';
+      document.getElementById('summary-calendar').classList.toggle('configured', calCount > 0);
+      document.getElementById('summary-calendar').classList.toggle('missing', calCount === 0);
+
+      document.getElementById('summary-timezone').textContent = document.getElementById('timezone').value;
+    }
+
+    // Launch
+    async function launchPlay() {
+      const btn = document.getElementById('launch-btn');
+      const icon = document.getElementById('launch-icon');
+      const msg = document.getElementById('launch-message');
+
+      btn.disabled = true;
+      btn.textContent = 'Launching...';
+      icon.textContent = '⏳';
+
+      // Save play selection
+      await fetch('/api/config', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ play: selectedPlay })
+      });
+
+      // Launch
+      await fetch('/api/launch', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ play: selectedPlay })
+      });
+
+      icon.textContent = '✨';
+      msg.textContent = 'Your companions are waking up! Check Telegram to start chatting.';
+      btn.textContent = 'Running';
+      btn.style.background = 'var(--success)';
+    }
+
+    // Load existing config on page load
+    async function loadExistingConfig() {
+      try {
+        const res = await fetch('/api/config');
+        const config = await res.json();
+
+        if (config.llmProvider) {
+          document.getElementById('llm-provider').value = config.llmProvider;
+        }
+
+        if (config.llmApiKey === '***configured***') {
+          document.getElementById('llm-key').classList.add('configured');
+          document.getElementById('llm-key').placeholder = '••••••••• (already configured)';
+        }
+
+        if (config.telegramToken === '***configured***') {
+          document.getElementById('telegram-token').classList.add('configured');
+          document.getElementById('telegram-token').placeholder = '••••••••• (already configured)';
+        }
+
+        if (config.resendApiKey === '***configured***') {
+          document.getElementById('resend-key').classList.add('configured');
+          document.getElementById('resend-key').placeholder = '••••••••• (already configured)';
+          document.getElementById('email-collapsible-status').textContent = 'Configured';
+          document.getElementById('email-collapsible-status').classList.add('configured');
+        }
+
+        if (config.userEmail) {
+          document.getElementById('user-email').value = config.userEmail;
+        }
+
+        if (config.emailDomain) {
+          document.getElementById('email-domain').value = config.emailDomain;
+        }
+
+        if (config.twilioSid) {
+          document.getElementById('twilio-sid').value = config.twilioSid;
+          document.getElementById('whatsapp-collapsible-status').textContent = 'Configured';
+          document.getElementById('whatsapp-collapsible-status').classList.add('configured');
+        }
+
+        if (config.twilioToken === '***configured***') {
+          document.getElementById('twilio-token').classList.add('configured');
+          document.getElementById('twilio-token').placeholder = '••••••••• (already configured)';
+        }
+
+        if (config.twilioWhatsApp) {
+          document.getElementById('twilio-whatsapp').value = config.twilioWhatsApp;
+        }
+
+        if (config.userWhatsApp) {
+          document.getElementById('user-whatsapp').value = config.userWhatsApp;
+        }
+
+        if (config.todoistApiKey === '***configured***') {
+          document.getElementById('todoist-key').classList.add('configured');
+          document.getElementById('todoist-key').placeholder = '••••••••• (already configured)';
+          document.getElementById('todoist-collapsible-status').textContent = 'Configured';
+          document.getElementById('todoist-collapsible-status').classList.add('configured');
+        }
+
+        if (config.timezone) {
+          document.getElementById('timezone').value = config.timezone;
+        }
+
+        if (config.play) {
+          selectPlay(config.play);
+        }
+
+        // Load ICS feeds
+        if (config.icsFeeds && Array.isArray(config.icsFeeds)) {
+          config.icsFeeds.forEach(feed => {
+            addICSFeed(feed.name, feed.url);
+          });
+        }
+
+        updateLLMFields();
+      } catch (e) {
+        console.error('Failed to load config:', e);
+      }
+    }
+
+    // Initialize
+    loadExistingConfig();
+  </script>
+</body>
+</html>
