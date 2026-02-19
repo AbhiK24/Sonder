@@ -850,8 +850,9 @@
       <!-- Timezone -->
       <div class="section" style="padding: 16px 20px;">
         <div class="form-group" style="margin: 0;">
-          <label>Your Timezone</label>
-          <select id="timezone">
+          <label>Your Timezone <span style="color: var(--error);">*</span></label>
+          <select id="timezone" required>
+            <option value="">Select your timezone...</option>
             <option value="Asia/Kolkata">Asia/Kolkata (IST)</option>
             <option value="America/New_York">America/New_York (EST)</option>
             <option value="America/Los_Angeles">America/Los_Angeles (PST)</option>
@@ -862,6 +863,7 @@
             <option value="Australia/Sydney">Australia/Sydney (AEDT)</option>
             <option value="UTC">UTC</option>
           </select>
+          <div class="status-msg error" id="timezone-error" style="display: none;">Please select your timezone</div>
         </div>
       </div>
 
@@ -1333,6 +1335,15 @@
 
     // Save config
     async function saveConfigAndNext() {
+      // Validate timezone is selected
+      const timezone = document.getElementById('timezone').value;
+      if (!timezone) {
+        document.getElementById('timezone-error').style.display = 'block';
+        document.getElementById('timezone').focus();
+        return;
+      }
+      document.getElementById('timezone-error').style.display = 'none';
+
       const config = {
         llmProvider: document.getElementById('llm-provider').value,
       };
@@ -1527,8 +1538,17 @@
           document.getElementById('todoist-collapsible-status').classList.add('configured');
         }
 
-        if (config.timezone) {
+        if (config.timezone && config.timezone !== 'UTC') {
           document.getElementById('timezone').value = config.timezone;
+        } else {
+          // Auto-detect timezone
+          try {
+            const detected = Intl.DateTimeFormat().resolvedOptions().timeZone;
+            const tzSelect = document.getElementById('timezone');
+            if ([...tzSelect.options].some(o => o.value === detected)) {
+              tzSelect.value = detected;
+            }
+          } catch (e) {}
         }
 
         if (config.play) {
