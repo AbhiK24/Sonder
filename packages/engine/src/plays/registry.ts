@@ -3,10 +3,18 @@
  *
  * Central registry of all available plays.
  * Each play registers itself with metadata and entry point.
+ *
+ * PlayDefinition is a lightweight registration type.
+ * The full Play interface (in types.ts) is loaded at runtime.
  */
 
+import type { PlayChannels, PlayType, UserRole } from './types.js';
+
+// Re-export for convenience
+export type { PlayChannels };
+
 // =============================================================================
-// Types
+// Registration Types (lightweight for registry)
 // =============================================================================
 
 export interface PlayDefinition {
@@ -14,31 +22,17 @@ export interface PlayDefinition {
   name: string;
   description: string;
   version: string;
+  type: PlayType;
+  userRole: UserRole;
 
   // Channels this play supports
   channels: PlayChannels;
 
-  // Agents in this play
+  // Agents in this play (lightweight info for registration)
   agents: PlayAgent[];
 
   // Path to play's root directory
   rootPath: string;
-}
-
-export interface PlayChannels {
-  telegram?: {
-    botTokenEnvVar: string;  // e.g., "SWARGALOKA_TELEGRAM_BOT_TOKEN"
-    botUsername?: string;    // e.g., "@SwargalokaBot"
-  };
-  whatsapp?: {
-    // Uses shared Sonder WhatsApp, but play-specific formatting
-    enabled: boolean;
-    messagePrefix?: string;  // e.g., "✨"
-  };
-  email?: {
-    enabled: boolean;
-    fromNamePrefix?: string;  // e.g., "Angels"
-  };
 }
 
 export interface PlayAgent {
@@ -57,6 +51,8 @@ export const WANDERERS_REST: PlayDefinition = {
   name: "Wanderer's Rest",
   description: 'A mystery game where you solve crimes through conversation',
   version: '0.1.0',
+  type: 'game',
+  userRole: 'investigator',
   channels: {
     telegram: {
       botTokenEnvVar: 'WANDERERS_REST_TELEGRAM_BOT_TOKEN',
@@ -86,6 +82,8 @@ export const CHORUS: PlayDefinition = {
   name: 'Chorus',
   description: 'Five voices harmonizing to support your ADHD brain',
   version: '0.1.0',
+  type: 'companion',
+  userRole: 'subject',
   channels: {
     telegram: {
       botTokenEnvVar: 'CHORUS_TELEGRAM_BOT_TOKEN',

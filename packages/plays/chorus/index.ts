@@ -33,12 +33,51 @@ import type {
   ProactiveCheckIn,
   AgentTool,
 } from './types.js';
+import type {
+  Play,
+  Agent,
+  AgentRelationship,
+  WorldState,
+  WorldRules,
+  IdleBehavior,
+  TriggerDefinition,
+  ToolPermissions,
+  PlayChannels,
+} from '../../engine/src/plays/types.js';
 
 // =============================================================================
-// Play Definition
+// Play Definition (Full Play interface)
 // =============================================================================
 
-export const CHORUS_PLAY = {
+/**
+ * Convert ChorusAgent to engine Agent format
+ */
+function toEngineAgent(agent: ChorusAgent): Agent {
+  return {
+    id: agent.id,
+    name: agent.name,
+    emoji: agent.emoji,
+    role: agent.role,
+    description: agent.description,
+    systemPrompt: agent.systemPrompt,
+    personality: {
+      traits: agent.voiceTraits,
+      strengths: agent.strengths,
+      values: ['supporting the user', 'gentle accountability', 'celebrating growth'],
+    },
+    voice: {
+      tone: agent.voiceTraits[0] || 'warm and supportive',
+      vocabulary: 'accessible, warm, non-clinical',
+      patterns: agent.voiceTraits,
+      examples: [],
+    },
+    tools: agent.preferredTools,
+    speaksWhen: agent.speaksWhen,
+    initialUserRelationship: 'supportive',
+  };
+}
+
+export const CHORUS_PLAY: Play = {
   id: 'chorus',
   name: 'Chorus',
   tagline: 'Five voices harmonizing to support your ADHD brain',
@@ -54,9 +93,199 @@ export const CHORUS_PLAY = {
 
     They discuss you with each other. They notice patterns you can't see.
     They reach out when you need them. They're rooting for you.
-  `,
+  `.trim(),
   version: '0.1.0',
-  agents: agentList,
+  type: 'companion',
+
+  // Cast
+  agents: agentList.map(toEngineAgent),
+  agentRelationships: [
+    {
+      agentA: 'luna',
+      agentB: 'sage',
+      type: 'collaborative',
+      strength: 0.9,
+      description: 'Luna remembers, Sage plans. They work closely together.',
+      dynamics: ['Luna feeds context to Sage', 'Sage helps Luna prioritize what to surface'],
+    },
+    {
+      agentA: 'ember',
+      agentB: 'joy',
+      type: 'supportive',
+      strength: 0.8,
+      description: 'Ember gets things started, Joy celebrates completion.',
+      dynamics: ['They form the action-celebration loop'],
+    },
+    {
+      agentA: 'echo',
+      agentB: 'luna',
+      type: 'collaborative',
+      strength: 0.7,
+      description: 'Echo reflects emotions, Luna provides context for patterns.',
+      dynamics: ['Luna helps Echo understand recurring emotional themes'],
+    },
+    {
+      agentA: 'sage',
+      agentB: 'ember',
+      type: 'collaborative',
+      strength: 0.7,
+      description: 'Sage plans the path, Ember provides the spark to start.',
+      dynamics: ['Sage breaks down tasks, Ember makes them feel doable'],
+    },
+    {
+      agentA: 'joy',
+      agentB: 'echo',
+      type: 'supportive',
+      strength: 0.6,
+      description: 'Joy balances Echo\'s introspection with celebration.',
+      dynamics: ['Joy helps reframe difficult emotions Echo surfaces'],
+    },
+  ],
+
+  // User role
+  userRole: 'subject',
+  userRelationshipDefault: 'supportive',
+
+  // World (minimal for companion play)
+  worldState: {
+    phase: 'ongoing',
+    day: 0,
+    time: 'morning',
+    events: [],
+    custom: {},
+  },
+
+  worldRules: {
+    timeProgression: 'real_time',
+    agentInteraction: 'collaborative',
+    userInteraction: 'direct',
+    agentsCanLie: false,
+    agentsCanHide: false,
+    agentsHaveAgendas: false,
+    hasWinCondition: false,
+    custom: {
+      alwaysRootingForUser: true,
+      celebrateSmallWins: true,
+    },
+  },
+
+  // Idle mechanics (core to Chorus)
+  idleBehavior: {
+    enabled: true,
+    awayBehavior: {
+      thinkAboutUser: true,
+      discussUser: true,
+      continueActivities: false,
+      advanceWorld: false,
+      custom: [
+        'Notice patterns in recent conversations',
+        'Prepare gentle reminders',
+        'Think about what user might need when they return',
+      ],
+    },
+    tickIntervalMinutes: 30,
+    generates: ['reflection', 'observation', 'question', 'concern', 'celebration', 'discussion'],
+    reunionBehavior: {
+      greetOnReturn: true,
+      shareAccumulated: true,
+      minAwayMinutes: 60,
+      format: 'conversation',
+      leadAgent: 'luna',
+    },
+  },
+
+  // How interaction works
+  interactionModes: ['direct_chat', 'group_chat', 'discussion', 'notification', 'check_in'],
+
+  // Proactive triggers
+  triggers: [
+    {
+      id: 'morning-checkin',
+      name: 'Morning Check-in',
+      description: 'Luna leads a morning planning session',
+      condition: { type: 'scheduled', schedule: { hour: 9, minute: 0 } },
+      action: { type: 'check_in', config: { checkInType: 'morning' } },
+      agents: ['luna', 'sage'],
+      cooldownMinutes: 60 * 20, // Once per day
+      maxPerDay: 1,
+      enabled: true,
+    },
+    {
+      id: 'midday-nudge',
+      name: 'Midday Energy Check',
+      description: 'Ember checks in on momentum',
+      condition: { type: 'scheduled', schedule: { hour: 13, minute: 0 } },
+      action: { type: 'nudge', config: { nudgeType: 'momentum' } },
+      agents: ['ember', 'joy'],
+      cooldownMinutes: 60 * 20,
+      maxPerDay: 1,
+      enabled: true,
+    },
+    {
+      id: 'evening-reflection',
+      name: 'Evening Reflection',
+      description: 'Joy leads evening win celebration',
+      condition: { type: 'scheduled', schedule: { hour: 19, minute: 0 } },
+      action: { type: 'reflect', config: { reflectType: 'wins' } },
+      agents: ['joy', 'echo'],
+      cooldownMinutes: 60 * 20,
+      maxPerDay: 1,
+      enabled: true,
+    },
+    {
+      id: 'inactivity-checkin',
+      name: 'Gentle Inactivity Check',
+      description: 'Check in if user has been quiet for a while',
+      condition: { type: 'inactivity', inactivity: { minutes: 180 } },
+      action: { type: 'message', config: { tone: 'gentle', notIntrusive: true } },
+      agents: 'context_based',
+      cooldownMinutes: 60 * 6, // Max once per 6 hours
+      maxPerDay: 2,
+      enabled: true,
+    },
+    {
+      id: 'celebration-trigger',
+      name: 'Win Celebration',
+      description: 'Celebrate when user completes something',
+      condition: { type: 'event', event: { eventType: 'task_completed' } },
+      action: { type: 'celebrate', config: {} },
+      agents: ['joy'],
+      cooldownMinutes: 15,
+      maxPerDay: 10,
+      enabled: true,
+    },
+  ],
+
+  // Tool permissions
+  toolPermissions: {
+    global: ['memory', 'patterns', 'other_agents'],
+    agentOverrides: {
+      luna: { add: ['tasks', 'calendar', 'triggers'] },
+      ember: { add: ['tasks', 'idle_thoughts', 'triggers'] },
+      sage: { add: ['tasks', 'calendar'] },
+      joy: { add: ['celebration', 'tasks'] },
+      echo: { add: ['triggers'] },
+    },
+  },
+
+  // Channels
+  channels: {
+    telegram: {
+      botTokenEnvVar: 'CHORUS_TELEGRAM_BOT_TOKEN',
+      botUsername: '@ChorusBot',
+    },
+    whatsapp: {
+      enabled: true,
+      messagePrefix: '✨',
+    },
+    email: {
+      enabled: true,
+      fromNamePrefix: 'Chorus',
+    },
+    web: {
+      enabled: true,
+    },
+  },
 };
 
 // =============================================================================

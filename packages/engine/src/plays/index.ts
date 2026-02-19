@@ -3,15 +3,20 @@
  *
  * Central management for Sonder plays.
  * A "Play" is a themed application built on the Sonder engine.
+ *
+ * A Play is the core unit of Sonder — a complete multi-agent experience.
+ * Supports: Companion, Game, Simulation, or Hybrid modes.
  */
+
+// Core Play types
+export * from './types.js';
 
 // Registry - all available plays
 export {
   PlayDefinition,
-  PlayChannels,
   PlayAgent,
   WANDERERS_REST,
-  SWARGALOKA,
+  CHORUS,
   playRegistry,
 } from './registry.js';
 

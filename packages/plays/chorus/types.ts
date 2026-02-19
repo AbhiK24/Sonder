@@ -2,7 +2,15 @@
  * Chorus Play Types
  *
  * Five voices harmonizing to support your ADHD brain.
+ *
+ * Imports core types from engine, extends with Chorus-specific types.
  */
+
+// Import from engine (relative path for monorepo compatibility)
+import type { AgentTool } from '../../engine/src/plays/types.js';
+
+// Re-export for convenience
+export type { AgentTool };
 
 // =============================================================================
 // Agent Types
@@ -32,18 +40,6 @@ export interface ChorusAgent {
   // How this agent talks
   voiceTraits: string[];
 }
-
-export type AgentTool =
-  | 'memory'           // Access to conversation history, facts, patterns
-  | 'tasks'            // Read/create tasks in Todoist
-  | 'calendar'         // Read/create calendar events
-  | 'email_read'       // Read user's inbox
-  | 'email_draft'      // Draft emails in user's account
-  | 'email_send'       // Send as agent (proactive outreach)
-  | 'patterns'         // Access to detected patterns about user
-  | 'triggers'         // Create/manage proactive triggers
-  | 'idle_thoughts'    // Generate idle thoughts
-  | 'celebration';     // Track and celebrate wins
 
 // =============================================================================
 // Discussion Types
