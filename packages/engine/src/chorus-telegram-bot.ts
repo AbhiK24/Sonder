@@ -79,6 +79,7 @@ interface UserState {
   profile: UserProfile;
   ftueRunner?: FTUERunner;
   inFTUE: boolean;
+  savedFtueProgress?: { stepIndex: number; responses: Record<string, string>; waitingForResponse: boolean };
 }
 
 // =============================================================================
@@ -148,8 +149,9 @@ function getState(chatId: number): UserState {
         userName: saved.userName,
         profile,
         inFTUE: needsFTUE(profile),
+        savedFtueProgress: saved.ftueProgress,
       });
-      console.log(`[${chatId}] Loaded save (session ${saved.sessionCount}, ftue: ${profile.ftueCompleted ? 'done' : 'pending'})`);
+      console.log(`[${chatId}] Loaded save (session ${saved.sessionCount}, ftue: ${profile.ftueCompleted ? 'done' : (saved.ftueProgress ? `step ${saved.ftueProgress.stepIndex}` : 'pending')})`);
     } else {
       // New user - will need FTUE
       const profile = createUserProfile(CONFIG.timezone);
@@ -177,6 +179,17 @@ function saveState(chatId: number): void {
   // Update profile timestamp
   state.profile.updatedAt = new Date();
 
+  // Capture FTUE progress if active
+  let ftueProgress: { stepIndex: number; responses: Record<string, string>; waitingForResponse: boolean } | undefined;
+  if (state.ftueRunner && state.inFTUE) {
+    const ftueState = state.ftueRunner.getState();
+    ftueProgress = {
+      stepIndex: ftueState.currentStepIndex,
+      responses: ftueState.context.responses,
+      waitingForResponse: ftueState.waitingForResponse,
+    };
+  }
+
   persistence.save(chatId, {
     lastAgent: state.lastAgent,
     history: state.history.slice(-100), // Keep last 100 messages
@@ -187,6 +200,7 @@ function saveState(chatId: number): void {
     userEmail: state.userEmail,
     userName: state.userName,
     profile: state.profile,
+    ftueProgress,
   });
 }
 
@@ -510,12 +524,21 @@ async function switchAgent(chatId: number, state: UserState, agentId: ChorusAgen
 // =============================================================================
 
 /**
- * Start FTUE for a new user
+ * Start or resume FTUE for a user
  */
-async function startFTUE(chatId: number, state: UserState): Promise<void> {
-  console.log(`[${chatId}] Starting FTUE flow`);
-
+async function startFTUE(chatId: number, state: UserState, savedProgress?: { stepIndex: number; responses: Record<string, string>; waitingForResponse: boolean }): Promise<void> {
   const ftueState = createFTUEState(chorusFTUE, String(chatId), state.profile);
+
+  // Restore progress if available
+  if (savedProgress && savedProgress.stepIndex > 0) {
+    console.log(`[${chatId}] Resuming FTUE from step ${savedProgress.stepIndex}`);
+    ftueState.currentStepIndex = savedProgress.stepIndex;
+    ftueState.context.currentStepIndex = savedProgress.stepIndex;
+    ftueState.context.responses = savedProgress.responses;
+    ftueState.waitingForResponse = savedProgress.waitingForResponse;
+  } else {
+    console.log(`[${chatId}] Starting FTUE flow`);
+  }
 
   const runner = new FTUERunner(ftueState, {
     getAgentDisplay: (agentId: string) => {
@@ -534,8 +557,11 @@ async function startFTUE(chatId: number, state: UserState): Promise<void> {
   state.ftueRunner = runner;
   state.inFTUE = true;
 
-  // Start the flow
+  // Start the flow (will resume from saved step if restored)
   await runner.start();
+
+  // Save progress after starting
+  saveState(chatId);
 }
 
 /**
@@ -587,20 +613,24 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
 
   // Handle FTUE for new users
   if (state.inFTUE) {
-    // Check if we need to start FTUE
+    // Check if we need to start/resume FTUE
     if (!state.ftueRunner) {
-      await startFTUE(chatId, state);
+      await startFTUE(chatId, state, state.savedFtueProgress);
+      state.savedFtueProgress = undefined; // Clear after using
       return ''; // Messages sent by FTUE runner
     }
 
     // If it looks like an off-topic question, answer it without breaking FTUE
     if (looksLikeQuestion(trimmed)) {
-      return answerOffTopicDuringFTUE(chatId, state, trimmed);
+      const answer = await answerOffTopicDuringFTUE(chatId, state, trimmed);
+      saveState(chatId); // Save progress
+      return answer;
     }
 
     // Process FTUE response
     const handled = await processFTUEResponse(chatId, state, trimmed);
     if (handled) {
+      saveState(chatId); // Save progress after each FTUE step
       return ''; // Messages sent by FTUE runner
     }
   }
@@ -619,7 +649,8 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
   if (upper === 'START') {
     // If new user, start FTUE
     if (needsFTUE(state.profile)) {
-      await startFTUE(chatId, state);
+      await startFTUE(chatId, state, state.savedFtueProgress);
+      state.savedFtueProgress = undefined;
       return '';
     }
     // Otherwise, welcome back
