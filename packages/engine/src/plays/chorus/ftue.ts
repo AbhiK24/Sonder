@@ -202,17 +202,22 @@ Let's talk about what you're working toward. What's one thing you want to achiev
       id: 'value_demo',
       type: 'value_demo',
       content: (context) => {
-        const win = context.responses['recent_win'] || 'your recent progress';
-        const struggle = context.responses['recent_struggle'] || 'what you\'re navigating';
-        const goal = context.goalsGathered[0]?.statement || 'your goals';
+        // Synthesize short descriptions instead of verbatim quotes
+        const goal = context.goalsGathered[0];
+        const goalDomain = goal?.domain || 'professional';
+        const goalSummary = goalDomain === 'professional' ? 'your professional ambitions'
+          : goalDomain === 'personal' ? 'your personal growth'
+          : goalDomain === 'relationship' ? 'your relationships'
+          : goalDomain === 'health' ? 'your health and wellbeing'
+          : 'what matters to you';
 
         return `**Here's how the Chorus sees you:**
 
-🌙 **Luna** (that's me): I'm going to remember all of this. The win, the struggle, the goal. I'll bring them up when they matter. Nothing falls through the cracks with me.
+🌙 **Luna** (that's me): I've got it all—the wins, the struggles, what you're working toward. I'll bring them up when they matter. Nothing falls through the cracks with me.
 
-🔥 **Ember**: When you're stuck on "${goal}"—that's when I show up. I'll remind you that you've done hard things before. Like ${win}.
+🔥 **Ember**: When you're stuck or losing momentum on ${goalSummary}—that's when I show up. I'll remind you that you've done hard things before.
 
-🌿 **Sage**: When "${struggle}" feels overwhelming, I'll be here to zoom out. It's a chapter, not the whole story. We'll find the wisdom in it.
+🌿 **Sage**: When things feel overwhelming, I'll be here to zoom out. Every struggle is a chapter, not the whole story. We'll find the wisdom in it.
 
 ✨ **Joy**: I'll make sure we celebrate. Not just the big wins—the small ones too. You deserve to feel good about progress.
 
