@@ -45,17 +45,17 @@ COPY --from=deps /app/packages/dashboard/node_modules ./packages/dashboard/node_
 # Copy source files
 COPY . .
 
-# Build all packages
-RUN pnpm build
+# Skip build - we use tsx at runtime which handles TypeScript directly
+# RUN pnpm build
 
 # -----------------------------------------------------------------------------
 # Stage 4: Production
 # -----------------------------------------------------------------------------
 FROM node:20-alpine AS production
 
-# Install pnpm and PM2 for process management
+# Install pnpm, PM2, and tsx for runtime TypeScript execution
 RUN corepack enable && corepack prepare pnpm@8.14.0 --activate
-RUN npm install -g pm2
+RUN npm install -g pm2 tsx
 
 # Create non-root user
 RUN addgroup -g 1001 -S sonder && \
