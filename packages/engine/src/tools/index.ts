@@ -723,7 +723,7 @@ If approved, other Sonder users can use this tool too.`,
 // Tool Executors
 // =============================================================================
 
-const toolExecutors: Record<string, ToolExecutor> = {
+export const toolExecutors: Record<string, ToolExecutor> = {
   // === Communication ===
   async send_email(args, context): Promise<ToolResult> {
     const { to, cc, subject, body } = args as { to: string; cc?: string; subject: string; body: string };

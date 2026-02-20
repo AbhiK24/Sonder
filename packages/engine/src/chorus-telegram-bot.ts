@@ -50,7 +50,12 @@ import {
   executeTool,
   ToolContext,
   orderToolCalls,
+  TOOL_DEFINITIONS,
+  toolExecutors,
 } from './tools/index.js';
+
+// Tool Forge for self-extending capabilities
+import { createToolForge, ToolForge } from './tool-forge/index.js';
 
 // Chorus play imports
 import {
@@ -132,6 +137,7 @@ let calendarAdapter: ICSFeedAdapter | null = null;
 let engineContext: EngineContext;
 let reminderEngine: ReminderEngine;
 let memory: Memory;
+let toolForge: ToolForge;
 let bot: Bot;
 
 // Persistence
@@ -458,6 +464,16 @@ IMPORTANT: You have real-time web search built in. When asked about current even
             maxTokens: 500,
           });
           return response;
+        },
+        // Tool Forge for self-extending capabilities
+        toolForge: {
+          buildTool: (request) => toolForge.buildTool(request),
+          testTool: (tool) => toolForge.testTool(tool),
+          activateTool: (userId, toolName) => toolForge.activateTool(userId, toolName),
+          disableTool: (userId, toolName) => toolForge.disableTool(userId, toolName),
+          submitTool: (userId, toolName) => toolForge.submitTool(userId, toolName),
+          getUserTools: (userId) => toolForge.getUserTools(userId),
+          getUserTool: (userId, toolName) => toolForge.getUserTool(userId, toolName),
         },
       };
 
@@ -1604,6 +1620,25 @@ async function main() {
   reminderEngine.start();
   console.log('[Chorus] ReminderEngine started');
 
+  // Setup Tool Forge for self-extending capabilities
+  toolForge = createToolForge(
+    provider,
+    TOOL_DEFINITIONS,
+    toolExecutors,
+    {
+      storageDir: resolve(storageDir, 'tools'),
+      maxToolsPerUser: 10,
+      maxBuildsPerDay: 3,
+      onToolBuilt: async (tool) => {
+        console.log(`[ToolForge] Tool built: ${tool.name} for user ${tool.userId}`);
+      },
+      onToolActivated: async (tool) => {
+        console.log(`[ToolForge] Tool activated: ${tool.name}`);
+      },
+    }
+  );
+  console.log('[Chorus] ToolForge initialized');
+
   // Create bot
   bot = new Bot(botToken);
 
@@ -1619,6 +1654,9 @@ async function main() {
       state.profile.name = telegramName;
       saveState(chatId);
     }
+
+    // Load user's custom tools (lazy loading)
+    toolForge.loadUserTools(String(chatId));
 
     // Capture email from Google OAuth if connected
     await captureGoogleEmail(state);
