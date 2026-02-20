@@ -23,6 +23,17 @@ import {
   createTask as createGoogleTask,
 } from '../integrations/index.js';
 import { resolveVenue, addVenue, listVenuesFormatted, Venue } from '../integrations/venues.js';
+import {
+  addContact,
+  findContact,
+  searchContacts,
+  resolveContact,
+  listContactsFormatted,
+  getContactsByCategory,
+  markContacted,
+  Contact,
+  ContactCategory,
+} from '../integrations/contacts.js';
 
 // Tool definitions for LLM
 export interface ToolDefinition {
@@ -422,6 +433,57 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['query'],
     },
   },
+
+  // === Contacts ===
+  {
+    name: 'save_contact',
+    description: 'Save a person as a contact. Use when user mentions someone with their email, phone, or describes who they are.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Full name of the person' },
+        nickname: { type: 'string', description: 'Short name or alias (optional)' },
+        email: { type: 'string', description: 'Email address (optional)' },
+        phone: { type: 'string', description: 'Phone number with country code (optional)' },
+        category: { type: 'string', description: 'Relationship type', enum: ['friend', 'family', 'business', 'acquaintance'] },
+        company: { type: 'string', description: 'Company/organization they work at (optional)' },
+        role: { type: 'string', description: 'Their job title or role (optional)' },
+        relationship: { type: 'string', description: 'How user knows them, e.g. "college friend", "client", "manager at X" (optional)' },
+      },
+      required: ['name', 'category'],
+    },
+  },
+  {
+    name: 'list_contacts',
+    description: 'List all saved contacts grouped by category (friend, family, business, acquaintance).',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'lookup_contact',
+    description: 'Look up a contact by name, email, or phone to get their full info. Use before sending emails/messages to resolve recipient.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Name, email, or phone to search for' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'search_contacts',
+    description: 'Search contacts by any field (name, company, role, notes, etc.).',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query' },
+      },
+      required: ['query'],
+    },
+  },
 ];
 
 // =============================================================================
@@ -437,9 +499,22 @@ const toolExecutors: Record<string, ToolExecutor> = {
       return { success: false, error: 'Email not configured. Ask user to set up RESEND_API_KEY.' };
     }
 
-    // Parse multiple emails (comma or semicolon separated)
-    const toList = to.split(/[,;]/).map(e => e.trim()).filter(e => e.includes('@'));
-    const ccList = cc ? cc.split(/[,;]/).map(e => e.trim()).filter(e => e.includes('@')) : [];
+    // Resolve contacts: names get looked up, emails pass through
+    const resolveRecipient = (r: string): string | null => {
+      const trimmed = r.trim();
+      if (trimmed.includes('@')) return trimmed;
+
+      // Try to resolve as contact name
+      const resolved = resolveContact(trimmed);
+      if (resolved.resolved && resolved.email) {
+        return resolved.email;
+      }
+      return null;  // Not found, will be filtered out
+    };
+
+    // Parse and resolve recipients
+    const toList = to.split(/[,;]/).map(resolveRecipient).filter((e): e is string => e !== null);
+    const ccList = cc ? cc.split(/[,;]/).map(resolveRecipient).filter((e): e is string => e !== null) : [];
 
     if (toList.length === 0) {
       return { success: false, error: 'No valid email addresses provided' };
@@ -1081,6 +1156,97 @@ const toolExecutors: Record<string, ToolExecutor> = {
     return {
       success: true,
       result: `No saved venue found for "${query}". Using as-is. Consider saving it with save_venue if it's a frequent location.`,
+    };
+  },
+
+  // === Contacts ===
+  async save_contact(args, context): Promise<ToolResult> {
+    const { name, nickname, email, phone, category, company, role, relationship } = args as {
+      name: string;
+      nickname?: string;
+      email?: string;
+      phone?: string;
+      category: ContactCategory;
+      company?: string;
+      role?: string;
+      relationship?: string;
+    };
+
+    try {
+      const contact = addContact({
+        name,
+        nickname,
+        email,
+        phone,
+        category,
+        company,
+        role,
+        relationship,
+      });
+
+      const details = [
+        email ? `email: ${email}` : null,
+        phone ? `phone: ${phone}` : null,
+        relationship ? `(${relationship})` : null,
+      ].filter(Boolean).join(', ');
+
+      return {
+        success: true,
+        result: `Saved contact: ${name}${nickname ? ` (${nickname})` : ''} as ${category}${details ? ` - ${details}` : ''}`,
+      };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to save contact' };
+    }
+  },
+
+  async list_contacts(args, context): Promise<ToolResult> {
+    const result = listContactsFormatted();
+    return { success: true, result };
+  },
+
+  async lookup_contact(args, context): Promise<ToolResult> {
+    const { query } = args as { query: string };
+
+    const resolved = resolveContact(query);
+
+    if (resolved.resolved && resolved.contact) {
+      const contact = resolved.contact;
+      const info = [
+        contact.email ? `Email: ${contact.email}` : null,
+        contact.phone ? `Phone: ${contact.phone}` : null,
+        contact.company ? `Company: ${contact.company}` : null,
+        contact.relationship ? `Relationship: ${contact.relationship}` : null,
+      ].filter(Boolean).join('\n');
+
+      return {
+        success: true,
+        result: `Found: **${contact.name}**${contact.nickname ? ` (${contact.nickname})` : ''}\nCategory: ${contact.category}\n${info}`,
+      };
+    }
+
+    return {
+      success: true,
+      result: `No contact found for "${query}". Would you like me to save them? Just tell me their details.`,
+    };
+  },
+
+  async search_contacts(args, context): Promise<ToolResult> {
+    const { query } = args as { query: string };
+
+    const contacts = searchContacts(query);
+
+    if (contacts.length === 0) {
+      return { success: true, result: `No contacts found matching "${query}".` };
+    }
+
+    const formatted = contacts.slice(0, 10).map(c => {
+      const info = [c.email, c.phone].filter(Boolean).join(', ');
+      return `• ${c.name} (${c.category})${info ? `: ${info}` : ''}`;
+    }).join('\n');
+
+    return {
+      success: true,
+      result: `Found ${contacts.length} contact(s):\n${formatted}`,
     };
   },
 };

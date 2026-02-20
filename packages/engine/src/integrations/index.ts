@@ -55,3 +55,22 @@ export * from './google-skills.js';
 // Venues
 export { VenueSkills, resolveVenue, addVenue, findVenue, getVenues, listVenuesFormatted } from './venues.js';
 export type { Venue, VenueMatch } from './venues.js';
+
+// Contacts / Friends Graph
+export {
+  ContactSkills,
+  addContact,
+  getContacts,
+  getContactsByCategory,
+  findContact,
+  searchContacts,
+  resolveContact,
+  markContacted,
+  getRecentContacts,
+  extractEmails,
+  extractPhones,
+  formatContact,
+  listContactsFormatted,
+  getContactsSummary,
+} from './contacts.js';
+export type { Contact, ContactCategory, ContactMatch } from './contacts.js';

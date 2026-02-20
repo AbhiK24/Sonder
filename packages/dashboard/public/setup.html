@@ -891,6 +891,30 @@
         </div>
       </div>
 
+      <!-- Contacts - optional quick setup -->
+      <div class="collapsible" id="contacts-section">
+        <div class="collapsible-header" onclick="toggleCollapsible('contacts-section')">
+          <span class="collapsible-icon">👥</span>
+          <span class="collapsible-title">Key Contacts</span>
+          <span class="collapsible-status" id="contacts-collapsible-status">Skip or add</span>
+          <span class="collapsible-arrow">▼</span>
+        </div>
+        <div class="collapsible-content">
+          <p style="margin-bottom: 16px; font-size: 0.9rem; color: var(--text-muted);">
+            Add a few key people you communicate with often. Sonder will remember them for quick emails and messages.
+            You can always add more later just by mentioning them in chat.
+          </p>
+
+          <div id="contacts-container">
+            <!-- Dynamic contact entries go here -->
+          </div>
+
+          <button class="test-btn" onclick="addContactEntry()" style="width: 100%; margin-top: 12px;">
+            + Add Contact
+          </button>
+        </div>
+      </div>
+
       <!-- Optional: Calendar (ICS) - fallback if not using Google -->
       <div class="collapsible" id="calendar-section">
         <div class="collapsible-header" onclick="toggleCollapsible('calendar-section')">
@@ -1047,6 +1071,10 @@
         <div class="summary-item">
           <span class="summary-label">Calendar</span>
           <span class="summary-value" id="summary-calendar">—</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Contacts</span>
+          <span class="summary-value" id="summary-contacts">—</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Timezone</span>
@@ -1395,6 +1423,91 @@
       }
     }
 
+    // Contacts
+    let contactCounter = 0;
+
+    function addContactEntry(prefill = {}) {
+      contactCounter++;
+      const id = `contact-${contactCounter}`;
+
+      const container = document.getElementById('contacts-container');
+      const contactDiv = document.createElement('div');
+      contactDiv.id = id;
+      contactDiv.className = 'contact-entry';
+      contactDiv.style.cssText = 'background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 12px;';
+
+      contactDiv.innerHTML = `
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 12px;">
+          <span style="font-weight: 500; font-size: 0.9rem;">Contact ${contactCounter}</span>
+          <button onclick="removeContactEntry('${id}')" style="background: none; border: none; color: var(--text-muted); cursor: pointer; font-size: 1.2rem;">×</button>
+        </div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label style="font-size: 0.75rem;">Name *</label>
+            <input type="text" id="${id}-name" placeholder="John Doe" value="${prefill.name || ''}" style="font-size: 0.9rem; padding: 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label style="font-size: 0.75rem;">Category</label>
+            <select id="${id}-category" style="font-size: 0.9rem; padding: 10px;">
+              <option value="friend" ${prefill.category === 'friend' ? 'selected' : ''}>Friend</option>
+              <option value="family" ${prefill.category === 'family' ? 'selected' : ''}>Family</option>
+              <option value="business" ${prefill.category === 'business' ? 'selected' : ''}>Business</option>
+              <option value="acquaintance" ${prefill.category === 'acquaintance' ? 'selected' : ''}>Acquaintance</option>
+            </select>
+          </div>
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label style="font-size: 0.75rem;">Email</label>
+            <input type="email" id="${id}-email" placeholder="john@example.com" value="${prefill.email || ''}" style="font-size: 0.9rem; padding: 10px;">
+          </div>
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label style="font-size: 0.75rem;">Phone</label>
+            <input type="tel" id="${id}-phone" placeholder="+1234567890" value="${prefill.phone || ''}" style="font-size: 0.9rem; padding: 10px;">
+          </div>
+        </div>
+        <div class="form-group" style="margin-bottom: 0;">
+          <label style="font-size: 0.75rem;">How do you know them? <span style="color: var(--text-muted);">(optional)</span></label>
+          <input type="text" id="${id}-relationship" placeholder="e.g., college friend, coworker at X, client" value="${prefill.relationship || ''}" style="font-size: 0.9rem; padding: 10px;">
+        </div>
+      `;
+
+      container.appendChild(contactDiv);
+      updateContactsStatus();
+    }
+
+    function removeContactEntry(id) {
+      document.getElementById(id).remove();
+      updateContactsStatus();
+    }
+
+    function updateContactsStatus() {
+      const status = document.getElementById('contacts-collapsible-status');
+      const count = document.querySelectorAll('.contact-entry').length;
+      if (count > 0) {
+        status.textContent = `${count} contact${count > 1 ? 's' : ''}`;
+        status.classList.add('configured');
+      } else {
+        status.textContent = 'Skip or add';
+        status.classList.remove('configured');
+      }
+    }
+
+    function collectContacts() {
+      const contacts = [];
+      document.querySelectorAll('.contact-entry').forEach(entry => {
+        const id = entry.id;
+        const name = document.getElementById(`${id}-name`)?.value?.trim();
+        const email = document.getElementById(`${id}-email`)?.value?.trim();
+        const phone = document.getElementById(`${id}-phone`)?.value?.trim();
+        const category = document.getElementById(`${id}-category`)?.value || 'friend';
+        const relationship = document.getElementById(`${id}-relationship`)?.value?.trim();
+
+        if (name) {
+          contacts.push({ name, email, phone, category, relationship });
+        }
+      });
+      return contacts;
+    }
+
     // Play selection
     function selectPlay(play) {
       selectedPlay = play;
@@ -1461,6 +1574,12 @@
         config.icsFeeds = icsFeeds;
       }
 
+      // Contacts
+      const contacts = collectContacts();
+      if (contacts.length > 0) {
+        config.contacts = contacts;
+      }
+
       config.timezone = document.getElementById('timezone').value;
 
       await fetch('/api/config', {
@@ -1523,6 +1642,13 @@
       document.getElementById('summary-calendar').textContent = calCount > 0 ? `${calCount} calendar${calCount > 1 ? 's' : ''}` : (googleConnected ? 'Via Google' : 'Skipped');
       document.getElementById('summary-calendar').classList.toggle('configured', calCount > 0 || googleConnected);
       document.getElementById('summary-calendar').classList.toggle('missing', calCount === 0 && !googleConnected);
+
+      // Contacts
+      const contacts = collectContacts();
+      const contactCount = contacts.length;
+      document.getElementById('summary-contacts').textContent = contactCount > 0 ? `${contactCount} contact${contactCount > 1 ? 's' : ''}` : 'Skipped';
+      document.getElementById('summary-contacts').classList.toggle('configured', contactCount > 0);
+      document.getElementById('summary-contacts').classList.toggle('missing', contactCount === 0);
 
       document.getElementById('summary-timezone').textContent = document.getElementById('timezone').value;
     }

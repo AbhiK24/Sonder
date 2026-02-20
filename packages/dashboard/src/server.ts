@@ -304,11 +304,60 @@ app.post('/api/config', (req, res) => {
       saveToEnv('ICS_FEEDS', JSON.stringify(value));
       continue;
     }
+    // Save contacts to ~/.sonder/contacts.json
+    if (key === 'contacts' && Array.isArray(value)) {
+      saveContacts(value);
+      continue;
+    }
     const envKey = keyMap[key];
     if (envKey && typeof value === 'string' && value) saveToEnv(envKey, value);
   }
   res.json({ success: true });
 });
+
+// Save contacts from onboarding
+function saveContacts(contacts: Array<{ name: string; email?: string; phone?: string; category: string; relationship?: string }>) {
+  const sonderDir = resolve(process.env.HOME || '', '.sonder');
+  const contactsPath = resolve(sonderDir, 'contacts.json');
+
+  if (!existsSync(sonderDir)) {
+    mkdirSync(sonderDir, { recursive: true });
+  }
+
+  // Load existing contacts
+  let existing: any[] = [];
+  if (existsSync(contactsPath)) {
+    try {
+      existing = JSON.parse(readFileSync(contactsPath, 'utf-8'));
+    } catch {}
+  }
+
+  // Add new contacts (avoid duplicates by email or name)
+  const now = new Date().toISOString();
+  for (const contact of contacts) {
+    if (!contact.name) continue;
+
+    const isDuplicate = existing.some(c =>
+      (contact.email && c.email?.toLowerCase() === contact.email.toLowerCase()) ||
+      c.name.toLowerCase() === contact.name.toLowerCase()
+    );
+
+    if (!isDuplicate) {
+      existing.push({
+        id: contact.email?.split('@')[0] || contact.name.toLowerCase().replace(/\s+/g, '_'),
+        name: contact.name,
+        email: contact.email || undefined,
+        phone: contact.phone || undefined,
+        category: contact.category || 'friend',
+        relationship: contact.relationship || undefined,
+        createdAt: now,
+        updatedAt: now,
+      });
+    }
+  }
+
+  writeFileSync(contactsPath, JSON.stringify(existing, null, 2));
+}
 
 app.get('/api/status', (req, res) => {
   const cfg = getCurrentConfig();
