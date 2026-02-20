@@ -315,9 +315,9 @@ export class DynamicToolRegistry {
 
   getStats() {
     let totalUserTools = 0;
-    for (const tools of this.userTools.values()) {
+    Array.from(this.userTools.values()).forEach(tools => {
       totalUserTools += tools.length;
-    }
+    });
 
     return {
       builtinTools: this.builtinTools.length,
