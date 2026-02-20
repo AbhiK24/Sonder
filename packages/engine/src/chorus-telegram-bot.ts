@@ -451,6 +451,14 @@ IMPORTANT: You have real-time web search built in. When asked about current even
           cancelReminderByContent: (userId: string, search: string) =>
             reminderEngine.cancelReminderByContent(userId, search),
         },
+        // LLM for summarization tasks
+        llmFn: async (prompt: string) => {
+          const response = await provider.generate(prompt, {
+            temperature: 0.3,  // Lower temp for more factual summaries
+            maxTokens: 500,
+          });
+          return response;
+        },
       };
 
       // Register user for reminders

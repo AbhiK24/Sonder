@@ -86,3 +86,7 @@ export type { Contact, ContactCategory, ContactMatch, Interaction, InteractionTy
 // Web Search
 export { webSearch, formatSearchResults, isSearchAvailable } from './search.js';
 export type { SearchResult, SearchResponse } from './search.js';
+
+// Link Summarization
+export { summarizeLink, fetchLinkContent } from './link-summarizer.js';
+export type { LinkContent, SummarizeResult } from './link-summarizer.js';

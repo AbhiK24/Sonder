@@ -45,6 +45,7 @@ import {
   ContactCategory,
 } from '../integrations/contacts.js';
 import { webSearch, formatSearchResults } from '../integrations/search.js';
+import { summarizeLink, fetchLinkContent } from '../integrations/link-summarizer.js';
 
 // Tool definitions for LLM
 export interface ToolDefinition {
@@ -122,6 +123,8 @@ export interface ToolContext {
     getReminders: (userId: string) => { id: string; content: string; dueAt: Date; fired: boolean }[];
     cancelReminderByContent: (userId: string, search: string) => { id: string; content: string } | undefined;
   };
+  // LLM for summarization tasks
+  llmFn?: (prompt: string) => Promise<string>;
 }
 
 // =============================================================================
@@ -585,6 +588,24 @@ Examples: "What's the weather in Mumbai?", "Latest news about AI", "How to make 
         query: { type: 'string', description: 'Search query - be specific and include context' },
       },
       required: ['query'],
+    },
+  },
+
+  // === Link Summarization ===
+  {
+    name: 'summarize_link',
+    description: `Summarize content from a URL - articles, blog posts, tweets, X/Twitter threads, YouTube videos.
+Use this when:
+- User shares a link and asks "what's this about?" or "summarize this"
+- User pastes an article/tweet URL they want summarized
+- User shares a Twitter/X thread and wants the key points
+Examples: "Summarize this article https://...", "What does this tweet say?", "TLDR this thread"`,
+    parameters: {
+      type: 'object',
+      properties: {
+        url: { type: 'string', description: 'The full URL to summarize (article, tweet, YouTube video)' },
+      },
+      required: ['url'],
     },
   },
   {
@@ -1674,6 +1695,67 @@ const toolExecutors: Record<string, ToolExecutor> = {
       return { success: true, result: formatSearchResults(response) };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Search failed' };
+    }
+  },
+
+  // === Link Summarization ===
+  async summarize_link(args, context): Promise<ToolResult> {
+    const { url } = args as { url: string };
+
+    if (!url || !url.trim()) {
+      return { success: false, error: 'Please provide a URL to summarize.' };
+    }
+
+    // Validate URL
+    try {
+      new URL(url);
+    } catch {
+      return { success: false, error: 'Invalid URL. Please provide a valid link.' };
+    }
+
+    // Check if we have an LLM function for summarization
+    if (!context.llmFn) {
+      // Fallback: just fetch and return content preview
+      const content = await fetchLinkContent(url);
+      if (!content) {
+        return { success: false, error: `Could not fetch content from ${url}. The site may be blocking access.` };
+      }
+
+      const preview = content.content.slice(0, 500) + (content.content.length > 500 ? '...' : '');
+      const header = content.title ? `**${content.title}**\n` : '';
+      const author = content.author ? `By: ${content.author}\n` : '';
+
+      return {
+        success: true,
+        result: `${header}${author}Type: ${content.type}\n\nPreview:\n${preview}`,
+      };
+    }
+
+    try {
+      const result = await summarizeLink(url, context.llmFn);
+
+      if (!result.success) {
+        return { success: false, error: result.error || 'Failed to summarize link' };
+      }
+
+      // Format the response
+      const lines: string[] = [];
+
+      if (result.title) {
+        lines.push(`**${result.title}**`);
+      }
+      if (result.author) {
+        lines.push(`By: ${result.author}`);
+      }
+      if (result.type) {
+        lines.push(`Type: ${result.type}`);
+      }
+      lines.push('');
+      lines.push(result.summary || 'No summary available.');
+
+      return { success: true, result: lines.join('\n') };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to summarize' };
     }
   },
 
