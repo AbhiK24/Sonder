@@ -411,6 +411,275 @@ app.post('/api/launch', (req, res) => {
 });
 
 // =============================================================================
+// Google OAuth
+// =============================================================================
+
+// Google OAuth configuration
+const GOOGLE_CLIENT_ID = process.env.GOOGLE_CLIENT_ID || '';
+const GOOGLE_CLIENT_SECRET = process.env.GOOGLE_CLIENT_SECRET || '';
+const GOOGLE_REDIRECT_URI = process.env.GOOGLE_REDIRECT_URI || `http://localhost:${process.env.DASHBOARD_PORT || '3000'}/auth/google/callback`;
+
+const GOOGLE_SCOPES = [
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/tasks.readonly',
+  'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+].join(' ');
+
+// Token storage path
+const googleTokenPath = resolve(process.env.HOME || '', '.sonder/google-tokens.json');
+
+function loadGoogleTokens(): any {
+  try {
+    if (existsSync(googleTokenPath)) {
+      return JSON.parse(readFileSync(googleTokenPath, 'utf-8'));
+    }
+  } catch {}
+  return null;
+}
+
+function saveGoogleTokens(tokens: any): void {
+  const dir = resolve(process.env.HOME || '', '.sonder');
+  if (!existsSync(dir)) {
+    require('fs').mkdirSync(dir, { recursive: true });
+  }
+  writeFileSync(googleTokenPath, JSON.stringify(tokens, null, 2));
+}
+
+// Start OAuth flow
+app.get('/auth/google', (req, res) => {
+  if (!GOOGLE_CLIENT_ID || !GOOGLE_CLIENT_SECRET) {
+    return res.status(400).send('Google OAuth not configured. Set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET in .env');
+  }
+
+  const params = new URLSearchParams({
+    client_id: GOOGLE_CLIENT_ID,
+    redirect_uri: GOOGLE_REDIRECT_URI,
+    response_type: 'code',
+    scope: GOOGLE_SCOPES,
+    access_type: 'offline',
+    prompt: 'consent',
+  });
+
+  res.redirect(`https://accounts.google.com/o/oauth2/v2/auth?${params}`);
+});
+
+// OAuth callback
+app.get('/auth/google/callback', async (req, res) => {
+  const { code, error } = req.query;
+
+  if (error) {
+    return res.send(`<html><body><h1>OAuth Error</h1><p>${error}</p><a href="/setup.html">Back to Setup</a></body></html>`);
+  }
+
+  if (!code || typeof code !== 'string') {
+    return res.status(400).send('Missing authorization code');
+  }
+
+  try {
+    // Exchange code for tokens
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        client_id: GOOGLE_CLIENT_ID,
+        client_secret: GOOGLE_CLIENT_SECRET,
+        code,
+        grant_type: 'authorization_code',
+        redirect_uri: GOOGLE_REDIRECT_URI,
+      }),
+    });
+
+    if (!tokenResponse.ok) {
+      const err = await tokenResponse.json();
+      throw new Error((err as any).error_description || 'Token exchange failed');
+    }
+
+    const tokens = await tokenResponse.json() as any;
+
+    // Get user info
+    const userResponse = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+      headers: { Authorization: `Bearer ${tokens.access_token}` },
+    });
+
+    const user = userResponse.ok ? await userResponse.json() as any : {};
+
+    // Save tokens
+    saveGoogleTokens({
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      expiresAt: Date.now() + (tokens.expires_in * 1000),
+      scope: tokens.scope,
+      email: user.email,
+    });
+
+    // Save email to .env
+    if (user.email) {
+      saveToEnv('GOOGLE_EMAIL', user.email);
+      saveToEnv('USER_EMAIL', user.email);
+    }
+
+    // Success page
+    res.send(`
+      <html>
+      <head><title>Connected!</title><style>
+        body { font-family: system-ui; max-width: 500px; margin: 100px auto; text-align: center; }
+        h1 { color: #22c55e; }
+        .email { background: #f3f4f6; padding: 10px 20px; border-radius: 8px; margin: 20px 0; }
+        a { color: #3b82f6; }
+      </style></head>
+      <body>
+        <h1>Connected to Google!</h1>
+        <div class="email">${user.email || 'Account connected'}</div>
+        <p>Sonder now has access to your Calendar, Gmail, and Tasks.</p>
+        <p><a href="/setup.html">Back to Setup</a></p>
+        <script>setTimeout(() => window.close(), 3000);</script>
+      </body>
+      </html>
+    `);
+  } catch (err) {
+    res.status(500).send(`
+      <html><body>
+        <h1>OAuth Error</h1>
+        <p>${err instanceof Error ? err.message : 'Unknown error'}</p>
+        <a href="/setup.html">Back to Setup</a>
+      </body></html>
+    `);
+  }
+});
+
+// Check Google connection status
+app.get('/api/google/status', async (req, res) => {
+  const tokens = loadGoogleTokens();
+
+  if (!tokens?.refreshToken) {
+    return res.json({ connected: false });
+  }
+
+  // Check if tokens are still valid
+  try {
+    // Refresh if expired
+    if (Date.now() > tokens.expiresAt - 5 * 60 * 1000) {
+      const refreshResponse = await fetch('https://oauth2.googleapis.com/token', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: GOOGLE_CLIENT_ID,
+          client_secret: GOOGLE_CLIENT_SECRET,
+          refresh_token: tokens.refreshToken,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (refreshResponse.ok) {
+        const newTokens = await refreshResponse.json() as any;
+        tokens.accessToken = newTokens.access_token;
+        tokens.expiresAt = Date.now() + (newTokens.expires_in * 1000);
+        saveGoogleTokens(tokens);
+      } else {
+        return res.json({ connected: false, error: 'Token refresh failed' });
+      }
+    }
+
+    res.json({
+      connected: true,
+      email: tokens.email,
+      scopes: tokens.scope?.split(' ') || [],
+    });
+  } catch {
+    res.json({ connected: false });
+  }
+});
+
+// Disconnect Google
+app.post('/api/google/disconnect', async (req, res) => {
+  const tokens = loadGoogleTokens();
+
+  if (tokens?.accessToken) {
+    try {
+      await fetch(`https://oauth2.googleapis.com/revoke?token=${tokens.accessToken}`, {
+        method: 'POST',
+      });
+    } catch {}
+  }
+
+  // Delete token file
+  if (existsSync(googleTokenPath)) {
+    require('fs').unlinkSync(googleTokenPath);
+  }
+
+  res.json({ success: true });
+});
+
+// Get Google calendars
+app.get('/api/google/calendars', async (req, res) => {
+  const tokens = loadGoogleTokens();
+  if (!tokens?.accessToken) {
+    return res.status(401).json({ error: 'Not connected' });
+  }
+
+  try {
+    const response = await fetch('https://www.googleapis.com/calendar/v3/users/me/calendarList', {
+      headers: { Authorization: `Bearer ${tokens.accessToken}` },
+    });
+
+    if (!response.ok) throw new Error('Failed to fetch calendars');
+
+    const data = await response.json() as any;
+    res.json({
+      calendars: (data.items || []).map((cal: any) => ({
+        id: cal.id,
+        name: cal.summary,
+        primary: cal.primary || false,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed' });
+  }
+});
+
+// Get upcoming events
+app.get('/api/google/events', async (req, res) => {
+  const tokens = loadGoogleTokens();
+  if (!tokens?.accessToken) {
+    return res.status(401).json({ error: 'Not connected' });
+  }
+
+  try {
+    const params = new URLSearchParams({
+      maxResults: '10',
+      singleEvents: 'true',
+      orderBy: 'startTime',
+      timeMin: new Date().toISOString(),
+    });
+
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?${params}`,
+      { headers: { Authorization: `Bearer ${tokens.accessToken}` } }
+    );
+
+    if (!response.ok) throw new Error('Failed to fetch events');
+
+    const data = await response.json() as any;
+    res.json({
+      events: (data.items || []).map((event: any) => ({
+        id: event.id,
+        summary: event.summary,
+        start: event.start?.dateTime || event.start?.date,
+        end: event.end?.dateTime || event.end?.date,
+        location: event.location,
+      })),
+    });
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Failed' });
+  }
+});
+
+// =============================================================================
 // Start Server
 // =============================================================================
 

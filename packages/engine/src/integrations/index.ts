@@ -37,3 +37,13 @@ export * from './outbound.js';
 
 // Manager
 export { IntegrationHub, getIntegrationHub } from './hub.js';
+
+// Google OAuth (Calendar, Gmail, Tasks)
+export { GoogleOAuth, getGoogleOAuth, createGoogleOAuth } from './google-oauth.js';
+export type {
+  GoogleOAuthConfig,
+  GoogleTokens,
+  CalendarEvent,
+  GmailMessage,
+  GoogleTask,
+} from './google-oauth.js';

@@ -1,0 +1,734 @@
+/**
+ * Google OAuth Integration
+ *
+ * Handles OAuth2 flow for Google services:
+ * - Calendar (read/write events)
+ * - Gmail (read/send emails)
+ * - Tasks (read/write tasks)
+ *
+ * Usage:
+ *   const google = new GoogleOAuth({ clientId, clientSecret, redirectUri });
+ *   const authUrl = google.getAuthUrl();
+ *   // User visits authUrl, gets redirected back with code
+ *   await google.handleCallback(code);
+ *   // Now you can use the APIs
+ *   const events = await google.calendar.listEvents();
+ */
+
+import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { resolve, dirname } from 'path';
+import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+
+// =============================================================================
+// Types
+// =============================================================================
+
+export interface GoogleOAuthConfig {
+  clientId: string;
+  clientSecret: string;
+  redirectUri: string;
+  /** Directory to store tokens (default: ~/.sonder) */
+  tokenDir?: string;
+  /** Encryption key for token storage (default: derived from clientSecret) */
+  encryptionKey?: string;
+}
+
+export interface GoogleTokens {
+  accessToken: string;
+  refreshToken: string;
+  expiresAt: number;
+  scope: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  summary: string;
+  description?: string;
+  location?: string;
+  start: Date;
+  end: Date;
+  allDay: boolean;
+  recurring: boolean;
+  status: 'confirmed' | 'tentative' | 'cancelled';
+  htmlLink?: string;
+}
+
+export interface GmailMessage {
+  id: string;
+  threadId: string;
+  from: string;
+  to: string[];
+  subject: string;
+  snippet: string;
+  body?: string;
+  date: Date;
+  labels: string[];
+  unread: boolean;
+}
+
+export interface GoogleTask {
+  id: string;
+  title: string;
+  notes?: string;
+  due?: Date;
+  completed: boolean;
+  completedAt?: Date;
+  listId: string;
+}
+
+// =============================================================================
+// Constants
+// =============================================================================
+
+const GOOGLE_AUTH_URL = 'https://accounts.google.com/o/oauth2/v2/auth';
+const GOOGLE_TOKEN_URL = 'https://oauth2.googleapis.com/token';
+const GOOGLE_CALENDAR_API = 'https://www.googleapis.com/calendar/v3';
+const GOOGLE_GMAIL_API = 'https://www.googleapis.com/gmail/v1';
+const GOOGLE_TASKS_API = 'https://www.googleapis.com/tasks/v1';
+
+// Scopes for full Google suite
+const SCOPES = [
+  'https://www.googleapis.com/auth/calendar.readonly',
+  'https://www.googleapis.com/auth/calendar.events',
+  'https://www.googleapis.com/auth/gmail.readonly',
+  'https://www.googleapis.com/auth/gmail.send',
+  'https://www.googleapis.com/auth/tasks.readonly',
+  'https://www.googleapis.com/auth/tasks',
+  'https://www.googleapis.com/auth/userinfo.email',
+  'https://www.googleapis.com/auth/userinfo.profile',
+].join(' ');
+
+// =============================================================================
+// Token Storage (encrypted)
+// =============================================================================
+
+function getEncryptionKey(secret: string): Buffer {
+  // Derive a 32-byte key from the secret
+  const hash = require('crypto').createHash('sha256');
+  hash.update(secret);
+  return hash.digest();
+}
+
+function encrypt(text: string, key: Buffer): string {
+  const iv = randomBytes(16);
+  const cipher = createCipheriv('aes-256-cbc', key, iv);
+  let encrypted = cipher.update(text, 'utf8', 'hex');
+  encrypted += cipher.final('hex');
+  return iv.toString('hex') + ':' + encrypted;
+}
+
+function decrypt(encrypted: string, key: Buffer): string {
+  const [ivHex, encryptedText] = encrypted.split(':');
+  const iv = Buffer.from(ivHex, 'hex');
+  const decipher = createDecipheriv('aes-256-cbc', key, iv);
+  let decrypted = decipher.update(encryptedText, 'hex', 'utf8');
+  decrypted += decipher.final('utf8');
+  return decrypted;
+}
+
+// =============================================================================
+// Google OAuth Class
+// =============================================================================
+
+export class GoogleOAuth {
+  private config: GoogleOAuthConfig;
+  private tokens: GoogleTokens | null = null;
+  private tokenPath: string;
+  private encryptionKey: Buffer;
+
+  // Sub-APIs
+  public calendar: GoogleCalendarAPI;
+  public gmail: GmailAPI;
+  public tasks: GoogleTasksAPI;
+
+  constructor(config: GoogleOAuthConfig) {
+    this.config = config;
+
+    const tokenDir = config.tokenDir || resolve(process.env.HOME || '', '.sonder');
+    if (!existsSync(tokenDir)) {
+      mkdirSync(tokenDir, { recursive: true });
+    }
+    this.tokenPath = resolve(tokenDir, 'google-tokens.enc');
+    this.encryptionKey = getEncryptionKey(config.encryptionKey || config.clientSecret);
+
+    // Load existing tokens
+    this.loadTokens();
+
+    // Initialize sub-APIs
+    this.calendar = new GoogleCalendarAPI(this);
+    this.gmail = new GmailAPI(this);
+    this.tasks = new GoogleTasksAPI(this);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Auth Flow
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Get the OAuth authorization URL
+   */
+  getAuthUrl(state?: string): string {
+    const params = new URLSearchParams({
+      client_id: this.config.clientId,
+      redirect_uri: this.config.redirectUri,
+      response_type: 'code',
+      scope: SCOPES,
+      access_type: 'offline',
+      prompt: 'consent', // Always show consent to get refresh token
+    });
+
+    if (state) {
+      params.set('state', state);
+    }
+
+    return `${GOOGLE_AUTH_URL}?${params.toString()}`;
+  }
+
+  /**
+   * Handle OAuth callback - exchange code for tokens
+   */
+  async handleCallback(code: string): Promise<{ success: boolean; error?: string; email?: string }> {
+    try {
+      const response = await fetch(GOOGLE_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: this.config.clientId,
+          client_secret: this.config.clientSecret,
+          code,
+          grant_type: 'authorization_code',
+          redirect_uri: this.config.redirectUri,
+        }),
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        return { success: false, error: error.error_description || 'Token exchange failed' };
+      }
+
+      const data = await response.json() as any;
+
+      this.tokens = {
+        accessToken: data.access_token,
+        refreshToken: data.refresh_token,
+        expiresAt: Date.now() + (data.expires_in * 1000),
+        scope: data.scope,
+      };
+
+      this.saveTokens();
+
+      // Get user email
+      const email = await this.getUserEmail();
+
+      return { success: true, email };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+    }
+  }
+
+  /**
+   * Check if authenticated
+   */
+  isAuthenticated(): boolean {
+    return this.tokens !== null && !!this.tokens.refreshToken;
+  }
+
+  /**
+   * Get valid access token (refreshes if needed)
+   */
+  async getAccessToken(): Promise<string | null> {
+    if (!this.tokens) return null;
+
+    // Refresh if expired or expiring soon (5 min buffer)
+    if (Date.now() > this.tokens.expiresAt - 5 * 60 * 1000) {
+      await this.refreshAccessToken();
+    }
+
+    return this.tokens?.accessToken || null;
+  }
+
+  /**
+   * Refresh the access token
+   */
+  private async refreshAccessToken(): Promise<boolean> {
+    if (!this.tokens?.refreshToken) return false;
+
+    try {
+      const response = await fetch(GOOGLE_TOKEN_URL, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          client_id: this.config.clientId,
+          client_secret: this.config.clientSecret,
+          refresh_token: this.tokens.refreshToken,
+          grant_type: 'refresh_token',
+        }),
+      });
+
+      if (!response.ok) return false;
+
+      const data = await response.json() as any;
+
+      this.tokens = {
+        ...this.tokens,
+        accessToken: data.access_token,
+        expiresAt: Date.now() + (data.expires_in * 1000),
+      };
+
+      this.saveTokens();
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
+  /**
+   * Revoke access and clear tokens
+   */
+  async disconnect(): Promise<void> {
+    if (this.tokens?.accessToken) {
+      try {
+        await fetch(`https://oauth2.googleapis.com/revoke?token=${this.tokens.accessToken}`, {
+          method: 'POST',
+        });
+      } catch {}
+    }
+
+    this.tokens = null;
+    if (existsSync(this.tokenPath)) {
+      require('fs').unlinkSync(this.tokenPath);
+    }
+  }
+
+  /**
+   * Get user email from Google
+   */
+  async getUserEmail(): Promise<string | null> {
+    const token = await this.getAccessToken();
+    if (!token) return null;
+
+    try {
+      const response = await fetch('https://www.googleapis.com/oauth2/v2/userinfo', {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (response.ok) {
+        const data = await response.json() as any;
+        return data.email;
+      }
+    } catch {}
+
+    return null;
+  }
+
+  // ---------------------------------------------------------------------------
+  // Token Storage
+  // ---------------------------------------------------------------------------
+
+  private loadTokens(): void {
+    if (!existsSync(this.tokenPath)) return;
+
+    try {
+      const encrypted = readFileSync(this.tokenPath, 'utf-8');
+      const decrypted = decrypt(encrypted, this.encryptionKey);
+      this.tokens = JSON.parse(decrypted);
+    } catch {
+      // Invalid or corrupted tokens
+      this.tokens = null;
+    }
+  }
+
+  private saveTokens(): void {
+    if (!this.tokens) return;
+
+    try {
+      const json = JSON.stringify(this.tokens);
+      const encrypted = encrypt(json, this.encryptionKey);
+      writeFileSync(this.tokenPath, encrypted, 'utf-8');
+    } catch (error) {
+      console.error('[GoogleOAuth] Failed to save tokens:', error);
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // API Helper
+  // ---------------------------------------------------------------------------
+
+  async fetch(url: string, options: RequestInit = {}): Promise<Response> {
+    const token = await this.getAccessToken();
+    if (!token) {
+      throw new Error('Not authenticated');
+    }
+
+    return fetch(url, {
+      ...options,
+      headers: {
+        ...options.headers,
+        Authorization: `Bearer ${token}`,
+      },
+    });
+  }
+}
+
+// =============================================================================
+// Google Calendar API
+// =============================================================================
+
+class GoogleCalendarAPI {
+  constructor(private oauth: GoogleOAuth) {}
+
+  /**
+   * List upcoming events
+   */
+  async listEvents(options: {
+    calendarId?: string;
+    maxResults?: number;
+    timeMin?: Date;
+    timeMax?: Date;
+  } = {}): Promise<CalendarEvent[]> {
+    const {
+      calendarId = 'primary',
+      maxResults = 50,
+      timeMin = new Date(),
+      timeMax,
+    } = options;
+
+    const params = new URLSearchParams({
+      maxResults: String(maxResults),
+      singleEvents: 'true',
+      orderBy: 'startTime',
+      timeMin: timeMin.toISOString(),
+    });
+
+    if (timeMax) {
+      params.set('timeMax', timeMax.toISOString());
+    }
+
+    const response = await this.oauth.fetch(
+      `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events?${params}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Calendar API error: ${response.status}`);
+    }
+
+    const data = await response.json() as any;
+
+    return (data.items || []).map((item: any) => this.parseEvent(item));
+  }
+
+  /**
+   * Get a single event
+   */
+  async getEvent(eventId: string, calendarId: string = 'primary'): Promise<CalendarEvent | null> {
+    const response = await this.oauth.fetch(
+      `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}`
+    );
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as any;
+    return this.parseEvent(data);
+  }
+
+  /**
+   * List all calendars
+   */
+  async listCalendars(): Promise<Array<{ id: string; name: string; primary: boolean }>> {
+    const response = await this.oauth.fetch(`${GOOGLE_CALENDAR_API}/users/me/calendarList`);
+
+    if (!response.ok) {
+      throw new Error(`Calendar API error: ${response.status}`);
+    }
+
+    const data = await response.json() as any;
+
+    return (data.items || []).map((cal: any) => ({
+      id: cal.id,
+      name: cal.summary,
+      primary: cal.primary || false,
+    }));
+  }
+
+  private parseEvent(item: any): CalendarEvent {
+    const start = item.start?.dateTime
+      ? new Date(item.start.dateTime)
+      : new Date(item.start?.date);
+
+    const end = item.end?.dateTime
+      ? new Date(item.end.dateTime)
+      : new Date(item.end?.date);
+
+    return {
+      id: item.id,
+      summary: item.summary || '(No title)',
+      description: item.description,
+      location: item.location,
+      start,
+      end,
+      allDay: !item.start?.dateTime,
+      recurring: !!item.recurringEventId,
+      status: item.status || 'confirmed',
+      htmlLink: item.htmlLink,
+    };
+  }
+}
+
+// =============================================================================
+// Gmail API
+// =============================================================================
+
+class GmailAPI {
+  constructor(private oauth: GoogleOAuth) {}
+
+  /**
+   * List recent emails
+   */
+  async listMessages(options: {
+    maxResults?: number;
+    query?: string;
+    labelIds?: string[];
+  } = {}): Promise<GmailMessage[]> {
+    const { maxResults = 20, query, labelIds } = options;
+
+    const params = new URLSearchParams({ maxResults: String(maxResults) });
+    if (query) params.set('q', query);
+    if (labelIds?.length) params.set('labelIds', labelIds.join(','));
+
+    const response = await this.oauth.fetch(
+      `${GOOGLE_GMAIL_API}/users/me/messages?${params}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gmail API error: ${response.status}`);
+    }
+
+    const data = await response.json() as any;
+    const messages: GmailMessage[] = [];
+
+    // Fetch details for each message
+    for (const msg of (data.messages || []).slice(0, maxResults)) {
+      const detail = await this.getMessage(msg.id);
+      if (detail) messages.push(detail);
+    }
+
+    return messages;
+  }
+
+  /**
+   * Get a single message
+   */
+  async getMessage(messageId: string): Promise<GmailMessage | null> {
+    const response = await this.oauth.fetch(
+      `${GOOGLE_GMAIL_API}/users/me/messages/${messageId}?format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date`
+    );
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as any;
+    return this.parseMessage(data);
+  }
+
+  /**
+   * Send an email
+   */
+  async sendMessage(options: {
+    to: string | string[];
+    subject: string;
+    body: string;
+    html?: boolean;
+  }): Promise<{ success: boolean; messageId?: string; error?: string }> {
+    const { to, subject, body, html = false } = options;
+
+    const toAddresses = Array.isArray(to) ? to.join(', ') : to;
+    const contentType = html ? 'text/html' : 'text/plain';
+
+    const email = [
+      `To: ${toAddresses}`,
+      `Subject: ${subject}`,
+      `Content-Type: ${contentType}; charset=utf-8`,
+      '',
+      body,
+    ].join('\r\n');
+
+    const encoded = Buffer.from(email).toString('base64url');
+
+    const response = await this.oauth.fetch(
+      `${GOOGLE_GMAIL_API}/users/me/messages/send`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ raw: encoded }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json() as any;
+      return { success: false, error: error.error?.message || 'Send failed' };
+    }
+
+    const data = await response.json() as any;
+    return { success: true, messageId: data.id };
+  }
+
+  private parseMessage(data: any): GmailMessage {
+    const headers = data.payload?.headers || [];
+    const getHeader = (name: string) => headers.find((h: any) => h.name === name)?.value || '';
+
+    return {
+      id: data.id,
+      threadId: data.threadId,
+      from: getHeader('From'),
+      to: getHeader('To').split(',').map((s: string) => s.trim()),
+      subject: getHeader('Subject'),
+      snippet: data.snippet || '',
+      date: new Date(getHeader('Date') || data.internalDate),
+      labels: data.labelIds || [],
+      unread: data.labelIds?.includes('UNREAD') || false,
+    };
+  }
+}
+
+// =============================================================================
+// Google Tasks API
+// =============================================================================
+
+class GoogleTasksAPI {
+  constructor(private oauth: GoogleOAuth) {}
+
+  /**
+   * List task lists
+   */
+  async listTaskLists(): Promise<Array<{ id: string; title: string }>> {
+    const response = await this.oauth.fetch(`${GOOGLE_TASKS_API}/users/@me/lists`);
+
+    if (!response.ok) {
+      throw new Error(`Tasks API error: ${response.status}`);
+    }
+
+    const data = await response.json() as any;
+
+    return (data.items || []).map((list: any) => ({
+      id: list.id,
+      title: list.title,
+    }));
+  }
+
+  /**
+   * List tasks in a list
+   */
+  async listTasks(listId: string = '@default', options: {
+    showCompleted?: boolean;
+    maxResults?: number;
+  } = {}): Promise<GoogleTask[]> {
+    const { showCompleted = false, maxResults = 100 } = options;
+
+    const params = new URLSearchParams({
+      maxResults: String(maxResults),
+      showCompleted: String(showCompleted),
+    });
+
+    const response = await this.oauth.fetch(
+      `${GOOGLE_TASKS_API}/lists/${listId}/tasks?${params}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Tasks API error: ${response.status}`);
+    }
+
+    const data = await response.json() as any;
+
+    return (data.items || []).map((task: any) => this.parseTask(task, listId));
+  }
+
+  /**
+   * Create a new task
+   */
+  async createTask(listId: string, task: {
+    title: string;
+    notes?: string;
+    due?: Date;
+  }): Promise<GoogleTask | null> {
+    const body: any = { title: task.title };
+    if (task.notes) body.notes = task.notes;
+    if (task.due) body.due = task.due.toISOString();
+
+    const response = await this.oauth.fetch(
+      `${GOOGLE_TASKS_API}/lists/${listId}/tasks`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      }
+    );
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as any;
+    return this.parseTask(data, listId);
+  }
+
+  /**
+   * Complete a task
+   */
+  async completeTask(listId: string, taskId: string): Promise<boolean> {
+    const response = await this.oauth.fetch(
+      `${GOOGLE_TASKS_API}/lists/${listId}/tasks/${taskId}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      }
+    );
+
+    return response.ok;
+  }
+
+  private parseTask(task: any, listId: string): GoogleTask {
+    return {
+      id: task.id,
+      title: task.title || '',
+      notes: task.notes,
+      due: task.due ? new Date(task.due) : undefined,
+      completed: task.status === 'completed',
+      completedAt: task.completed ? new Date(task.completed) : undefined,
+      listId,
+    };
+  }
+}
+
+// =============================================================================
+// Factory
+// =============================================================================
+
+let googleOAuthInstance: GoogleOAuth | null = null;
+
+/**
+ * Get or create the Google OAuth instance
+ */
+export function getGoogleOAuth(config?: GoogleOAuthConfig): GoogleOAuth | null {
+  if (googleOAuthInstance) return googleOAuthInstance;
+
+  if (!config) {
+    // Try to load from environment
+    const clientId = process.env.GOOGLE_CLIENT_ID;
+    const clientSecret = process.env.GOOGLE_CLIENT_SECRET;
+    const redirectUri = process.env.GOOGLE_REDIRECT_URI || 'http://localhost:3000/auth/google/callback';
+
+    if (!clientId || !clientSecret) {
+      return null;
+    }
+
+    config = { clientId, clientSecret, redirectUri };
+  }
+
+  googleOAuthInstance = new GoogleOAuth(config);
+  return googleOAuthInstance;
+}
+
+/**
+ * Create a new Google OAuth instance (for testing/multiple accounts)
+ */
+export function createGoogleOAuth(config: GoogleOAuthConfig): GoogleOAuth {
+  return new GoogleOAuth(config);
+}

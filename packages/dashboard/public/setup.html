@@ -822,7 +822,46 @@
         </div>
       </div>
 
-      <!-- Optional: Calendar (ICS) -->
+      <!-- Google Integration (OAuth) -->
+      <div class="section" id="google-section">
+        <div class="section-header">
+          <span class="section-icon">🔗</span>
+          <span class="section-title">Google Integration</span>
+          <span class="section-badge optional">Recommended</span>
+        </div>
+        <p style="margin-bottom: 16px; font-size: 0.9rem; color: var(--text-muted);">
+          Connect your Google account to give Sonder access to your Calendar, Gmail, and Tasks.
+          One click, no manual API keys needed.
+        </p>
+        <div id="google-status-container">
+          <button class="btn btn-primary" onclick="connectGoogle()" id="google-connect-btn" style="width: 100%;">
+            <span style="margin-right: 8px;">
+              <svg width="18" height="18" viewBox="0 0 24 24" style="vertical-align: middle;">
+                <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
+                <path fill="currentColor" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                <path fill="currentColor" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                <path fill="currentColor" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+              </svg>
+            </span>
+            Connect Google Account
+          </button>
+          <div id="google-connected" style="display: none; padding: 16px; background: rgba(74, 222, 128, 0.1); border-radius: 8px; margin-top: 12px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <span style="font-size: 1.5rem;">✓</span>
+              <div>
+                <div style="font-weight: 500; color: var(--success);">Connected</div>
+                <div id="google-email" style="font-size: 0.9rem; color: var(--text-muted);"></div>
+              </div>
+              <button onclick="disconnectGoogle()" style="margin-left: auto; background: none; border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; color: var(--text-muted); cursor: pointer; font-size: 0.8rem;">
+                Disconnect
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="status-msg" id="google-status"></div>
+      </div>
+
+      <!-- Optional: Calendar (ICS) - fallback if not using Google -->
       <div class="collapsible" id="calendar-section">
         <div class="collapsible-header" onclick="toggleCollapsible('calendar-section')">
           <span class="collapsible-icon">📅</span>
@@ -832,7 +871,7 @@
         </div>
         <div class="collapsible-content">
           <p style="margin-bottom: 16px; font-size: 0.9rem;">
-            Let agents see your schedule. No OAuth needed.
+            Alternative to Google OAuth. Add calendar feeds manually.
             <button class="info-btn" onclick="event.stopPropagation(); showInfo('calendar')">?</button>
           </p>
 
@@ -970,6 +1009,10 @@
         <div class="summary-item">
           <span class="summary-label">Todoist</span>
           <span class="summary-value" id="summary-todoist">—</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">Google</span>
+          <span class="summary-value" id="summary-google">—</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">Calendar</span>
@@ -1438,11 +1481,18 @@
       document.getElementById('summary-todoist').classList.toggle('configured', hasTodoist);
       document.getElementById('summary-todoist').classList.toggle('missing', !hasTodoist);
 
+      // Google status
+      const googleConnected = document.getElementById('google-connected').style.display !== 'none';
+      const googleEmail = document.getElementById('google-email').textContent;
+      document.getElementById('summary-google').textContent = googleConnected ? (googleEmail || 'Connected') : 'Not connected';
+      document.getElementById('summary-google').classList.toggle('configured', googleConnected);
+      document.getElementById('summary-google').classList.toggle('missing', !googleConnected);
+
       updateICSFeeds();
       const calCount = icsFeeds.length;
-      document.getElementById('summary-calendar').textContent = calCount > 0 ? `${calCount} calendar${calCount > 1 ? 's' : ''}` : 'Skipped';
-      document.getElementById('summary-calendar').classList.toggle('configured', calCount > 0);
-      document.getElementById('summary-calendar').classList.toggle('missing', calCount === 0);
+      document.getElementById('summary-calendar').textContent = calCount > 0 ? `${calCount} calendar${calCount > 1 ? 's' : ''}` : (googleConnected ? 'Via Google' : 'Skipped');
+      document.getElementById('summary-calendar').classList.toggle('configured', calCount > 0 || googleConnected);
+      document.getElementById('summary-calendar').classList.toggle('missing', calCount === 0 && !googleConnected);
 
       document.getElementById('summary-timezone').textContent = document.getElementById('timezone').value;
     }
@@ -1568,8 +1618,72 @@
       }
     }
 
+    // Google OAuth
+    async function checkGoogleStatus() {
+      try {
+        const res = await fetch('/api/google/status');
+        const data = await res.json();
+
+        if (data.connected) {
+          document.getElementById('google-connect-btn').style.display = 'none';
+          document.getElementById('google-connected').style.display = 'block';
+          document.getElementById('google-email').textContent = data.email || 'Connected';
+
+          // Update section badge
+          const badge = document.querySelector('#google-section .section-badge');
+          if (badge) {
+            badge.textContent = 'Connected';
+            badge.classList.remove('optional');
+          }
+        }
+      } catch (e) {
+        console.error('Failed to check Google status:', e);
+      }
+    }
+
+    function connectGoogle() {
+      // Open OAuth flow in popup
+      const width = 500;
+      const height = 600;
+      const left = (window.innerWidth - width) / 2;
+      const top = (window.innerHeight - height) / 2;
+
+      const popup = window.open(
+        '/auth/google',
+        'google-oauth',
+        `width=${width},height=${height},left=${left},top=${top}`
+      );
+
+      // Check for popup close
+      const checkClosed = setInterval(() => {
+        if (popup.closed) {
+          clearInterval(checkClosed);
+          checkGoogleStatus();
+        }
+      }, 500);
+    }
+
+    async function disconnectGoogle() {
+      if (!confirm('Disconnect Google account?')) return;
+
+      try {
+        await fetch('/api/google/disconnect', { method: 'POST' });
+        document.getElementById('google-connect-btn').style.display = 'block';
+        document.getElementById('google-connected').style.display = 'none';
+
+        const badge = document.querySelector('#google-section .section-badge');
+        if (badge) {
+          badge.textContent = 'Recommended';
+          badge.classList.add('optional');
+        }
+      } catch (e) {
+        console.error('Failed to disconnect:', e);
+      }
+    }
+
     // Initialize
     loadExistingConfig();
+    checkGoogleStatus();
 
     // Info popup system
     const infoContent = {
