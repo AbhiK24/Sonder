@@ -1271,7 +1271,7 @@ function setupIdleEngine(): void {
       },
       onReunion: async (payload, message) => {
         const chatId = parseInt(payload.userId);
-        await handleReunion(chatId, payload.awayMinutes, message.greeting);
+        await handleReunion(chatId, payload.awayDuration, message.text);
       },
       onThoughtGenerated: async (thought) => {
         console.log(`[IdleEngine] Generated thought for ${thought.userId}: ${thought.type}`);
