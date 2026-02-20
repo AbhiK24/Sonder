@@ -49,6 +49,7 @@ import {
   removeToolCallsFromResponse,
   executeTool,
   ToolContext,
+  orderToolCalls,
 } from './tools/index.js';
 
 // Chorus play imports
@@ -108,8 +109,9 @@ interface UserState {
   inFTUE: boolean;
   savedFtueProgress?: { stepIndex: number; responses: Record<string, string>; waitingForResponse: boolean };
 
-  // Pending action awaiting user confirmation
+  // Pending action(s) awaiting user confirmation
   pendingAction?: PendingAction;
+  pendingActions?: PendingAction[];  // For batch confirmations (multiple tools)
 }
 
 // =============================================================================
@@ -405,28 +407,11 @@ IMPORTANT: You have real-time web search built in. When asked about current even
     const CONFIRMATION_REQUIRED_TOOLS = ['send_email', 'send_whatsapp', 'google_create_event', 'google_update_event'];
 
     if (toolCalls.length > 0) {
-      // Check if any tool requires confirmation
-      const confirmationTool = toolCalls.find(tc => CONFIRMATION_REQUIRED_TOOLS.includes(tc.name));
+      // Separate tools into confirmation-required and immediate
+      const confirmationTools = toolCalls.filter(tc => CONFIRMATION_REQUIRED_TOOLS.includes(tc.name));
+      const immediateTools = toolCalls.filter(tc => !CONFIRMATION_REQUIRED_TOOLS.includes(tc.name));
 
-      if (confirmationTool) {
-        // Store as pending action and ask for confirmation
-        const description = formatPendingActionDescription(confirmationTool);
-        state.pendingAction = {
-          tool: confirmationTool.name,
-          args: confirmationTool.arguments,
-          description,
-          proposedAt: new Date(),
-          agentId: agent.id,
-        };
-        saveState(state.id);
-
-        console.log(`[${state.id}] Stored pending action: ${confirmationTool.name}`);
-
-        // Return a confirmation prompt
-        return `${agent.emoji} *${agent.name}:* ${description}\n\nShould I go ahead? (Reply **yes** to confirm or **no** to cancel)`;
-      }
-
-      // Execute non-confirmation tools immediately
+      // Build tool context (shared for all executions)
       const toolContext: ToolContext = {
         userId: String(state.profile.id),
         userName: state.profile.name,
@@ -471,33 +456,109 @@ IMPORTANT: You have real-time web search built in. When asked about current even
       // Register user for reminders
       reminderEngine.registerUser(String(state.profile.id));
 
-      const toolResults: string[] = [];
-      for (const toolCall of toolCalls) {
-        const result = await executeTool(toolCall, toolContext);
-        toolResults.push(
-          result.success
-            ? `✓ ${toolCall.name}: ${result.result}`
-            : `✗ ${toolCall.name} failed: ${result.error}`
-        );
+      // Order immediate tools: queries first, then actions
+      // This ensures read operations complete before write operations
+      const { queries, actions, other } = orderToolCalls(immediateTools);
+      const orderedImmediateTools = [...queries, ...other, ...actions];
+
+      // Execute immediate tools (queries first in parallel, then actions in parallel)
+      const immediateResults: string[] = [];
+      if (orderedImmediateTools.length > 0) {
+        console.log(`[DEBUG] Executing ${orderedImmediateTools.length} immediate tools (${queries.length} queries, ${actions.length} actions, ${other.length} other)`);
+
+        // Execute queries first (in parallel)
+        if (queries.length > 0) {
+          const queryResults = await Promise.all(
+            queries.map(async (toolCall) => {
+              const result = await executeTool(toolCall, toolContext);
+              return {
+                name: toolCall.name,
+                success: result.success,
+                result: result.success ? result.result : result.error,
+              };
+            })
+          );
+          queryResults.forEach(r => {
+            immediateResults.push(r.success ? `✓ ${r.name}: ${r.result}` : `✗ ${r.name} failed: ${r.result}`);
+          });
+        }
+
+        // Then execute other + actions (in parallel)
+        const remainingTools = [...other, ...actions];
+        if (remainingTools.length > 0) {
+          const actionResults = await Promise.all(
+            remainingTools.map(async (toolCall) => {
+              const result = await executeTool(toolCall, toolContext);
+              return {
+                name: toolCall.name,
+                success: result.success,
+                result: result.success ? result.result : result.error,
+              };
+            })
+          );
+          actionResults.forEach(r => {
+            immediateResults.push(r.success ? `✓ ${r.name}: ${r.result}` : `✗ ${r.name} failed: ${r.result}`);
+          });
+        }
       }
 
-      // Generate follow-up response with tool results
-      const followUpPrompt = `${prompt}
+      // Handle confirmation-required tools
+      if (confirmationTools.length > 0) {
+        // Store ALL confirmation tools as pending actions (batch confirmation)
+        const pendingActions = confirmationTools.map(tc => ({
+          tool: tc.name,
+          args: tc.arguments,
+          description: formatPendingActionDescription(tc),
+          proposedAt: new Date(),
+          agentId: agent.id,
+        }));
+
+        // Store as batch (use pendingActions array if multiple, or single pendingAction for backwards compat)
+        if (pendingActions.length === 1) {
+          state.pendingAction = pendingActions[0];
+        } else {
+          state.pendingActions = pendingActions;
+        }
+        saveState(state.id);
+
+        console.log(`[${state.id}] Stored ${pendingActions.length} pending action(s)`);
+
+        // Build batch confirmation message
+        let confirmMsg = '';
+        if (pendingActions.length === 1) {
+          confirmMsg = pendingActions[0].description;
+        } else {
+          confirmMsg = `I'll do ${pendingActions.length} things:\n\n${pendingActions.map((a, i) => `${i + 1}. ${a.description}`).join('\n')}`;
+        }
+
+        // If we also executed immediate tools, include those results
+        if (immediateResults.length > 0) {
+          return `${immediateResults.join('\n')}\n\n${agent.emoji} *${agent.name}:* ${confirmMsg}\n\nShould I go ahead? (Reply **yes** to confirm or **no** to cancel)`;
+        }
+
+        return `${agent.emoji} *${agent.name}:* ${confirmMsg}\n\nShould I go ahead? (Reply **yes** to confirm or **no** to cancel)`;
+      }
+
+      // No confirmation needed - just return results from immediate tools
+      if (immediateResults.length > 0) {
+        // Generate follow-up response with tool results
+        const followUpPrompt = `${prompt}
 
 ## Tool Results
-${toolResults.join('\n')}
+${immediateResults.join('\n')}
 
 ## Your Follow-up Response
 Based on the tool results above, give a brief response confirming what happened. Be honest about failures.`;
 
-      const followUp = await provider.generate(followUpPrompt, {
-        temperature: 0.7,
-        maxTokens: 200,
-        useSearch: true,
-      });
+        const followUp = await provider.generate(followUpPrompt, {
+          temperature: 0.7,
+          maxTokens: 200,
+          useSearch: true,
+        });
 
-      const cleaned = removeToolCallsFromResponse(followUp).trim();
-      return stripAgentNamePrefix(cleaned, agent.name);
+        const cleaned = removeToolCallsFromResponse(followUp).trim();
+        return stripAgentNamePrefix(cleaned, agent.name);
+      }
     }
 
     // No tool calls - return cleaned response
@@ -918,22 +979,29 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
   const confirmationWords = ['YES', 'YEP', 'YEAH', 'YA', 'GO AHEAD', 'DO IT', 'PROCEED', 'OK', 'OKAY', 'SURE', 'CONFIRM', 'APPROVED', 'GO FOR IT'];
   const cancelWords = ['NO', 'NOPE', 'CANCEL', 'STOP', 'NEVERMIND', 'NEVER MIND', 'DON\'T', 'DONT'];
 
-  if (state.pendingAction) {
+  // Handle batch pending actions OR single pending action
+  const hasPendingActions = state.pendingActions && state.pendingActions.length > 0;
+  const hasPendingAction = !!state.pendingAction;
+
+  if (hasPendingActions || hasPendingAction) {
     const isConfirmation = confirmationWords.some(w => upper === w || upper.startsWith(w + ' '));
     const isCancellation = cancelWords.some(w => upper === w || upper.startsWith(w + ' '));
 
     if (isConfirmation) {
-      const action = state.pendingAction;
+      // Get all pending actions (batch or single)
+      const actions = hasPendingActions ? state.pendingActions! : [state.pendingAction!];
       state.pendingAction = undefined;
+      state.pendingActions = undefined;
       saveState(chatId);
 
-      console.log(`[${chatId}] Executing confirmed action: ${action.tool}`);
+      console.log(`[${chatId}] Executing ${actions.length} confirmed action(s): ${actions.map(a => a.tool).join(', ')}`);
 
-      // Execute the pending action
-      const agent = chorusAgents[action.agentId];
+      // Build tool context (use first action's agentId for context)
+      const firstAction = actions[0];
+      const agent = chorusAgents[firstAction.agentId];
       const toolContext: ToolContext = {
         userId: String(chatId),
-        agentId: action.agentId,
+        agentId: firstAction.agentId,
         agentName: agent.name,
         userName: state.profile.name,
         userEmail: state.userEmail || state.profile.email,
@@ -943,29 +1011,45 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
         taskAdapter: taskAdapter || undefined,
         whatsappAdapter: whatsappAdapter ? {
           sendMessage: async (to: string, message: string) => {
-            const result = await whatsappAdapter.sendAsAgent(action.agentId, to, message, true);
+            const result = await whatsappAdapter.sendAsAgent(firstAction.agentId, to, message, true);
             return result;
           }
         } : undefined,
       };
 
-      const result = await executeTool({ name: action.tool, arguments: action.args }, toolContext);
-      console.log(`[Tool] Result: ${result.success ? '✓' : '✗'} ${result.result || result.error}`);
+      // Execute all actions in parallel
+      const results = await Promise.all(
+        actions.map(async (action) => {
+          const result = await executeTool({ name: action.tool, arguments: action.args }, toolContext);
+          return {
+            tool: action.tool,
+            success: result.success,
+            message: result.success ? result.result : result.error,
+          };
+        })
+      );
 
-      const resultMsg = result.success
-        ? `✓ Done! ${result.result}`
-        : `Something went wrong: ${result.error}`;
+      // Format results
+      const resultLines = results.map(r =>
+        r.success ? `✓ ${r.tool}: ${r.message}` : `✗ ${r.tool}: ${r.message}`
+      );
+      const allSucceeded = results.every(r => r.success);
+      const resultMsg = actions.length === 1
+        ? (allSucceeded ? `✓ Done! ${results[0].message}` : `Something went wrong: ${results[0].message}`)
+        : `${allSucceeded ? '✓ All done!' : 'Completed with some issues:'}\n${resultLines.join('\n')}`;
+
+      console.log(`[Tool] Results: ${resultLines.join(' | ')}`);
 
       actionLog.agentResponse({
         agent: agent.name,
         userId: String(chatId),
         messagePreview: resultMsg,
-        toolsUsed: [action.tool],
+        toolsUsed: actions.map(a => a.tool),
       });
 
       state.history.push({
         role: 'agent',
-        agentId: action.agentId,
+        agentId: firstAction.agentId,
         content: resultMsg,
         timestamp: new Date(),
       });
@@ -975,19 +1059,28 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
     }
 
     if (isCancellation) {
-      const action = state.pendingAction;
+      const actions = hasPendingActions ? state.pendingActions! : [state.pendingAction!];
+      const firstAction = actions[0];
       state.pendingAction = undefined;
+      state.pendingActions = undefined;
       saveState(chatId);
 
-      const agent = chorusAgents[action.agentId];
-      return `${agent.emoji} *${agent.name}:* Okay, cancelled. Let me know if you need anything else!`;
+      const agent = chorusAgents[firstAction.agentId];
+      const cancelMsg = actions.length === 1
+        ? 'Okay, cancelled. Let me know if you need anything else!'
+        : `Okay, cancelled all ${actions.length} actions. Let me know if you need anything else!`;
+      return `${agent.emoji} *${agent.name}:* ${cancelMsg}`;
     }
 
     // If neither confirm nor cancel, clear pending and continue (user is asking something else)
     // Only clear if the action is older than 5 minutes
-    const actionAge = Date.now() - state.pendingAction.proposedAt.getTime();
+    const oldestAction = hasPendingActions
+      ? state.pendingActions![0]
+      : state.pendingAction!;
+    const actionAge = Date.now() - oldestAction.proposedAt.getTime();
     if (actionAge > 5 * 60 * 1000) {
       state.pendingAction = undefined;
+      state.pendingActions = undefined;
     }
   }
 

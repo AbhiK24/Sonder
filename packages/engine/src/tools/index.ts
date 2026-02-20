@@ -1837,7 +1837,7 @@ export function formatToolsForPrompt(userInfo?: {
     : '';
 
   return `## Available Tools
-You can use these tools by responding with a JSON tool call. Format:
+You can use these tools by responding with JSON tool calls. Format:
 \`\`\`tool
 {"name": "tool_name", "arguments": {...}}
 \`\`\`
@@ -1859,7 +1859,23 @@ ${TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description}
 3. The system asks user for confirmation before executing. Just call the tool.
 4. **NEVER say "I've created" or "Done" without outputting a tool call block first**
 5. For emails: Signature is auto-added. Don't include one in the body.
-6. For calendar invites: Use ISO 8601 format for times (e.g., 2026-02-23T15:00:00).`;
+6. For calendar invites: Use ISO 8601 format for times (e.g., 2026-02-23T15:00:00).
+
+## MULTIPLE ACTIONS - IMPORTANT
+When the user asks for multiple things at once, output MULTIPLE tool calls in sequence:
+
+Example: "Email John, remind me at 5pm to call mom, and check my meetings tomorrow"
+\`\`\`tool
+{"name": "send_email", "arguments": {"to": "john@example.com", "subject": "...", "body": "..."}}
+\`\`\`
+\`\`\`tool
+{"name": "create_reminder", "arguments": {"content": "Call mom", "time": "5pm today"}}
+\`\`\`
+\`\`\`tool
+{"name": "google_get_events", "arguments": {"date": "tomorrow"}}
+\`\`\`
+
+Always handle ALL requests in a single response. Don't ask which one to do first - do them all.`;
 }
 
 /**
@@ -1911,4 +1927,98 @@ export function removeToolCallsFromResponse(response: string): string {
     .replace(/```tool\s*\n?[\s\S]*?```/g, '')
     .replace(/\{"name":\s*"\w+",\s*"arguments":\s*\{[^}]+\}\}/g, '')
     .trim();
+}
+
+/**
+ * Categorize tools for dependency ordering
+ * - Query tools (read-only) should execute first
+ * - Action tools (write) execute after queries
+ */
+const QUERY_TOOLS = new Set([
+  'google_get_events',
+  'google_search_events',
+  'google_find_free_time',
+  'gmail_get_recent',
+  'gmail_search',
+  'gmail_read',
+  'gmail_unread_count',
+  'gmail_summarize',
+  'gmail_find_replies',
+  'tasks_get_pending',
+  'list_reminders',
+  'search_contacts',
+  'get_contact',
+  'list_contacts',
+  'list_venues',
+  'web_search',
+]);
+
+const ACTION_TOOLS = new Set([
+  'send_email',
+  'send_whatsapp',
+  'google_create_event',
+  'google_update_event',
+  'gmail_send',
+  'tasks_create',
+  'create_reminder',
+  'cancel_reminder',
+  'add_contact',
+  'add_venue',
+  'log_interaction',
+]);
+
+/**
+ * Order tool calls for optimal execution
+ * 1. Query tools first (can run in parallel)
+ * 2. Action tools second (may depend on query results)
+ */
+export function orderToolCalls(toolCalls: ToolCall[]): {
+  queries: ToolCall[];
+  actions: ToolCall[];
+  other: ToolCall[];
+} {
+  const queries: ToolCall[] = [];
+  const actions: ToolCall[] = [];
+  const other: ToolCall[] = [];
+
+  for (const tc of toolCalls) {
+    if (QUERY_TOOLS.has(tc.name)) {
+      queries.push(tc);
+    } else if (ACTION_TOOLS.has(tc.name)) {
+      actions.push(tc);
+    } else {
+      other.push(tc);
+    }
+  }
+
+  return { queries, actions, other };
+}
+
+/**
+ * Check if any action tools might depend on query tool results
+ * This is a heuristic - we assume email/whatsapp with dynamic content
+ * might reference calendar/task data
+ */
+export function hasLikelyDependencies(toolCalls: ToolCall[]): boolean {
+  const { queries, actions } = orderToolCalls(toolCalls);
+
+  if (queries.length === 0 || actions.length === 0) {
+    return false;
+  }
+
+  // If there are both query and action tools, there might be dependencies
+  // Check for common patterns:
+  // - Calendar query + email (sending schedule)
+  // - Task query + email (sending task list)
+  const hasCalendarQuery = queries.some(q =>
+    q.name.startsWith('google_') || q.name.includes('event')
+  );
+  const hasTaskQuery = queries.some(q =>
+    q.name.includes('task') || q.name.includes('reminder')
+  );
+  const hasEmailAction = actions.some(a =>
+    a.name.includes('email') || a.name === 'send_whatsapp'
+  );
+
+  return (hasCalendarQuery || hasTaskQuery) && hasEmailAction;
 }
