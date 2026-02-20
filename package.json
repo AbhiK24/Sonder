@@ -40,6 +40,9 @@
     "type": "git",
     "url": "https://github.com/AbhiK24/Sonder.git"
   },
+  "dependencies": {
+    "tsx": "^4.7.0"
+  },
   "devDependencies": {
     "@types/node": "^20.11.0",
     "typescript": "^5.3.3",

@@ -53,9 +53,9 @@ COPY . .
 # -----------------------------------------------------------------------------
 FROM node:20-alpine AS production
 
-# Install pnpm, PM2, and tsx for runtime TypeScript execution
+# Install pnpm and PM2 for process management
 RUN corepack enable && corepack prepare pnpm@8.14.0 --activate
-RUN npm install -g pm2 tsx
+RUN npm install -g pm2
 
 # Create non-root user
 RUN addgroup -g 1001 -S sonder && \
