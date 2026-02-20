@@ -57,33 +57,27 @@ FROM node:20-alpine AS production
 RUN corepack enable && corepack prepare pnpm@8.14.0 --activate
 RUN npm install -g pm2
 
-# Create non-root user
-RUN addgroup -g 1001 -S sonder && \
-    adduser -S sonder -u 1001 -G sonder
-
 WORKDIR /app
 
 # Copy built files and dependencies
-COPY --from=builder --chown=sonder:sonder /app/package.json ./
-COPY --from=builder --chown=sonder:sonder /app/pnpm-workspace.yaml ./
-COPY --from=builder --chown=sonder:sonder /app/node_modules ./node_modules
-COPY --from=builder --chown=sonder:sonder /app/packages ./packages
+COPY --from=builder /app/package.json ./
+COPY --from=builder /app/pnpm-workspace.yaml ./
+COPY --from=builder /app/node_modules ./node_modules
+COPY --from=builder /app/packages ./packages
 
-# Copy PM2 ecosystem config
-COPY --chown=sonder:sonder ecosystem.config.cjs ./
+# Copy PM2 ecosystem config and entrypoint
+COPY ecosystem.config.cjs ./
+COPY docker-entrypoint.sh /usr/local/bin/
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 
-# Create data directory
-RUN mkdir -p /home/sonder/.sonder/saves && \
-    chown -R sonder:sonder /home/sonder/.sonder
+# Create data directories
+RUN mkdir -p /root/.sonder/saves /root/.sonder/reminders /root/.sonder/whatsapp-auth /root/.sonder/memory
 
 # Set environment
 ENV NODE_ENV=production
-ENV HOME=/home/sonder
-ENV SAVE_PATH=/home/sonder/.sonder/saves
-ENV SONDER_CONFIG_DIR=/home/sonder/.sonder
-
-# Switch to non-root user
-USER sonder
+ENV HOME=/root
+ENV SAVE_PATH=/root/.sonder/saves
+ENV SONDER_CONFIG_DIR=/root/.sonder
 
 # Expose dashboard port
 EXPOSE 3000
@@ -92,5 +86,5 @@ EXPOSE 3000
 HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD wget --no-verbose --tries=1 --spider http://localhost:3000/health || exit 1
 
-# Start with PM2
-CMD ["pm2-runtime", "ecosystem.config.cjs"]
+# Start with entrypoint
+ENTRYPOINT ["docker-entrypoint.sh"]
