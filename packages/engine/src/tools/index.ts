@@ -1609,6 +1609,7 @@ const toolExecutors: Record<string, ToolExecutor> = {
 // Helper to normalize phone numbers for comparison
 function normalizePhone(phone: string): string {
   return phone.replace(/[\s\-\(\)]/g, '').replace(/^\+/, '');
+}
 
 // Helper: Parse date strings
 function parseDate(dateStr: string, timezone?: string): Date {
