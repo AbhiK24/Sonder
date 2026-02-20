@@ -434,29 +434,66 @@ docker exec sonder ls -la /home/sonder/.sonder/saves
 
 ## Updating
 
+Sonder includes an auto-update script that handles everything.
+
+### Quick Update (All Platforms)
+
+```bash
+# Check for updates
+pnpm update:check
+
+# Update to latest version
+pnpm update
+```
+
+Or run directly:
+```bash
+./scripts/update.sh           # Update and restart
+./scripts/update.sh --check   # Check only
+./scripts/update.sh --force   # Force update
+```
+
+The update script will:
+1. Check for new commits
+2. Stash any local changes
+3. Stop running services
+4. Pull latest code
+5. Install dependencies
+6. Rebuild
+7. Restart services
+
 ### Railway
 
+Railway auto-deploys when you push:
 ```bash
-git push origin main  # Auto-deploys
+git push origin main
 ```
 
-### AWS/Manual
-
-```bash
-cd sonder
-git pull
-pnpm install
-pnpm build
-pm2 restart all
-```
+Or trigger manually in Railway Dashboard → Deployments → Redeploy.
 
 ### Docker
 
 ```bash
 docker-compose down
 git pull
-docker-compose build
+docker-compose build --no-cache
 docker-compose up -d
+```
+
+### Automatic Updates (Cron)
+
+To check for updates daily:
+```bash
+# Edit crontab
+crontab -e
+
+# Add (checks at 3am, notifies if update available)
+0 3 * * * cd /path/to/sonder && ./scripts/update.sh --check >> /var/log/sonder-update.log 2>&1
+```
+
+For automatic updates (use with caution):
+```bash
+0 3 * * * cd /path/to/sonder && ./scripts/update.sh >> /var/log/sonder-update.log 2>&1
 ```
 
 ---

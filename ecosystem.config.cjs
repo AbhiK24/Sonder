@@ -57,21 +57,24 @@ module.exports = {
     },
 
     // -------------------------------------------------------------------------
-    // Wanderer's Rest Bot (optional - uncomment to enable)
+    // Wanderer's Rest Bot
     // -------------------------------------------------------------------------
-    // {
-    //   name: 'wanderers-rest',
-    //   script: 'packages/engine/src/wanderers-rest-telegram-bot.ts',
-    //   interpreter: 'node',
-    //   interpreter_args: '--import tsx',
-    //   cwd: __dirname,
-    //   instances: 1,
-    //   autorestart: true,
-    //   watch: false,
-    //   max_memory_restart: '500M',
-    //   env: {
-    //     NODE_ENV: 'production',
-    //   },
-    // },
+    {
+      name: 'wanderers-rest',
+      script: 'packages/engine/src/wanderers-rest-telegram-bot.ts',
+      interpreter: 'node',
+      interpreter_args: '--import tsx',
+      cwd: __dirname,
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'production',
+      },
+      kill_timeout: 5000,
+      wait_ready: true,
+      listen_timeout: 10000,
+    },
   ],
 };

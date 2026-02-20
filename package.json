@@ -16,7 +16,12 @@
     "build": "pnpm -r build",
     "test": "pnpm -r test",
     "lint": "eslint packages/*/src/**/*.ts",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "update": "./scripts/update.sh",
+    "update:check": "./scripts/update.sh --check",
+    "start": "pm2 start ecosystem.config.cjs",
+    "stop": "pm2 stop all",
+    "logs": "pm2 logs"
   },
   "keywords": [
     "game-engine",
