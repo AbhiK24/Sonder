@@ -60,11 +60,19 @@ export type { Venue, VenueMatch } from './venues.js';
 export {
   ContactSkills,
   addContact,
+  addInteraction,
   getContacts,
+  getContactById,
   getContactsByCategory,
   findContact,
+  findAllMatches,
+  findContactWithDisambiguation,
   searchContacts,
   resolveContact,
+  recordCalendarEvent,
+  recordEmailSent,
+  getInteractionHistory,
+  getRecentInteractions,
   markContacted,
   getRecentContacts,
   extractEmails,
@@ -73,4 +81,4 @@ export {
   listContactsFormatted,
   getContactsSummary,
 } from './contacts.js';
-export type { Contact, ContactCategory, ContactMatch } from './contacts.js';
+export type { Contact, ContactCategory, ContactMatch, Interaction, InteractionType, DisambiguationResult } from './contacts.js';

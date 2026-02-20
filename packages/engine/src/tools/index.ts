@@ -25,12 +25,19 @@ import {
 import { resolveVenue, addVenue, listVenuesFormatted, Venue } from '../integrations/venues.js';
 import {
   addContact,
+  addInteraction,
   findContact,
+  findContactWithDisambiguation,
   searchContacts,
   resolveContact,
   listContactsFormatted,
   getContactsByCategory,
+  getContactById,
+  getInteractionHistory,
   markContacted,
+  recordEmailSent,
+  recordCalendarEvent,
+  formatContact,
   Contact,
   ContactCategory,
 } from '../integrations/contacts.js';
@@ -484,6 +491,31 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       required: ['query'],
     },
   },
+  {
+    name: 'get_contact_history',
+    description: 'Get full interaction history with a contact - all meetings, emails, venues where you met.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Contact name (use full name if ambiguous)' },
+      },
+      required: ['name'],
+    },
+  },
+  {
+    name: 'add_contact_note',
+    description: 'Add a note or interaction to a contact\'s history. Use when user mentions meeting someone, talking to someone, etc.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Contact name' },
+        note: { type: 'string', description: 'What happened - e.g. "Had coffee and discussed project timeline"' },
+        venue: { type: 'string', description: 'Where it happened (optional)' },
+        type: { type: 'string', description: 'Type of interaction', enum: ['meeting', 'call', 'note'] },
+      },
+      required: ['name', 'note'],
+    },
+  },
 ];
 
 // =============================================================================
@@ -499,22 +531,42 @@ const toolExecutors: Record<string, ToolExecutor> = {
       return { success: false, error: 'Email not configured. Ask user to set up RESEND_API_KEY.' };
     }
 
-    // Resolve contacts: names get looked up, emails pass through
-    const resolveRecipient = (r: string): string | null => {
+    // Resolve contacts with disambiguation support
+    const resolveRecipient = (r: string): { email: string | null; needsDisambiguation?: boolean; message?: string } => {
       const trimmed = r.trim();
-      if (trimmed.includes('@')) return trimmed;
+      if (trimmed.includes('@')) return { email: trimmed };
 
       // Try to resolve as contact name
       const resolved = resolveContact(trimmed);
-      if (resolved.resolved && resolved.email) {
-        return resolved.email;
+
+      // Check for disambiguation needed
+      if (resolved.needsDisambiguation && resolved.disambiguationMessage) {
+        return {
+          email: null,
+          needsDisambiguation: true,
+          message: resolved.disambiguationMessage,
+        };
       }
-      return null;  // Not found, will be filtered out
+
+      if (resolved.resolved && resolved.email) {
+        return { email: resolved.email };
+      }
+
+      return { email: null };
     };
 
+    // Check for disambiguation needs first
+    const toRecipients = to.split(/[,;]/).map(r => r.trim()).filter(Boolean);
+    for (const recipient of toRecipients) {
+      const result = resolveRecipient(recipient);
+      if (result.needsDisambiguation && result.message) {
+        return { success: false, error: result.message };
+      }
+    }
+
     // Parse and resolve recipients
-    const toList = to.split(/[,;]/).map(resolveRecipient).filter((e): e is string => e !== null);
-    const ccList = cc ? cc.split(/[,;]/).map(resolveRecipient).filter((e): e is string => e !== null) : [];
+    const toList = toRecipients.map(r => resolveRecipient(r).email).filter((e): e is string => e !== null);
+    const ccList = cc ? cc.split(/[,;]/).map(r => resolveRecipient(r.trim()).email).filter((e): e is string => e !== null) : [];
 
     if (toList.length === 0) {
       return { success: false, error: 'No valid email addresses provided' };
@@ -547,6 +599,14 @@ const toolExecutors: Record<string, ToolExecutor> = {
           userRequested: true,
           userConfirmed: true,
         });
+
+        // Record interaction in contacts
+        recordEmailSent({
+          toEmails: [...toList, ...ccList],
+          subject,
+          agentId: context.agentId,
+        });
+
         const ccMsg = ccList.length > 0 ? ` (CC: ${ccList.join(', ')})` : '';
         return { success: true, result: `Email sent to ${toList.join(', ')}${ccMsg}` };
       }
@@ -875,10 +935,12 @@ const toolExecutors: Record<string, ToolExecutor> = {
     // Try to resolve venue if location provided
     let resolvedLocation = location;
     let venueNote = '';
+    let resolvedVenue: { name: string; address: string } | undefined;
     if (location) {
       const resolved = resolveVenue(location);
       if (resolved.resolved && resolved.venue) {
         resolvedLocation = resolved.venue.address;
+        resolvedVenue = { name: resolved.venue.name, address: resolved.venue.address };
         venueNote = ` (resolved "${location}" to ${resolved.venue.name})`;
       }
     }
@@ -904,6 +966,19 @@ const toolExecutors: Record<string, ToolExecutor> = {
       success: true,
       userRequested: true,
     });
+
+    // Record interaction in contacts for each attendee
+    if (inviteeList.length > 0) {
+      recordCalendarEvent({
+        attendeeEmails: inviteeList,
+        eventTitle: title,
+        eventDate: start,
+        venue: resolvedVenue?.name,
+        venueAddress: resolvedLocation,
+        calendarEventId: result.data?.id,
+        agentId: context.agentId,
+      });
+    }
 
     return { success: true, result: result.message + venueNote };
   },
@@ -1209,18 +1284,20 @@ const toolExecutors: Record<string, ToolExecutor> = {
 
     const resolved = resolveContact(query);
 
-    if (resolved.resolved && resolved.contact) {
-      const contact = resolved.contact;
-      const info = [
-        contact.email ? `Email: ${contact.email}` : null,
-        contact.phone ? `Phone: ${contact.phone}` : null,
-        contact.company ? `Company: ${contact.company}` : null,
-        contact.relationship ? `Relationship: ${contact.relationship}` : null,
-      ].filter(Boolean).join('\n');
-
+    // Check if disambiguation is needed
+    if (resolved.needsDisambiguation && resolved.disambiguationMessage) {
       return {
         success: true,
-        result: `Found: **${contact.name}**${contact.nickname ? ` (${contact.nickname})` : ''}\nCategory: ${contact.category}\n${info}`,
+        result: resolved.disambiguationMessage,
+      };
+    }
+
+    if (resolved.resolved && resolved.contact) {
+      // Use formatContact with history
+      const formatted = formatContact(resolved.contact, true);
+      return {
+        success: true,
+        result: formatted,
       };
     }
 
@@ -1241,12 +1318,103 @@ const toolExecutors: Record<string, ToolExecutor> = {
 
     const formatted = contacts.slice(0, 10).map(c => {
       const info = [c.email, c.phone].filter(Boolean).join(', ');
-      return `• ${c.name} (${c.category})${info ? `: ${info}` : ''}`;
+      const interactions = c.interactionCount > 0 ? ` [${c.interactionCount} interactions]` : '';
+      return `• ${c.name} (${c.category})${info ? `: ${info}` : ''}${interactions}`;
     }).join('\n');
 
     return {
       success: true,
       result: `Found ${contacts.length} contact(s):\n${formatted}`,
+    };
+  },
+
+  async get_contact_history(args, context): Promise<ToolResult> {
+    const { name } = args as { name: string };
+
+    const result = findContactWithDisambiguation(name);
+
+    // Check for disambiguation
+    if (result.needsDisambiguation && result.message) {
+      return { success: true, result: result.message };
+    }
+
+    if (result.matches.length === 0) {
+      return { success: true, result: `No contact found for "${name}".` };
+    }
+
+    const contact = result.matches[0].contact;
+    const history = getInteractionHistory(contact.id, 20);
+
+    if (history.length === 0) {
+      return {
+        success: true,
+        result: `**${contact.name}**\nNo recorded interactions yet. I'll start tracking as you communicate with them.`,
+      };
+    }
+
+    const formatted = history.map(i => {
+      const date = i.date.toLocaleDateString();
+      const venue = i.venue ? ` @ ${i.venue}` : '';
+      return `• ${date} (${i.type}): ${i.summary}${venue}`;
+    }).join('\n');
+
+    const venues = contact.frequentVenues?.length
+      ? `\nUsually meet at: ${contact.frequentVenues.join(', ')}`
+      : '';
+
+    return {
+      success: true,
+      result: `**${contact.name}** - ${contact.interactionCount} interactions\nFirst contact: ${contact.firstInteraction?.toLocaleDateString() || 'Unknown'}\nLast contact: ${contact.lastInteraction?.toLocaleDateString() || 'Unknown'}${venues}\n\nHistory:\n${formatted}`,
+    };
+  },
+
+  async add_contact_note(args, context): Promise<ToolResult> {
+    const { name, note, venue, type = 'note' } = args as {
+      name: string;
+      note: string;
+      venue?: string;
+      type?: 'meeting' | 'call' | 'note';
+    };
+
+    const result = findContactWithDisambiguation(name);
+
+    // Check for disambiguation
+    if (result.needsDisambiguation && result.message) {
+      return { success: true, result: result.message };
+    }
+
+    if (result.matches.length === 0) {
+      return {
+        success: false,
+        error: `No contact found for "${name}". Save them first with save_contact.`,
+      };
+    }
+
+    const contact = result.matches[0].contact;
+
+    // Resolve venue if provided
+    let resolvedVenue = venue;
+    if (venue) {
+      const venueResult = resolveVenue(venue);
+      if (venueResult.resolved && venueResult.venue) {
+        resolvedVenue = venueResult.venue.name;
+      }
+    }
+
+    const interaction = addInteraction(contact.id, {
+      type: type as any,
+      summary: note,
+      venue: resolvedVenue,
+      agentId: context.agentId,
+    });
+
+    if (!interaction) {
+      return { success: false, error: 'Failed to add interaction.' };
+    }
+
+    return {
+      success: true,
+      result: `Noted for ${contact.name}: "${note}"${resolvedVenue ? ` @ ${resolvedVenue}` : ''}`,
     };
   },
 };
