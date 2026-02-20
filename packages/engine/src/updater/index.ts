@@ -27,8 +27,8 @@ const PACKAGE_JSON = resolve(ROOT_DIR, 'package.json');
 const GITHUB_REPO = 'AbhiK24/Sonder';
 const GITHUB_API = `https://api.github.com/repos/${GITHUB_REPO}`;
 
-// Check every 6 hours by default
-const DEFAULT_CHECK_INTERVAL = 6 * 60 * 60 * 1000;
+// Check every 24 hours by default
+const DEFAULT_CHECK_INTERVAL = 24 * 60 * 60 * 1000;
 
 // =============================================================================
 // Types

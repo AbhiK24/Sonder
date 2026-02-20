@@ -1302,7 +1302,7 @@ async function main() {
 
       // Start auto-updater (checks every 6 hours)
       startUpdateChecker({
-        checkInterval: 6 * 60 * 60 * 1000, // 6 hours
+        checkInterval: 24 * 60 * 60 * 1000, // 24 hours
         autoUpdate: false, // Notify only, don't auto-update
         onUpdateAvailable: async (info) => {
           console.log(`[Updater] New version available: v${info.latestVersion}`);

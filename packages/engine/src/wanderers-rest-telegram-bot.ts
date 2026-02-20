@@ -720,7 +720,7 @@ async function main() {
 
       // Start auto-updater (checks every 6 hours)
       startUpdateChecker({
-        checkInterval: 6 * 60 * 60 * 1000,
+        checkInterval: 24 * 60 * 60 * 1000, // 24 hours
         autoUpdate: false,
         onUpdateAvailable: async (info) => {
           console.log(`[Updater] New version available: v${info.latestVersion}`);
