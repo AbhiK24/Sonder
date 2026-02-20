@@ -19,6 +19,7 @@ import {
   readEmail,
   getUnreadCount,
   summarizeEmails,
+  sendGmailEmail,
   getPendingTasks,
   createTask as createGoogleTask,
 } from '../integrations/index.js';
@@ -527,8 +528,12 @@ const toolExecutors: Record<string, ToolExecutor> = {
   async send_email(args, context): Promise<ToolResult> {
     const { to, cc, subject, body } = args as { to: string; cc?: string; subject: string; body: string };
 
-    if (!context.emailAdapter) {
-      return { success: false, error: 'Email not configured. Ask user to set up RESEND_API_KEY.' };
+    // Check if we have any way to send email
+    const google = getGoogleOAuth();
+    const canUseGmail = google?.isAuthenticated();
+
+    if (!canUseGmail && !context.emailAdapter) {
+      return { success: false, error: 'Email not configured. Connect Google or set up Resend.' };
     }
 
     // Resolve contacts with disambiguation support
@@ -573,17 +578,55 @@ const toolExecutors: Record<string, ToolExecutor> = {
     }
 
     try {
-      // Build from address using user's name (not agent name!)
-      const domain = context.emailDomain || 'resend.dev';
       const userName = context.userName || 'User';
+      let sentVia = '';
+
+      // Prefer Gmail (sends from user's actual email address)
+      if (canUseGmail) {
+        const result = await sendGmailEmail({
+          to: [...toList, ...ccList],
+          subject,
+          body: body,  // Gmail sends from their email, no need for special signature
+        });
+
+        if (result.success) {
+          sentVia = 'Gmail';
+          actionLog.emailSent({
+            userId: context.userId,
+            agent: context.agentName,
+            to: toList,
+            subject,
+            messageId: result.data?.messageId,
+            userRequested: true,
+            userConfirmed: true,
+          });
+
+          // Record interaction in contacts
+          recordEmailSent({
+            toEmails: [...toList, ...ccList],
+            subject,
+            agentId: context.agentId,
+          });
+
+          const ccMsg = ccList.length > 0 ? ` (CC: ${ccList.join(', ')})` : '';
+          return { success: true, result: `Email sent via Gmail to ${toList.join(', ')}${ccMsg}` };
+        }
+        // Gmail failed, try Resend as fallback
+        if (!context.emailAdapter) {
+          return { success: false, error: result.error || 'Gmail send failed' };
+        }
+      }
+
+      // Fallback to Resend
+      const domain = context.emailDomain || 'resend.dev';
       const fromAddress = domain !== 'resend.dev'
         ? `${userName} via Sonder <sonder@${domain}>`
         : `${userName} via Sonder <onboarding@resend.dev>`;
 
-      // Add signature to body
+      // Add signature for Resend (since it's not from their email)
       const signedBody = `${body}\n\n—\n${userName} via Sonder`;
 
-      const result = await context.emailAdapter.sendEmail({
+      const result = await context.emailAdapter!.sendEmail({
         from: fromAddress,
         to: toList,
         cc: ccList.length > 0 ? ccList : undefined,

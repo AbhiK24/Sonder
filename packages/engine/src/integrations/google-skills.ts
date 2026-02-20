@@ -500,6 +500,45 @@ export async function summarizeEmails(options: {
   }
 }
 
+/**
+ * Send an email via Gmail (from user's actual Gmail address)
+ */
+export async function sendGmailEmail(options: {
+  to: string | string[];
+  subject: string;
+  body: string;
+  html?: boolean;
+}): Promise<SkillResult<{ messageId: string }>> {
+  const { to, subject, body, html = false } = options;
+
+  const google = getGoogleOAuth();
+  if (!google?.isAuthenticated()) {
+    return { success: false, error: 'Google not connected. Cannot send via Gmail.' };
+  }
+
+  try {
+    const result = await google.gmail.sendMessage({
+      to: Array.isArray(to) ? to : [to],
+      subject,
+      body,
+      html,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.error || 'Failed to send email' };
+    }
+
+    const recipients = Array.isArray(to) ? to.join(', ') : to;
+    return {
+      success: true,
+      data: { messageId: result.messageId! },
+      message: `Email sent to ${recipients}`,
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to send email' };
+  }
+}
+
 // =============================================================================
 // Tasks Skills
 // =============================================================================
@@ -611,6 +650,7 @@ export const GoogleSkills = {
   readEmail,
   getUnreadCount,
   summarizeEmails,
+  sendGmailEmail,
 
   // Tasks
   getPendingTasks,
