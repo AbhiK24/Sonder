@@ -176,14 +176,14 @@ const PLAYS = [
   {
     id: 'chorus',
     name: 'Chorus',
-    tagline: 'Your productivity ensemble',
-    description: 'Five AI companions help you think, plan, do, and grow. Each with distinct personality and purpose.',
+    tagline: 'Five voices harmonizing to support your ADHD brain',
+    description: 'Your external working memory, momentum spark, strategic guide, celebration partner, and emotional mirror - all working together.',
     agents: [
-      { id: 'kai', name: 'Kai', emoji: '🎯', role: 'The Anchor', bio: 'Grounds you when overwhelmed. Calm, steady presence.' },
-      { id: 'nova', name: 'Nova', emoji: '✨', role: 'The Spark', bio: 'Ignites momentum. Celebrates wins, nudges forward.' },
-      { id: 'sage', name: 'Sage', emoji: '🌿', role: 'The Mirror', bio: 'Reflects patterns back. Asks the hard questions.' },
-      { id: 'echo', name: 'Echo', emoji: '🔮', role: 'The Keeper', bio: 'Remembers everything. Connects past to present.' },
-      { id: 'arc', name: 'Arc', emoji: '🌈', role: 'The Bridge', bio: 'Sees the big picture. Weaves threads together.' },
+      { id: 'luna', name: 'Luna', emoji: '🌙', role: 'The Keeper', bio: 'Remembers everything so you don\'t have to. Your external working memory.' },
+      { id: 'ember', name: 'Ember', emoji: '🔥', role: 'The Spark', bio: 'Gets you moving when you\'re stuck. Momentum over perfection.' },
+      { id: 'sage', name: 'Sage', emoji: '🌿', role: 'The Guide', bio: 'Helps you prioritize and see the path forward. Strategic thinking.' },
+      { id: 'joy', name: 'Joy', emoji: '✨', role: 'The Light', bio: 'Celebrates your wins, big and small. Finds the bright side.' },
+      { id: 'echo', name: 'Echo', emoji: '🪞', role: 'The Mirror', bio: 'Reflects your feelings back. Validates without judgment.' },
     ],
   },
 ];
