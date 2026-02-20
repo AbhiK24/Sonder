@@ -469,6 +469,7 @@ IMPORTANT: You have real-time web search built in. When asked about current even
         toolForge: {
           buildTool: (request) => toolForge.buildTool(request),
           testTool: (tool) => toolForge.testTool(tool),
+          improveTool: (tool, testResults) => toolForge.improveTool(tool, testResults),
           activateTool: (userId, toolName) => toolForge.activateTool(userId, toolName),
           disableTool: (userId, toolName) => toolForge.disableTool(userId, toolName),
           submitTool: (userId, toolName) => toolForge.submitTool(userId, toolName),

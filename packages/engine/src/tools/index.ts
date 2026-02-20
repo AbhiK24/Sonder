@@ -127,8 +127,9 @@ export interface ToolContext {
   llmFn?: (prompt: string) => Promise<string>;
   // Tool Forge for self-extending capabilities
   toolForge?: {
-    buildTool: (request: { userId: string; name: string; description: string; requirements: string; agentId?: string }) => Promise<{ success: boolean; tool?: any; error?: string }>;
+    buildTool: (request: { userId: string; name: string; description: string; requirements: string; agentId?: string }) => Promise<{ success: boolean; tool?: any; error?: string; logs?: string[] }>;
     testTool: (tool: any) => Promise<{ passed: boolean; output: string }[]>;
+    improveTool: (tool: any, testResults: { passed: boolean; output: string }[]) => Promise<{ success: boolean; tool?: any; error?: string }>;
     activateTool: (userId: string, toolName: string) => Promise<boolean>;
     disableTool: (userId: string, toolName: string) => Promise<boolean>;
     submitTool: (userId: string, toolName: string) => Promise<boolean>;
@@ -1845,8 +1846,10 @@ export const toolExecutors: Record<string, ToolExecutor> = {
       };
     }
 
+    const MAX_RETRIES = 2;
+
     try {
-      const result = await context.toolForge.buildTool({
+      let result = await context.toolForge.buildTool({
         userId: context.userId,
         name,
         description,
@@ -1858,25 +1861,41 @@ export const toolExecutors: Record<string, ToolExecutor> = {
         return { success: false, error: result.error || 'Failed to build tool' };
       }
 
-      // Test the tool
-      const testResults = await context.toolForge.testTool(result.tool);
-      const allPassed = testResults.every(t => t.passed);
+      let tool = result.tool;
 
-      if (allPassed) {
-        // Activate the tool
-        await context.toolForge.activateTool(context.userId, name);
+      // Test and retry loop
+      for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+        const testResults = await context.toolForge.testTool(tool);
+        const allPassed = testResults.every(t => t.passed);
 
-        return {
-          success: true,
-          result: `✅ Tool \`${name}\` built and activated!\n\nYou can now use it in our conversations.`,
-        };
-      } else {
+        if (allPassed) {
+          // Activate the tool
+          await context.toolForge.activateTool(context.userId, name);
+
+          return {
+            success: true,
+            result: `✅ Tool \`${name}\` built and activated!\n\nYou can now use it in our conversations.`,
+          };
+        }
+
+        // Tests failed - try to improve if we have retries left
+        if (attempt < MAX_RETRIES) {
+          const improveResult = await context.toolForge.improveTool(tool, testResults);
+          if (improveResult.success && improveResult.tool) {
+            tool = improveResult.tool;
+            continue; // Retry with improved tool
+          }
+        }
+
+        // Final attempt failed
         const failures = testResults.filter(t => !t.passed);
         return {
           success: false,
-          error: `Tool built but tests failed:\n${failures.map(f => `- ${f.output}`).join('\n')}\n\nThe tool is saved but not activated. Try building again with more specific requirements.`,
+          error: `Tool built but tests failed after ${attempt + 1} attempt(s):\n${failures.map(f => `- ${f.output}`).join('\n')}\n\nThe tool is saved but not activated. Try building again with more specific requirements.`,
         };
       }
+
+      return { success: false, error: 'Tool build failed unexpectedly' };
     } catch (error) {
       return {
         success: false,
@@ -2214,7 +2233,26 @@ Example: "Email John, remind me at 5pm to call mom, and check my meetings tomorr
 {"name": "google_get_events", "arguments": {"date": "tomorrow"}}
 \`\`\`
 
-Always handle ALL requests in a single response. Don't ask which one to do first - do them all.`;
+Always handle ALL requests in a single response. Don't ask which one to do first - do them all.
+
+## MISSING CAPABILITIES - CRITICAL
+**NEVER HALLUCINATE OR MAKE UP RESULTS.** If user asks for something you cannot do with existing tools:
+
+1. **Be honest**: Tell user you don't have that capability yet
+2. **Offer to build**: You can create custom tools using \`build_tool\`!
+3. **Examples of things to build tools for**:
+   - YouTube video summarization (no existing tool for this!)
+   - Notion/Airtable search
+   - Spotify control
+   - Custom API integrations
+
+**WRONG** (hallucinating):
+User: "Summarize this YouTube video"
+Agent: "The video discusses..." ❌ (you can't access YouTube!)
+
+**RIGHT** (honest + offer to build):
+User: "Summarize this YouTube video"
+Agent: "I don't have YouTube access yet. Want me to build a youtube_summarizer tool? It would extract transcripts and create summaries." ✅`;
 }
 
 /**

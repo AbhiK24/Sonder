@@ -128,6 +128,13 @@ export class ToolForge {
   }
 
   /**
+   * Improve a tool based on test failures
+   */
+  async improveTool(tool: UserTool, testResults: TestResult[]): Promise<ToolBuildResult> {
+    return this.builder.improveTool(tool, testResults);
+  }
+
+  /**
    * Activate a tool (make it usable)
    */
   async activateTool(userId: string, toolName: string): Promise<boolean> {
