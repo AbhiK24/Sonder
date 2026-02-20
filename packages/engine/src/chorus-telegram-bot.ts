@@ -936,9 +936,12 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
   // COMMANDS - Check these FIRST, even during FTUE
   // ============================================================
 
-  // RESET always works
-  if (upper === 'RESET') {
+  // RESET and SKIP always work (even during FTUE)
+  if (upper === 'RESET' || upper === '/RESET') {
     return COMMANDS.RESET(chatId, state);
+  }
+  if (upper === 'SKIP' || upper === '/SKIP') {
+    return COMMANDS.SKIP(chatId, state);
   }
 
   // START command
