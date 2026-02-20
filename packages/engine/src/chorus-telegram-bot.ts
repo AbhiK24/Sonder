@@ -727,6 +727,16 @@ Or just talk to us. We're here. 💫`;
     return "Fresh start. We're here when you're ready. 💫";
   },
 
+  // Skip FTUE for returning users whose save got lost
+  async SKIP(chatId, state) {
+    state.inFTUE = false;
+    state.ftueRunner = undefined;
+    state.profile.ftueCompleted = true;
+    state.profile.ftueCompletedAt = new Date();
+    saveState(chatId);
+    return "✓ Onboarding skipped. You're all set! Just talk to me normally.";
+  },
+
   // Direct agent switches
   async LUNA(chatId, state) { return switchAgent(chatId, state, 'luna'); },
   async EMBER(chatId, state) { return switchAgent(chatId, state, 'ember'); },
