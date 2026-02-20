@@ -19,6 +19,7 @@ import {
   readEmail,
   getUnreadCount,
   summarizeEmails,
+  findEmailReplies,
   sendGmailEmail,
   getPendingTasks,
   createTask as createGoogleTask,
@@ -377,6 +378,18 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       properties: {
         count: { type: 'number', description: 'Number of emails to summarize (default 10)' },
         query: { type: 'string', description: 'Optional search filter' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'google_find_replies',
+    description: 'Find replies or follow-up emails in a thread. Use after sending an email to check for responses.',
+    parameters: {
+      type: 'object',
+      properties: {
+        subject: { type: 'string', description: 'Subject line to search for (will find the thread)' },
+        contactEmail: { type: 'string', description: 'Email address to search conversations with' },
       },
       required: [],
     },
@@ -1178,6 +1191,27 @@ const toolExecutors: Record<string, ToolExecutor> = {
 
     const { count = 10, query } = args as { count?: number; query?: string };
     const result = await summarizeEmails({ count, query });
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  async google_find_replies(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { subject, contactEmail } = args as { subject?: string; contactEmail?: string };
+
+    if (!subject && !contactEmail) {
+      return { success: false, error: 'Provide either a subject or contact email to search for replies.' };
+    }
+
+    const result = await findEmailReplies({ subject, contactEmail });
 
     if (!result.success) {
       return { success: false, error: result.error };

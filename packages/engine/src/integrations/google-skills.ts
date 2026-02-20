@@ -501,6 +501,52 @@ export async function summarizeEmails(options: {
 }
 
 /**
+ * Find replies/follow-ups to an email
+ */
+export async function findEmailReplies(options: {
+  subject?: string;
+  threadId?: string;
+  contactEmail?: string;
+}): Promise<SkillResult<GmailMessage[]>> {
+  const { subject, threadId, contactEmail } = options;
+
+  const google = getGoogleOAuth();
+  if (!google?.isAuthenticated()) {
+    return { success: false, error: 'Google not connected' };
+  }
+
+  try {
+    const messages = await google.gmail.findReplies({
+      subject,
+      threadId,
+      to: contactEmail,
+    });
+
+    if (messages.length === 0) {
+      return { success: true, data: [], message: 'No replies found.' };
+    }
+
+    // Sort by date
+    messages.sort((a, b) => a.date.getTime() - b.date.getTime());
+
+    const summary = messages.map((m, i) => {
+      const from = m.from.split('<')[0].trim() || m.from;
+      const date = m.date.toLocaleDateString();
+      const prefix = i === 0 ? 'Original' : `Reply ${i}`;
+      return `${prefix} (${date}) - ${from}: "${m.snippet.slice(0, 50)}..."`;
+    }).join('\n');
+
+    return {
+      success: true,
+      data: messages,
+      message: `Found ${messages.length} message(s) in thread:\n${summary}`,
+    };
+  } catch (error) {
+    return { success: false, error: error instanceof Error ? error.message : 'Failed to find replies' };
+  }
+}
+
+/**
  * Send an email via Gmail (from user's actual Gmail address)
  */
 export async function sendGmailEmail(options: {
@@ -650,6 +696,7 @@ export const GoogleSkills = {
   readEmail,
   getUnreadCount,
   summarizeEmails,
+  findEmailReplies,
   sendGmailEmail,
 
   // Tasks

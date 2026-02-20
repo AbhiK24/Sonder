@@ -833,6 +833,56 @@ class GmailAPI {
     return { success: true, messageId: data.id };
   }
 
+  /**
+   * Get all messages in a thread (for finding replies)
+   */
+  async getThread(threadId: string): Promise<GmailMessage[]> {
+    const response = await this.oauth.fetch(
+      `${GOOGLE_GMAIL_API}/users/me/threads/${threadId}?format=full`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Gmail API error: ${response.status}`);
+    }
+
+    const data = await response.json() as any;
+    const messages = data.messages || [];
+
+    return messages.map((msg: any) => this.parseMessage(msg));
+  }
+
+  /**
+   * Find replies to an email by searching for the subject or thread
+   */
+  async findReplies(options: {
+    subject?: string;
+    threadId?: string;
+    to?: string;
+  }): Promise<GmailMessage[]> {
+    const { subject, threadId, to } = options;
+
+    // If we have threadId, get the whole thread
+    if (threadId) {
+      return this.getThread(threadId);
+    }
+
+    // Otherwise search by subject
+    if (subject) {
+      // Remove Re: Fwd: prefixes for better matching
+      const cleanSubject = subject.replace(/^(Re:|Fwd:|FW:)\s*/gi, '').trim();
+      const query = `subject:"${cleanSubject}"`;
+      return this.listMessages({ query, maxResults: 10 });
+    }
+
+    // Search by recipient
+    if (to) {
+      const query = `to:${to} OR from:${to}`;
+      return this.listMessages({ query, maxResults: 10 });
+    }
+
+    return [];
+  }
+
   private parseMessage(data: any): GmailMessage {
     const headers = data.payload?.headers || [];
     const getHeader = (name: string) => headers.find((h: any) => h.name === name)?.value || '';
