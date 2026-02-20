@@ -625,12 +625,15 @@ const toolExecutors: Record<string, ToolExecutor> = {
       let sentVia = '';
 
       // Prefer Gmail (sends from user's actual email address)
+      console.log(`[send_email] Gmail available: ${canUseGmail}`);
       if (canUseGmail) {
+        console.log(`[send_email] Trying Gmail...`);
         const result = await sendGmailEmail({
           to: [...toList, ...ccList],
           subject,
           body: body,  // Gmail sends from their email, no need for special signature
         });
+        console.log(`[send_email] Gmail result: ${result.success}, error: ${result.error || 'none'}`);
 
         if (result.success) {
           sentVia = 'Gmail';

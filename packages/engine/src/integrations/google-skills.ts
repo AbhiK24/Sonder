@@ -562,11 +562,13 @@ export async function sendGmailEmail(options: {
   const { to, subject, body, html = false } = options;
 
   const google = getGoogleOAuth();
+  console.log(`[sendGmailEmail] Google instance: ${!!google}, authenticated: ${google?.isAuthenticated()}`);
   if (!google?.isAuthenticated()) {
     return { success: false, error: 'Google not connected. Cannot send via Gmail.' };
   }
 
   try {
+    console.log(`[sendGmailEmail] Calling gmail.sendMessage...`);
     const result = await google.gmail.sendMessage({
       to: Array.isArray(to) ? to : [to],
       subject,
