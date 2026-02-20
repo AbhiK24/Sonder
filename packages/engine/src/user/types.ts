@@ -39,6 +39,7 @@ export interface UserContext {
 export interface UserProfile {
   id: string;
   name?: string;
+  email?: string;  // User's email (from Google OAuth or FTUE)
   timezone: string;
 
   // Goals - the core of proactive support
