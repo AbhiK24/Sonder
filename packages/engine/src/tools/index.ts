@@ -525,6 +525,24 @@ Examples:
     },
   },
   {
+    name: 'add_contact',
+    description: 'Add a new contact to your contacts list. Use when user mentions a person they want to remember.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Full name of the contact' },
+        email: { type: 'string', description: 'Email address (optional)' },
+        phone: { type: 'string', description: 'Phone number with country code (optional)' },
+        category: { type: 'string', description: 'Category: friend, family, business, or acquaintance' },
+        company: { type: 'string', description: 'Company or organization (optional)' },
+        role: { type: 'string', description: 'Job title or role (optional)' },
+        relationship: { type: 'string', description: 'How user knows them, e.g. "college friend", "client" (optional)' },
+        notes: { type: 'string', description: 'Any additional notes (optional)' },
+      },
+      required: ['name', 'category'],
+    },
+  },
+  {
     name: 'get_contact_history',
     description: 'Get full interaction history with a contact - all meetings, emails, venues where you met.',
     parameters: {
@@ -1504,6 +1522,43 @@ const toolExecutors: Record<string, ToolExecutor> = {
     return {
       success: true,
       result: `Found ${contacts.length} contact(s):\n${formatted}`,
+    };
+  },
+
+  async add_contact(args, context): Promise<ToolResult> {
+    const { name, email, phone, category, company, role, relationship, notes } = args as {
+      name: string;
+      email?: string;
+      phone?: string;
+      category: ContactCategory;
+      company?: string;
+      role?: string;
+      relationship?: string;
+      notes?: string;
+    };
+
+    const contact = addContact({
+      name,
+      email,
+      phone,
+      category: category || 'acquaintance',
+      company,
+      role,
+      relationship,
+      notes,
+    });
+
+    const details = [
+      email && `📧 ${email}`,
+      phone && `📱 ${phone}`,
+      company && `🏢 ${company}`,
+      role && `💼 ${role}`,
+      relationship && `🔗 ${relationship}`,
+    ].filter(Boolean).join('\n');
+
+    return {
+      success: true,
+      result: `✓ Added ${name} to ${category} contacts!\n${details}`,
     };
   },
 
