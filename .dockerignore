@@ -1,0 +1,51 @@
+# =============================================================================
+# Docker Ignore
+# =============================================================================
+# Files to exclude from Docker build context
+# =============================================================================
+
+# Git
+.git
+.gitignore
+
+# Dependencies (will be installed fresh)
+node_modules
+**/node_modules
+
+# Build outputs (will be rebuilt)
+dist
+**/dist
+
+# Development files
+.env
+.env.local
+.env.*.local
+*.log
+*.tmp
+
+# IDE
+.vscode
+.idea
+*.swp
+*.swo
+
+# macOS
+.DS_Store
+**/.DS_Store
+
+# Testing
+coverage
+.nyc_output
+
+# Documentation (not needed in container)
+*.md
+!DEPLOYMENT.md
+docs
+
+# Local development
+.sonder
+tmp
+
+# Misc
+*.tgz
+*.tar.gz

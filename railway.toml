@@ -1,0 +1,27 @@
+# =============================================================================
+# Railway Configuration
+# =============================================================================
+# Deploy Sonder to Railway with one click
+#
+# https://railway.app
+# =============================================================================
+
+[build]
+# Use Dockerfile for building
+builder = "dockerfile"
+dockerfilePath = "Dockerfile"
+
+[deploy]
+# Start command (PM2 manages all processes)
+startCommand = "pm2-runtime ecosystem.config.cjs"
+
+# Health check
+healthcheckPath = "/health"
+healthcheckTimeout = 30
+
+# Restart policy
+restartPolicyType = "on_failure"
+restartPolicyMaxRetries = 3
+
+# Resources (Railway Hobby plan)
+numReplicas = 1

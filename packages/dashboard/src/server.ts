@@ -198,6 +198,12 @@ app.use(express.json());
 app.use(express.static(publicDir));
 app.use('/assets', express.static(assetsDir));
 
+// --- Health Check ---
+
+app.get('/health', (req, res) => {
+  res.json({ status: 'ok', timestamp: new Date().toISOString() });
+});
+
 // --- Dashboard APIs ---
 
 app.get('/api/games', (req, res) => {

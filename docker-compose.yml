@@ -1,0 +1,71 @@
+# =============================================================================
+# Sonder - Docker Compose
+# =============================================================================
+# Local development and production deployment configuration
+#
+# Usage:
+#   docker-compose up -d          # Start all services
+#   docker-compose logs -f        # View logs
+#   docker-compose down           # Stop all services
+#
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------------------
+  # Main Sonder Application
+  # ---------------------------------------------------------------------------
+  sonder:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: sonder
+    restart: unless-stopped
+    env_file:
+      - .env
+    environment:
+      - NODE_ENV=production
+      - SAVE_PATH=/home/sonder/.sonder/saves
+      - SONDER_CONFIG_DIR=/home/sonder/.sonder
+    volumes:
+      # Persistent storage for saves and config
+      - sonder-data:/home/sonder/.sonder
+      # WhatsApp auth persistence (if using Baileys)
+      - whatsapp-auth:/home/sonder/.sonder/whatsapp-auth
+    ports:
+      - "3000:3000"
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+
+  # ---------------------------------------------------------------------------
+  # Ollama (Local LLM - Optional)
+  # ---------------------------------------------------------------------------
+  # Uncomment to run Ollama locally for free LLM inference
+  #
+  # ollama:
+  #   image: ollama/ollama:latest
+  #   container_name: ollama
+  #   restart: unless-stopped
+  #   volumes:
+  #     - ollama-models:/root/.ollama
+  #   ports:
+  #     - "11434:11434"
+  #   # GPU support (uncomment for NVIDIA)
+  #   # deploy:
+  #   #   resources:
+  #   #     reservations:
+  #   #       devices:
+  #   #         - driver: nvidia
+  #   #           count: 1
+  #   #           capabilities: [gpu]
+
+volumes:
+  sonder-data:
+    driver: local
+  whatsapp-auth:
+    driver: local
+  # ollama-models:
+  #   driver: local
