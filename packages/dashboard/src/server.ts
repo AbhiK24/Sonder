@@ -204,6 +204,49 @@ app.get('/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// --- Version & Updates ---
+
+const PACKAGE_JSON_PATH = resolve(rootDir, 'package.json');
+
+function getVersion(): string {
+  try {
+    const pkg = JSON.parse(readFileSync(PACKAGE_JSON_PATH, 'utf-8'));
+    return pkg.version || '0.0.0';
+  } catch {
+    return '0.0.0';
+  }
+}
+
+app.get('/api/version', async (req, res) => {
+  const currentVersion = getVersion();
+
+  // Check GitHub for latest
+  try {
+    const response = await fetch('https://api.github.com/repos/AbhiK24/Sonder/releases/latest', {
+      headers: { 'User-Agent': 'Sonder-Dashboard' },
+    });
+
+    if (response.ok) {
+      const data = await response.json() as any;
+      const latestVersion = data.tag_name?.replace(/^v/, '') || currentVersion;
+      const hasUpdate = latestVersion !== currentVersion;
+
+      res.json({
+        currentVersion,
+        latestVersion,
+        hasUpdate,
+        releaseUrl: data.html_url,
+        releaseNotes: data.body?.slice(0, 500),
+        publishedAt: data.published_at,
+      });
+    } else {
+      res.json({ currentVersion, latestVersion: currentVersion, hasUpdate: false });
+    }
+  } catch {
+    res.json({ currentVersion, latestVersion: currentVersion, hasUpdate: false });
+  }
+});
+
 // --- Dashboard APIs ---
 
 app.get('/api/games', (req, res) => {

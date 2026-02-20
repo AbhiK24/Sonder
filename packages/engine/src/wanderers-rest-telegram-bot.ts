@@ -22,6 +22,9 @@ import { Persistence } from './utils/persistence.js';
 import type { ModelConfig, LLMProvider } from './types/index.js';
 import { CaseGenerator, CaseGenerationManager, WANDERERS_REST_CONTEXT } from './case-generator.js';
 
+// Auto-updater
+import { startUpdateChecker, stopUpdateChecker, getCurrentVersion } from './updater/index.js';
+
 // Wanderer's Rest play imports
 import {
   npcs,
@@ -707,19 +710,30 @@ async function main() {
   console.log('✓ Bot starting...');
 
   bot.start({
-    onStart: (botInfo) => {
+    onStart: async (botInfo) => {
       console.log(`✓ @${botInfo.username} is running!`);
       console.log('');
       console.log('The tavern is open:');
       coreCast.forEach(n => console.log(`  ${n.emoji} ${n.name} - ${n.role}`));
       console.log('');
       console.log('Message the bot to enter the tavern.');
+
+      // Start auto-updater (checks every 6 hours)
+      startUpdateChecker({
+        checkInterval: 6 * 60 * 60 * 1000,
+        autoUpdate: false,
+        onUpdateAvailable: async (info) => {
+          console.log(`[Updater] New version available: v${info.latestVersion}`);
+        },
+      });
+      console.log(`[Updater] Watching for updates (v${getCurrentVersion()})`);
     },
   });
 
   // Graceful shutdown
   const shutdown = () => {
     console.log('\nClosing the tavern...');
+    stopUpdateChecker();
     bot.stop();
     process.exit(0);
   };

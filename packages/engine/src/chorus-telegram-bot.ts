@@ -32,6 +32,9 @@ import { createUserProfile } from './user/types.js';
 // Memory (local embeddings + vector store)
 import { createMemory, Memory } from './memory/index.js';
 
+// Auto-updater
+import { startUpdateChecker, stopUpdateChecker, getCurrentVersion } from './updater/index.js';
+
 // Action logging for transparency
 import { actionLog } from './action-log.js';
 
@@ -1296,12 +1299,38 @@ async function main() {
       } else {
         console.log('Waiting for first user to message the bot...');
       }
+
+      // Start auto-updater (checks every 6 hours)
+      startUpdateChecker({
+        checkInterval: 6 * 60 * 60 * 1000, // 6 hours
+        autoUpdate: false, // Notify only, don't auto-update
+        onUpdateAvailable: async (info) => {
+          console.log(`[Updater] New version available: v${info.latestVersion}`);
+          // Notify admin users (first user in saves)
+          const adminChats = persistence.listSaves().slice(0, 1);
+          for (const chatId of adminChats) {
+            try {
+              await bot.api.sendMessage(
+                chatId,
+                `🆕 *Sonder Update Available*\n\n` +
+                `Current: v${info.currentVersion}\n` +
+                `Latest: v${info.latestVersion}\n\n` +
+                `Run \`pnpm update\` to upgrade.\n` +
+                `[View Release](${info.releaseUrl})`,
+                { parse_mode: 'Markdown', link_preview_options: { is_disabled: true } }
+              );
+            } catch {}
+          }
+        },
+      });
+      console.log(`[Updater] Watching for updates (v${getCurrentVersion()})`);
     },
   });
 
   // Graceful shutdown
   const shutdown = () => {
     console.log('\nShutting down Chorus...');
+    stopUpdateChecker();
     idleEngine?.stop();
     insightEngine?.stop();
     bot.stop();

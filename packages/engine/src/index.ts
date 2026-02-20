@@ -38,5 +38,17 @@ export { TelegramBot } from './chat/telegram.js';
 // Puzzles
 export * from './puzzles/index.js';
 
+// Auto-updater
+export {
+  startUpdateChecker,
+  stopUpdateChecker,
+  checkForUpdates,
+  performUpdate,
+  getCurrentVersion,
+  getLastCheckResult,
+  forceCheck,
+} from './updater/index.js';
+export type { UpdateInfo, UpdaterConfig } from './updater/index.js';
+
 // Version
 export const VERSION = '0.1.0';
