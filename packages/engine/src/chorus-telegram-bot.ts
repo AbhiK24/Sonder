@@ -19,6 +19,7 @@ import { TodoistAdapter, createTaskAdapter } from './integrations/tasks.js';
 import { WhatsAppAdapter, createWhatsAppAdapter, UnifiedWhatsApp, createUnifiedWhatsApp } from './integrations/whatsapp.js';
 import { ICSFeedAdapter, createICSAdapter } from './integrations/calendar.js';
 import type { ICSFeedConfig } from './integrations/types.js';
+import { getGoogleOAuth } from './integrations/google-oauth.js';
 import { EngineContext, initEngineContext } from './context/index.js';
 import { Persistence } from './utils/persistence.js';
 import type { ModelConfig, LLMProvider } from './types/index.js';
@@ -197,6 +198,23 @@ function getState(chatId: number): UserState {
   }
 
   return userStates.get(chatId)!;
+}
+
+/**
+ * Capture user's email from Google OAuth if connected
+ */
+async function captureGoogleEmail(state: UserState): Promise<void> {
+  if (state.profile.email) return; // Already have it
+
+  const google = getGoogleOAuth();
+  if (google?.isAuthenticated()) {
+    const email = await google.getUserEmail();
+    if (email) {
+      state.profile.email = email;
+      state.userEmail = email;
+      console.log(`[${state.id}] Captured Google email: ${email}`);
+    }
+  }
 }
 
 function saveState(chatId: number): void {
@@ -1400,6 +1418,9 @@ async function main() {
       state.profile.name = telegramName;
       saveState(chatId);
     }
+
+    // Capture email from Google OAuth if connected
+    await captureGoogleEmail(state);
 
     console.log(`[${chatId}] ${text.slice(0, 50)}${text.length > 50 ? '...' : ''}`);
 
