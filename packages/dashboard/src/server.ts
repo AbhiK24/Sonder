@@ -744,11 +744,12 @@ app.get('/api/google/events', async (req, res) => {
 // Start Server
 // =============================================================================
 
-const PORT = parseInt(process.env.DASHBOARD_PORT || '3000');
+const PORT = parseInt(process.env.PORT || process.env.DASHBOARD_PORT || '3000');
+const HOST = process.env.HOST || '0.0.0.0';
 
-app.listen(PORT, () => {
+app.listen(PORT, HOST, () => {
   console.log(`\n🎭 Sonder Dashboard`);
-  console.log(`   http://localhost:${PORT}\n`);
+  console.log(`   http://${HOST}:${PORT}\n`);
   console.log(`   /            - Dashboard home`);
   console.log(`   /setup.html  - Setup wizard`);
   console.log(`   Sessions: ${listSavedChats().length}\n`);
