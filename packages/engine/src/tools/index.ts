@@ -6,6 +6,23 @@
  */
 
 import { actionLog } from '../action-log.js';
+import {
+  getGoogleOAuth,
+  getTodayEvents,
+  getUpcomingEvents,
+  createCalendarEvent,
+  updateCalendarEvent,
+  searchCalendarEvents,
+  findFreeTime,
+  getRecentEmails,
+  searchEmails,
+  readEmail,
+  getUnreadCount,
+  summarizeEmails,
+  getPendingTasks,
+  createTask as createGoogleTask,
+} from '../integrations/index.js';
+import { resolveVenue, addVenue, listVenuesFormatted, Venue } from '../integrations/venues.js';
 
 // Tool definitions for LLM
 export interface ToolDefinition {
@@ -206,6 +223,203 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
       type: 'object',
       properties: {},
       required: [],
+    },
+  },
+
+  // === Google Calendar ===
+  {
+    name: 'google_get_today_events',
+    description: "Get today's events from Google Calendar. Use when user asks about their schedule today.",
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'google_get_upcoming_events',
+    description: 'Get upcoming events from Google Calendar for the next N days.',
+    parameters: {
+      type: 'object',
+      properties: {
+        days: { type: 'number', description: 'Number of days to look ahead (default 7)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'google_create_event',
+    description: 'Create a new calendar event on Google Calendar. Can include invitees who will receive email invitations.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Event title' },
+        startTime: { type: 'string', description: 'Start time (ISO format or natural like "tomorrow 3pm")' },
+        durationMinutes: { type: 'number', description: 'Duration in minutes (default 60)' },
+        description: { type: 'string', description: 'Event description' },
+        location: { type: 'string', description: 'Event location' },
+        invitees: { type: 'string', description: 'Comma-separated email addresses to invite' },
+      },
+      required: ['title', 'startTime'],
+    },
+  },
+  {
+    name: 'google_find_free_time',
+    description: 'Find available time slots in the calendar for a given day.',
+    parameters: {
+      type: 'object',
+      properties: {
+        date: { type: 'string', description: 'Date to check (YYYY-MM-DD or "today", "tomorrow")' },
+        durationMinutes: { type: 'number', description: 'Minimum slot duration needed (default 60)' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'google_search_events',
+    description: 'Search for calendar events by title or keyword. Returns event IDs needed for updating.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search term (event title, description, etc.)' },
+        days: { type: 'number', description: 'Days to search ahead (default 30)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'google_update_event',
+    description: 'Update/edit an existing calendar event. First use google_search_events to find the event ID.',
+    parameters: {
+      type: 'object',
+      properties: {
+        eventId: { type: 'string', description: 'Event ID (from google_search_events)' },
+        title: { type: 'string', description: 'New title (optional)' },
+        startTime: { type: 'string', description: 'New start time (optional)' },
+        endTime: { type: 'string', description: 'New end time (optional)' },
+        location: { type: 'string', description: 'New location (optional)' },
+        description: { type: 'string', description: 'New description (optional)' },
+        addInvitees: { type: 'string', description: 'Additional invitees to add, comma-separated emails (optional)' },
+      },
+      required: ['eventId'],
+    },
+  },
+
+  // === Gmail ===
+  {
+    name: 'google_get_emails',
+    description: 'Get recent emails from Gmail. Can filter to unread only.',
+    parameters: {
+      type: 'object',
+      properties: {
+        count: { type: 'number', description: 'Number of emails to fetch (default 10)' },
+        unreadOnly: { type: 'boolean', description: 'Only get unread emails' },
+      },
+      required: [],
+    },
+  },
+  {
+    name: 'google_search_emails',
+    description: 'Search emails in Gmail. Use Gmail search syntax.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query (e.g., "from:john", "subject:meeting", "is:unread")' },
+        maxResults: { type: 'number', description: 'Max results (default 10)' },
+      },
+      required: ['query'],
+    },
+  },
+  {
+    name: 'google_read_email',
+    description: 'Read the full content of a specific email.',
+    parameters: {
+      type: 'object',
+      properties: {
+        messageId: { type: 'string', description: 'Email message ID' },
+      },
+      required: ['messageId'],
+    },
+  },
+  {
+    name: 'google_unread_count',
+    description: 'Get the count of unread emails.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'google_summarize_emails',
+    description: 'Get a summary of recent emails grouped by sender.',
+    parameters: {
+      type: 'object',
+      properties: {
+        count: { type: 'number', description: 'Number of emails to summarize (default 10)' },
+        query: { type: 'string', description: 'Optional search filter' },
+      },
+      required: [],
+    },
+  },
+
+  // === Google Tasks ===
+  {
+    name: 'google_get_tasks',
+    description: 'Get pending tasks from Google Tasks.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'google_create_task',
+    description: 'Create a new task in Google Tasks.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Task title' },
+        notes: { type: 'string', description: 'Task notes/description' },
+        dueDate: { type: 'string', description: 'Due date (YYYY-MM-DD)' },
+      },
+      required: ['title'],
+    },
+  },
+
+  // === Venues ===
+  {
+    name: 'save_venue',
+    description: 'Save a frequently used venue/location for quick reference. Use when user mentions a place they often go to.',
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Full venue name (e.g., "Bloom Hotel Jayanagar")' },
+        shortName: { type: 'string', description: 'Short alias (e.g., "Bloom")' },
+        address: { type: 'string', description: 'Full address' },
+        type: { type: 'string', description: 'Type: cafe, restaurant, office, hotel, coworking, home, other' },
+      },
+      required: ['name', 'address'],
+    },
+  },
+  {
+    name: 'list_venues',
+    description: 'List all saved venues the user frequently visits.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'lookup_venue',
+    description: 'Look up a venue by name to get its full address. Use before creating calendar events to resolve location.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Venue name or partial name to search' },
+      },
+      required: ['query'],
     },
   },
 ];
@@ -530,6 +744,345 @@ const toolExecutors: Record<string, ToolExecutor> = {
     });
     return { success: true, result: `${formatted} (${tz})` };
   },
+
+  // === Google Calendar ===
+  async google_get_today_events(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const result = await getTodayEvents();
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  async google_get_upcoming_events(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { days = 7 } = args as { days?: number };
+    const result = await getUpcomingEvents({ days });
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  async google_create_event(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { title, startTime, durationMinutes = 60, description, location, invitees } = args as {
+      title: string;
+      startTime: string;
+      durationMinutes?: number;
+      description?: string;
+      location?: string;
+      invitees?: string;
+    };
+
+    // Parse start time
+    const start = parseDateTime(startTime, context.timezone);
+
+    // Parse invitees
+    const inviteeList = invitees ? invitees.split(',').map(e => e.trim()).filter(e => e.includes('@')) : [];
+
+    // Try to resolve venue if location provided
+    let resolvedLocation = location;
+    let venueNote = '';
+    if (location) {
+      const resolved = resolveVenue(location);
+      if (resolved.resolved && resolved.venue) {
+        resolvedLocation = resolved.venue.address;
+        venueNote = ` (resolved "${location}" to ${resolved.venue.name})`;
+      }
+    }
+
+    const result = await createCalendarEvent({
+      title,
+      startTime: start,
+      durationMinutes,
+      description,
+      location: resolvedLocation,
+      invitees: inviteeList,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    actionLog.log({
+      userId: context.userId,
+      action: 'event_created',
+      agent: context.agentName,
+      details: { title, startTime: start.toISOString(), invitees: inviteeList, location: resolvedLocation },
+      success: true,
+      userRequested: true,
+    });
+
+    return { success: true, result: result.message + venueNote };
+  },
+
+  async google_find_free_time(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { date, durationMinutes = 60 } = args as { date?: string; durationMinutes?: number };
+
+    const targetDate = date ? parseDate(date, context.timezone) : new Date();
+    const result = await findFreeTime({ date: targetDate, durationMinutes });
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  async google_search_events(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { query, days = 30 } = args as { query: string; days?: number };
+    const result = await searchCalendarEvents({ query, days });
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  async google_update_event(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { eventId, title, startTime, endTime, location, description, addInvitees } = args as {
+      eventId: string;
+      title?: string;
+      startTime?: string;
+      endTime?: string;
+      location?: string;
+      description?: string;
+      addInvitees?: string;
+    };
+
+    const inviteeList = addInvitees ? addInvitees.split(',').map(e => e.trim()).filter(e => e.includes('@')) : undefined;
+
+    const result = await updateCalendarEvent({
+      eventId,
+      title,
+      startTime: startTime ? parseDateTime(startTime, context.timezone) : undefined,
+      endTime: endTime ? parseDateTime(endTime, context.timezone) : undefined,
+      location,
+      description,
+      addInvitees: inviteeList,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    actionLog.log({
+      userId: context.userId,
+      action: 'event_created',  // Using existing action type
+      agent: context.agentName,
+      details: { eventId, title, location, addInvitees: inviteeList, action: 'update' },
+      success: true,
+      userRequested: true,
+    });
+
+    return { success: true, result: result.message };
+  },
+
+  // === Gmail ===
+  async google_get_emails(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { count = 10, unreadOnly = false } = args as { count?: number; unreadOnly?: boolean };
+    const result = await getRecentEmails({ count, unreadOnly });
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  async google_search_emails(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { query, maxResults = 10 } = args as { query: string; maxResults?: number };
+    const result = await searchEmails(query, maxResults);
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  async google_read_email(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { messageId } = args as { messageId: string };
+    const result = await readEmail(messageId);
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  async google_unread_count(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const result = await getUnreadCount();
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  async google_summarize_emails(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { count = 10, query } = args as { count?: number; query?: string };
+    const result = await summarizeEmails({ count, query });
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  // === Google Tasks ===
+  async google_get_tasks(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const result = await getPendingTasks();
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    return { success: true, result: result.message };
+  },
+
+  async google_create_task(args, context): Promise<ToolResult> {
+    const google = getGoogleOAuth();
+    if (!google?.isAuthenticated()) {
+      return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
+    }
+
+    const { title, notes, dueDate } = args as { title: string; notes?: string; dueDate?: string };
+
+    const result = await createGoogleTask({
+      title,
+      notes,
+      dueDate: dueDate ? parseDate(dueDate, context.timezone) : undefined,
+    });
+
+    if (!result.success) {
+      return { success: false, error: result.error };
+    }
+
+    actionLog.log({
+      userId: context.userId,
+      action: 'task_created',
+      agent: context.agentName,
+      details: { title, notes, dueDate, source: 'google_tasks' },
+      success: true,
+      userRequested: true,
+    });
+
+    return { success: true, result: result.message };
+  },
+
+  // === Venues ===
+  async save_venue(args, context): Promise<ToolResult> {
+    const { name, shortName, address, type } = args as {
+      name: string;
+      shortName?: string;
+      address: string;
+      type?: string;
+    };
+
+    try {
+      addVenue({
+        name,
+        shortName,
+        address,
+        type: type as Venue['type'],
+      });
+
+      const alias = shortName ? ` (alias: "${shortName}")` : '';
+      return { success: true, result: `Saved venue "${name}"${alias} at ${address}. I'll remember this for future events.` };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to save venue' };
+    }
+  },
+
+  async list_venues(args, context): Promise<ToolResult> {
+    const result = listVenuesFormatted();
+    return { success: true, result };
+  },
+
+  async lookup_venue(args, context): Promise<ToolResult> {
+    const { query } = args as { query: string };
+
+    const resolved = resolveVenue(query);
+
+    if (resolved.resolved && resolved.venue) {
+      return {
+        success: true,
+        result: `Found: "${resolved.venue.name}" at ${resolved.venue.address}`,
+      };
+    }
+
+    return {
+      success: true,
+      result: `No saved venue found for "${query}". Using as-is. Consider saving it with save_venue if it's a frequent location.`,
+    };
+  },
 };
 
 // Helper: Parse date strings
@@ -549,6 +1102,47 @@ function parseDate(dateStr: string, timezone?: string): Date {
   if (!isNaN(parsed.getTime())) return parsed;
 
   return now;
+}
+
+// Helper: Parse datetime strings (more flexible)
+function parseDateTime(dateTimeStr: string, timezone?: string): Date {
+  const lower = dateTimeStr.toLowerCase();
+  const now = new Date();
+
+  // Handle "tomorrow 3pm", "today at 2:30pm", etc.
+  const tomorrowMatch = lower.match(/tomorrow\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (tomorrowMatch) {
+    const d = new Date(now);
+    d.setDate(d.getDate() + 1);
+    let hour = parseInt(tomorrowMatch[1]);
+    const minute = tomorrowMatch[2] ? parseInt(tomorrowMatch[2]) : 0;
+    const ampm = tomorrowMatch[3]?.toLowerCase();
+    if (ampm === 'pm' && hour < 12) hour += 12;
+    if (ampm === 'am' && hour === 12) hour = 0;
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  }
+
+  const todayMatch = lower.match(/today\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
+  if (todayMatch) {
+    const d = new Date(now);
+    let hour = parseInt(todayMatch[1]);
+    const minute = todayMatch[2] ? parseInt(todayMatch[2]) : 0;
+    const ampm = todayMatch[3]?.toLowerCase();
+    if (ampm === 'pm' && hour < 12) hour += 12;
+    if (ampm === 'am' && hour === 12) hour = 0;
+    d.setHours(hour, minute, 0, 0);
+    return d;
+  }
+
+  // Try ISO format
+  const parsed = new Date(dateTimeStr);
+  if (!isNaN(parsed.getTime())) return parsed;
+
+  // Fallback: use current time + 1 hour
+  const fallback = new Date(now);
+  fallback.setHours(fallback.getHours() + 1, 0, 0, 0);
+  return fallback;
 }
 
 // =============================================================================

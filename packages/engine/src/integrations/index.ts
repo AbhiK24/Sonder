@@ -47,3 +47,11 @@ export type {
   GmailMessage,
   GoogleTask,
 } from './google-oauth.js';
+
+// Google Skills (high-level agent actions)
+export { GoogleSkills, default as googleSkills } from './google-skills.js';
+export * from './google-skills.js';
+
+// Venues
+export { VenueSkills, resolveVenue, addVenue, findVenue, getVenues, listVenuesFormatted } from './venues.js';
+export type { Venue, VenueMatch } from './venues.js';

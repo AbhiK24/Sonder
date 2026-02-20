@@ -15,9 +15,9 @@
  *   const events = await google.calendar.listEvents();
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, unlinkSync } from 'fs';
 import { resolve, dirname } from 'path';
-import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
+import { createCipheriv, createDecipheriv, randomBytes, createHash } from 'crypto';
 
 // =============================================================================
 // Types
@@ -104,7 +104,7 @@ const SCOPES = [
 
 function getEncryptionKey(secret: string): Buffer {
   // Derive a 32-byte key from the secret
-  const hash = require('crypto').createHash('sha256');
+  const hash = createHash('sha256');
   hash.update(secret);
   return hash.digest();
 }
@@ -202,8 +202,8 @@ export class GoogleOAuth {
       });
 
       if (!response.ok) {
-        const error = await response.json();
-        return { success: false, error: error.error_description || 'Token exchange failed' };
+        const errorData = await response.json() as any;
+        return { success: false, error: errorData.error_description || 'Token exchange failed' };
       }
 
       const data = await response.json() as any;
@@ -220,7 +220,7 @@ export class GoogleOAuth {
       // Get user email
       const email = await this.getUserEmail();
 
-      return { success: true, email };
+      return { success: true, email: email || undefined };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
     }
@@ -296,7 +296,7 @@ export class GoogleOAuth {
 
     this.tokens = null;
     if (existsSync(this.tokenPath)) {
-      require('fs').unlinkSync(this.tokenPath);
+      unlinkSync(this.tokenPath);
     }
   }
 
@@ -326,16 +326,37 @@ export class GoogleOAuth {
   // ---------------------------------------------------------------------------
 
   private loadTokens(): void {
-    if (!existsSync(this.tokenPath)) return;
-
-    try {
-      const encrypted = readFileSync(this.tokenPath, 'utf-8');
-      const decrypted = decrypt(encrypted, this.encryptionKey);
-      this.tokens = JSON.parse(decrypted);
-    } catch {
-      // Invalid or corrupted tokens
-      this.tokens = null;
+    // Try encrypted file first
+    if (existsSync(this.tokenPath)) {
+      try {
+        const encrypted = readFileSync(this.tokenPath, 'utf-8');
+        const decrypted = decrypt(encrypted, this.encryptionKey);
+        this.tokens = JSON.parse(decrypted);
+        return;
+      } catch {
+        // Invalid or corrupted tokens
+      }
     }
+
+    // Fallback: check for plain JSON (from dashboard)
+    const jsonPath = this.tokenPath.replace('.enc', '.json');
+    if (existsSync(jsonPath)) {
+      try {
+        const data = JSON.parse(readFileSync(jsonPath, 'utf-8'));
+        // Map dashboard format to our format
+        this.tokens = {
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          expiresAt: data.expiresAt || Date.now() + 3600000,
+          scope: data.scope || '',
+        };
+        return;
+      } catch {
+        // Invalid JSON
+      }
+    }
+
+    this.tokens = null;
   }
 
   private saveTokens(): void {
@@ -432,6 +453,178 @@ class GoogleCalendarAPI {
   }
 
   /**
+   * Create a calendar event (with optional invitees)
+   */
+  async createEvent(options: {
+    summary: string;
+    description?: string;
+    location?: string;
+    start: Date;
+    end: Date;
+    attendees?: string[];  // email addresses
+    calendarId?: string;
+    sendNotifications?: boolean;
+  }): Promise<CalendarEvent | null> {
+    const {
+      summary,
+      description,
+      location,
+      start,
+      end,
+      attendees = [],
+      calendarId = 'primary',
+      sendNotifications = true,
+    } = options;
+
+    const event: any = {
+      summary,
+      start: { dateTime: start.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      end: { dateTime: end.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+    };
+
+    if (description) event.description = description;
+    if (location) event.location = location;
+    if (attendees.length > 0) {
+      event.attendees = attendees.map(email => ({ email }));
+    }
+
+    const params = new URLSearchParams();
+    if (sendNotifications) params.set('sendUpdates', 'all');
+
+    const response = await this.oauth.fetch(
+      `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(event),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json() as any;
+      console.error('[Calendar] Create event failed:', error);
+      return null;
+    }
+
+    const data = await response.json() as any;
+    return this.parseEvent(data);
+  }
+
+  /**
+   * Update/edit an existing calendar event
+   */
+  async updateEvent(options: {
+    eventId: string;
+    summary?: string;
+    description?: string;
+    location?: string;
+    start?: Date;
+    end?: Date;
+    attendees?: string[];
+    calendarId?: string;
+    sendNotifications?: boolean;
+  }): Promise<CalendarEvent | null> {
+    const {
+      eventId,
+      summary,
+      description,
+      location,
+      start,
+      end,
+      attendees,
+      calendarId = 'primary',
+      sendNotifications = true,
+    } = options;
+
+    // First get the existing event
+    const existing = await this.getEvent(eventId, calendarId);
+    if (!existing) {
+      console.error('[Calendar] Event not found:', eventId);
+      return null;
+    }
+
+    // Build update payload (only include changed fields)
+    const event: any = {};
+
+    if (summary !== undefined) event.summary = summary;
+    if (description !== undefined) event.description = description;
+    if (location !== undefined) event.location = location;
+
+    if (start) {
+      event.start = { dateTime: start.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    }
+    if (end) {
+      event.end = { dateTime: end.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+    }
+    if (attendees !== undefined) {
+      event.attendees = attendees.map(email => ({ email }));
+    }
+
+    const params = new URLSearchParams();
+    if (sendNotifications) params.set('sendUpdates', 'all');
+
+    const response = await this.oauth.fetch(
+      `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events/${eventId}?${params}`,
+      {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(event),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json() as any;
+      console.error('[Calendar] Update event failed:', error);
+      return null;
+    }
+
+    const data = await response.json() as any;
+    return this.parseEvent(data);
+  }
+
+  /**
+   * Search for events by title/query
+   */
+  async searchEvents(options: {
+    query: string;
+    timeMin?: Date;
+    timeMax?: Date;
+    maxResults?: number;
+    calendarId?: string;
+  }): Promise<CalendarEvent[]> {
+    const {
+      query,
+      timeMin = new Date(),
+      timeMax,
+      maxResults = 20,
+      calendarId = 'primary',
+    } = options;
+
+    const params = new URLSearchParams({
+      q: query,
+      maxResults: String(maxResults),
+      singleEvents: 'true',
+      orderBy: 'startTime',
+      timeMin: timeMin.toISOString(),
+    });
+
+    if (timeMax) {
+      params.set('timeMax', timeMax.toISOString());
+    }
+
+    const response = await this.oauth.fetch(
+      `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events?${params}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Calendar search error: ${response.status}`);
+    }
+
+    const data = await response.json() as any;
+    return (data.items || []).map((item: any) => this.parseEvent(item));
+  }
+
+  /**
    * List all calendars
    */
   async listCalendars(): Promise<Array<{ id: string; name: string; primary: boolean }>> {
@@ -516,7 +709,7 @@ class GmailAPI {
   }
 
   /**
-   * Get a single message
+   * Get a single message (metadata only)
    */
   async getMessage(messageId: string): Promise<GmailMessage | null> {
     const response = await this.oauth.fetch(
@@ -527,6 +720,75 @@ class GmailAPI {
 
     const data = await response.json() as any;
     return this.parseMessage(data);
+  }
+
+  /**
+   * Get full message with body
+   */
+  async getFullMessage(messageId: string): Promise<GmailMessage | null> {
+    const response = await this.oauth.fetch(
+      `${GOOGLE_GMAIL_API}/users/me/messages/${messageId}?format=full`
+    );
+
+    if (!response.ok) return null;
+
+    const data = await response.json() as any;
+    const message = this.parseMessage(data);
+
+    // Extract body
+    message.body = this.extractBody(data.payload);
+
+    return message;
+  }
+
+  /**
+   * Get unread count
+   */
+  async getUnreadCount(): Promise<number> {
+    const response = await this.oauth.fetch(
+      `${GOOGLE_GMAIL_API}/users/me/labels/UNREAD`
+    );
+
+    if (!response.ok) return 0;
+
+    const data = await response.json() as any;
+    return data.messagesUnread || 0;
+  }
+
+  /**
+   * Extract body from message payload
+   */
+  private extractBody(payload: any): string {
+    if (!payload) return '';
+
+    // Direct body
+    if (payload.body?.data) {
+      return Buffer.from(payload.body.data, 'base64url').toString('utf-8');
+    }
+
+    // Multipart - look for text/plain or text/html
+    if (payload.parts) {
+      for (const part of payload.parts) {
+        if (part.mimeType === 'text/plain' && part.body?.data) {
+          return Buffer.from(part.body.data, 'base64url').toString('utf-8');
+        }
+      }
+      // Fallback to HTML
+      for (const part of payload.parts) {
+        if (part.mimeType === 'text/html' && part.body?.data) {
+          const html = Buffer.from(part.body.data, 'base64url').toString('utf-8');
+          // Strip HTML tags for plain text
+          return html.replace(/<[^>]*>/g, '').replace(/\s+/g, ' ').trim();
+        }
+      }
+      // Recursive for nested parts
+      for (const part of payload.parts) {
+        const body = this.extractBody(part);
+        if (body) return body;
+      }
+    }
+
+    return '';
   }
 
   /**
