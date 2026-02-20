@@ -82,3 +82,7 @@ export {
   getContactsSummary,
 } from './contacts.js';
 export type { Contact, ContactCategory, ContactMatch, Interaction, InteractionType, DisambiguationResult } from './contacts.js';
+
+// Web Search
+export { webSearch, formatSearchResults, isSearchAvailable } from './search.js';
+export type { SearchResult, SearchResponse } from './search.js';

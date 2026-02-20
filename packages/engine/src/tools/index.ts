@@ -43,6 +43,7 @@ import {
   Contact,
   ContactCategory,
 } from '../integrations/contacts.js';
+import { webSearch, formatSearchResults } from '../integrations/search.js';
 
 // Tool definitions for LLM
 export interface ToolDefinition {
@@ -537,6 +538,26 @@ Examples:
         type: { type: 'string', description: 'Type of interaction', enum: ['meeting', 'call', 'note'] },
       },
       required: ['name', 'note'],
+    },
+  },
+
+  // === Web Search ===
+  {
+    name: 'web_search',
+    description: `Search the web for current information, news, facts, or anything the user asks about.
+Use this when:
+- User asks about current events, news, or recent developments
+- User needs factual information you're unsure about
+- User asks "what is X" or "how to Y" questions
+- User wants to know about a person, company, topic, etc.
+- You need to verify or look up information
+Examples: "What's the weather in Mumbai?", "Latest news about AI", "How to make pasta"`,
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Search query - be specific and include context' },
+      },
+      required: ['query'],
     },
   },
 ];
@@ -1514,6 +1535,31 @@ const toolExecutors: Record<string, ToolExecutor> = {
       success: true,
       result: `Noted for ${contact.name}: "${note}"${resolvedVenue ? ` @ ${resolvedVenue}` : ''}`,
     };
+  },
+
+  // === Web Search ===
+  async web_search(args, context): Promise<ToolResult> {
+    const { query } = args as { query: string };
+
+    if (!query || query.trim().length === 0) {
+      return { success: false, error: 'Please provide a search query.' };
+    }
+
+    try {
+      const response = await webSearch(query.trim());
+
+      if (!response.success) {
+        return { success: false, error: response.error || 'Search failed' };
+      }
+
+      if (response.results.length === 0 && !response.answer) {
+        return { success: true, result: `No results found for "${query}".` };
+      }
+
+      return { success: true, result: formatSearchResults(response) };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Search failed' };
+    }
   },
 };
 
