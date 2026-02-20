@@ -501,14 +501,16 @@ export async function summarizeEmails(options: {
 }
 
 /**
- * Find replies/follow-ups to an email
+ * Find replies/follow-ups to an email using smart fuzzy search
  */
 export async function findEmailReplies(options: {
   subject?: string;
   threadId?: string;
   contactEmail?: string;
+  keywords?: string[];  // Context words to help find the right thread
+  daysBack?: number;    // How far back to search (default 14 days)
 }): Promise<SkillResult<GmailMessage[]>> {
-  const { subject, threadId, contactEmail } = options;
+  const { subject, threadId, contactEmail, keywords, daysBack } = options;
 
   const google = getGoogleOAuth();
   if (!google?.isAuthenticated()) {
@@ -520,6 +522,8 @@ export async function findEmailReplies(options: {
       subject,
       threadId,
       to: contactEmail,
+      keywords,
+      daysBack,
     });
 
     if (messages.length === 0) {

@@ -384,12 +384,21 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'google_find_replies',
-    description: 'Find replies or follow-up emails in a thread. Use after sending an email to check for responses.',
+    description: `Find replies or follow-up emails in a thread using smart fuzzy search.
+IMPORTANT: Don't just pass a single word - provide CONTEXT:
+- Include relevant keywords from the conversation (person names, topics, projects)
+- Include the contact's email if known
+- Be specific: "meeting with John about Q4 budget" not just "meeting"
+Examples:
+- Good: subject="Q4 budget review", keywords=["John", "finance", "quarterly"], contactEmail="john@company.com"
+- Bad: subject="meeting"`,
     parameters: {
       type: 'object',
       properties: {
-        subject: { type: 'string', description: 'Subject line to search for (will find the thread)' },
+        subject: { type: 'string', description: 'Subject or key topic to search for (be specific, include context)' },
         contactEmail: { type: 'string', description: 'Email address to search conversations with' },
+        keywords: { type: 'string', description: 'Comma-separated context keywords: names, topics, projects (e.g. "John,budget,Q4")' },
+        daysBack: { type: 'number', description: 'How many days back to search (default 14)' },
       },
       required: [],
     },
@@ -1205,13 +1214,23 @@ const toolExecutors: Record<string, ToolExecutor> = {
       return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
     }
 
-    const { subject, contactEmail } = args as { subject?: string; contactEmail?: string };
+    const { subject, contactEmail, keywords: keywordsStr, daysBack } = args as {
+      subject?: string;
+      contactEmail?: string;
+      keywords?: string;
+      daysBack?: number;
+    };
 
-    if (!subject && !contactEmail) {
-      return { success: false, error: 'Provide either a subject or contact email to search for replies.' };
+    if (!subject && !contactEmail && !keywordsStr) {
+      return { success: false, error: 'Provide context to search: subject, contact email, or keywords. Be specific!' };
     }
 
-    const result = await findEmailReplies({ subject, contactEmail });
+    // Parse comma-separated keywords into array
+    const keywords = keywordsStr
+      ? keywordsStr.split(',').map(k => k.trim()).filter(k => k.length > 0)
+      : undefined;
+
+    const result = await findEmailReplies({ subject, contactEmail, keywords, daysBack });
 
     if (!result.success) {
       return { success: false, error: result.error };

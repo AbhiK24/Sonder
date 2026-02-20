@@ -852,35 +852,83 @@ class GmailAPI {
   }
 
   /**
-   * Find replies to an email by searching for the subject or thread
+   * Get recently sent emails (to find threads we started)
+   */
+  async getSentEmails(options: { maxResults?: number; daysBack?: number } = {}): Promise<GmailMessage[]> {
+    const { maxResults = 20, daysBack = 7 } = options;
+
+    const afterDate = new Date();
+    afterDate.setDate(afterDate.getDate() - daysBack);
+    const afterStr = afterDate.toISOString().split('T')[0].replace(/-/g, '/');
+
+    const query = `in:sent after:${afterStr}`;
+    return this.listMessages({ query, maxResults });
+  }
+
+  /**
+   * Find replies to an email - smart search with fuzzy matching
    */
   async findReplies(options: {
     subject?: string;
     threadId?: string;
     to?: string;
+    keywords?: string[];  // Multiple keywords to search
+    daysBack?: number;
   }): Promise<GmailMessage[]> {
-    const { subject, threadId, to } = options;
+    const { subject, threadId, to, keywords, daysBack = 14 } = options;
 
-    // If we have threadId, get the whole thread
+    // If we have threadId, get the whole thread directly
     if (threadId) {
       return this.getThread(threadId);
     }
 
-    // Otherwise search by subject
+    // Build a smart search query
+    const queryParts: string[] = [];
+
+    // Date filter
+    const afterDate = new Date();
+    afterDate.setDate(afterDate.getDate() - daysBack);
+    const afterStr = afterDate.toISOString().split('T')[0].replace(/-/g, '/');
+    queryParts.push(`after:${afterStr}`);
+
+    // Subject search - extract key words, not exact match
     if (subject) {
-      // Remove Re: Fwd: prefixes for better matching
-      const cleanSubject = subject.replace(/^(Re:|Fwd:|FW:)\s*/gi, '').trim();
-      const query = `subject:"${cleanSubject}"`;
-      return this.listMessages({ query, maxResults: 10 });
+      // Remove Re: Fwd: prefixes and common words
+      const cleanSubject = subject
+        .replace(/^(Re:|Fwd:|FW:)\s*/gi, '')
+        .replace(/\b(the|a|an|is|are|was|were|be|been|being|have|has|had|do|does|did|will|would|could|should|may|might|must|shall|can|need|dare|ought|used|to|of|in|for|on|with|at|by|from|as|into|through|during|before|after|above|below|between|under|again|further|then|once|here|there|when|where|why|how|all|each|few|more|most|other|some|such|no|nor|not|only|own|same|so|than|too|very|just|also|now|and|but|or|if)\b/gi, '')
+        .trim();
+
+      // Split into key words
+      const words = cleanSubject.split(/\s+/).filter(w => w.length > 2);
+
+      if (words.length > 0) {
+        // Search for any of the key words in subject
+        const subjectQuery = words.slice(0, 4).map(w => `subject:${w}`).join(' OR ');
+        queryParts.push(`(${subjectQuery})`);
+      }
     }
 
-    // Search by recipient
+    // Keywords from context
+    if (keywords && keywords.length > 0) {
+      const kwQuery = keywords.slice(0, 4).map(k => `"${k}"`).join(' OR ');
+      queryParts.push(`(${kwQuery})`);
+    }
+
+    // Search by contact
     if (to) {
-      const query = `to:${to} OR from:${to}`;
-      return this.listMessages({ query, maxResults: 10 });
+      queryParts.push(`(to:${to} OR from:${to})`);
     }
 
-    return [];
+    // Combine query
+    const query = queryParts.join(' ');
+
+    if (query.trim() === `after:${afterStr}`) {
+      // No real search criteria, get recent threads
+      return this.listMessages({ maxResults: 15 });
+    }
+
+    return this.listMessages({ query, maxResults: 20 });
   }
 
   private parseMessage(data: any): GmailMessage {
