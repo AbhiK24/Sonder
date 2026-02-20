@@ -120,25 +120,25 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   // === Communication ===
   {
     name: 'send_email',
-    description: 'Send an email. IMPORTANT: Write the actual email body - no placeholders like [Name]. Use the user\'s real name from context.',
+    description: 'Send an email. REQUIRES CONFIRMATION: Before calling this, tell the user exactly what you\'re about to send (to, subject, summary of body) and wait for their "yes" or "go ahead". Signature is auto-added.',
     parameters: {
       type: 'object',
       properties: {
-        to: { type: 'string', description: 'Recipient email(s), comma-separated' },
-        cc: { type: 'string', description: 'CC email(s), comma-separated (optional)' },
-        subject: { type: 'string', description: 'Clear subject line (40-50 chars). Be specific.' },
-        body: { type: 'string', description: 'Complete email body. NO placeholders. Sign with user\'s actual name.' },
+        to: { type: 'string', description: 'Recipient email or name (will resolve from contacts). Comma-separated for multiple.' },
+        cc: { type: 'string', description: 'CC recipients (optional)' },
+        subject: { type: 'string', description: 'Clear subject line' },
+        body: { type: 'string', description: 'Complete email body. NO placeholders. Signature auto-added, don\'t include one.' },
       },
       required: ['to', 'subject', 'body'],
     },
   },
   {
     name: 'send_whatsapp',
-    description: 'Send a WhatsApp message. Use when user asks to WhatsApp someone.',
+    description: 'Send a WhatsApp message. REQUIRES CONFIRMATION: Before calling, show user the message and recipient, wait for "yes".',
     parameters: {
       type: 'object',
       properties: {
-        to: { type: 'string', description: 'Phone number with country code (+91...)' },
+        to: { type: 'string', description: 'Phone number with country code (+91...) or contact name' },
         message: { type: 'string', description: 'Message text' },
       },
       required: ['to', 'message'],
@@ -267,7 +267,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'google_create_event',
-    description: 'Create a new calendar event on Google Calendar. Can include invitees who will receive email invitations.',
+    description: 'Create a calendar event. REQUIRES CONFIRMATION: Before calling, tell user the details (title, time, location, invitees) and wait for "yes" or "go ahead".',
     parameters: {
       type: 'object',
       properties: {
@@ -275,8 +275,8 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
         startTime: { type: 'string', description: 'Start time (ISO format or natural like "tomorrow 3pm")' },
         durationMinutes: { type: 'number', description: 'Duration in minutes (default 60)' },
         description: { type: 'string', description: 'Event description' },
-        location: { type: 'string', description: 'Event location' },
-        invitees: { type: 'string', description: 'Comma-separated email addresses to invite' },
+        location: { type: 'string', description: 'Venue name or address (will resolve from saved venues)' },
+        invitees: { type: 'string', description: 'Names or emails to invite (will resolve from contacts)' },
       },
       required: ['title', 'startTime'],
     },
@@ -307,7 +307,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'google_update_event',
-    description: 'Update/edit an existing calendar event. First use google_search_events to find the event ID.',
+    description: 'Update/edit an existing calendar event. First use google_search_events to find the event ID. REQUIRES CONFIRMATION: Show user what changes you\'ll make before calling.',
     parameters: {
       type: 'object',
       properties: {
@@ -573,20 +573,22 @@ const toolExecutors: Record<string, ToolExecutor> = {
     }
 
     try {
-      // Build from address using agent name and configured domain
+      // Build from address using user's name (not agent name!)
       const domain = context.emailDomain || 'resend.dev';
-      const agentName = context.agentName || 'Chorus';
-      const agentId = context.agentId || 'chorus';
+      const userName = context.userName || 'User';
       const fromAddress = domain !== 'resend.dev'
-        ? `${agentName} <${agentId}@${domain}>`
-        : `${agentName} <onboarding@resend.dev>`;
+        ? `${userName} via Sonder <sonder@${domain}>`
+        : `${userName} via Sonder <onboarding@resend.dev>`;
+
+      // Add signature to body
+      const signedBody = `${body}\n\n—\n${userName} via Sonder`;
 
       const result = await context.emailAdapter.sendEmail({
         from: fromAddress,
         to: toList,
         cc: ccList.length > 0 ? ccList : undefined,
         subject,
-        body,
+        body: signedBody,
       }, true);
 
       if (result.success) {
@@ -1516,17 +1518,23 @@ You can use these tools by responding with a JSON tool call. Format:
 {"name": "tool_name", "arguments": {...}}
 \`\`\`
 
-${userName ? `## User Info\nUser's name: ${userName} (use this in emails, not placeholders!)` : ''}
+${userName ? `## User Info\nUser's name: ${userName}` : ''}
 
 Tools:
 ${TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description}
   Parameters: ${Object.entries(t.parameters.properties).map(([k, v]) => `${k} (${v.type}): ${v.description}`).join(', ')}`).join('\n\n')}
 
 ## CRITICAL Rules:
-1. Only use tools when user explicitly asks for an action
-2. Wait for tool result before confirming to user
-3. NEVER claim to have done something without calling the tool
-4. For emails: Write complete body with NO placeholders. Sign with "${userName || 'user\'s actual name'}"`;
+1. **CONFIRMATION REQUIRED** for send_email, send_whatsapp, google_create_event, google_update_event:
+   - BEFORE calling these tools, tell user exactly what you're about to do
+   - Include: recipient, subject/title, summary of content, time/location
+   - WAIT for user to say "yes", "go ahead", "do it", or similar
+   - Only then call the tool
+
+2. Only use tools when user explicitly asks for an action
+3. Wait for tool result before confirming to user
+4. NEVER claim to have done something without calling the tool
+5. For emails: Signature is auto-added. Don't include one in the body.`;
 }
 
 /**

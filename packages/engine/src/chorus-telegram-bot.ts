@@ -1244,6 +1244,14 @@ async function main() {
     const chatId = ctx.chat.id;
     const text = ctx.message.text;
 
+    // Capture user's name from Telegram if not already set
+    const state = getState(chatId);
+    if (!state.profile.name && ctx.from) {
+      const telegramName = ctx.from.first_name || ctx.from.username || 'User';
+      state.profile.name = telegramName;
+      saveState(chatId);
+    }
+
     console.log(`[${chatId}] ${text.slice(0, 50)}${text.length > 50 ? '...' : ''}`);
 
     try {
