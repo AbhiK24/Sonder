@@ -43,6 +43,9 @@
     "zod": "^3.22.4"
   },
   "devDependencies": {
+    "@mariozechner/pi-agent-core": "^0.54.0",
+    "@mariozechner/pi-ai": "^0.54.0",
+    "@mariozechner/pi-coding-agent": "^0.54.0",
     "@types/hapi__boom": "^9.0.1",
     "@types/qrcode-terminal": "^0.12.2",
     "tsx": "^4.7.0",

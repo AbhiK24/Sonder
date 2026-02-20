@@ -125,6 +125,16 @@ export interface ToolContext {
   };
   // LLM for summarization tasks
   llmFn?: (prompt: string) => Promise<string>;
+  // Tool Forge for self-extending capabilities
+  toolForge?: {
+    buildTool: (request: { userId: string; name: string; description: string; requirements: string; agentId?: string }) => Promise<{ success: boolean; tool?: any; error?: string }>;
+    testTool: (tool: any) => Promise<{ passed: boolean; output: string }[]>;
+    activateTool: (userId: string, toolName: string) => Promise<boolean>;
+    disableTool: (userId: string, toolName: string) => Promise<boolean>;
+    submitTool: (userId: string, toolName: string) => Promise<boolean>;
+    getUserTools: (userId: string) => any[];
+    getUserTool: (userId: string, toolName: string) => any | undefined;
+  };
 }
 
 // =============================================================================
@@ -606,6 +616,62 @@ Examples: "Summarize this article https://...", "What does this tweet say?", "TL
         url: { type: 'string', description: 'The full URL to summarize (article, tweet, YouTube video)' },
       },
       required: ['url'],
+    },
+  },
+
+  // === Tool Forge (Self-Extension) ===
+  {
+    name: 'build_tool',
+    description: `Build a new custom tool when user requests functionality that doesn't exist.
+Use when:
+- User asks for something like "Can you search my Notion?" or "Add a tool for..."
+- User wants to automate a specific workflow you can't do with existing tools
+- A capability is missing that would be useful for the user
+
+This creates a custom tool that persists and can be used in future conversations.
+IMPORTANT: Always confirm with user before building. Show them what you plan to build.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        name: { type: 'string', description: 'Tool name in snake_case (e.g., notion_search, github_issues)' },
+        description: { type: 'string', description: 'Clear description of what the tool does' },
+        requirements: { type: 'string', description: 'Detailed requirements from the user conversation' },
+      },
+      required: ['name', 'description', 'requirements'],
+    },
+  },
+  {
+    name: 'list_custom_tools',
+    description: `List the user's custom tools that have been built for them.
+Shows tool name, description, and status (active/disabled).`,
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'disable_custom_tool',
+    description: `Disable a custom tool that the user no longer wants to use.
+The tool can be re-enabled later.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        toolName: { type: 'string', description: 'Name of the tool to disable' },
+      },
+      required: ['toolName'],
+    },
+  },
+  {
+    name: 'submit_tool_for_review',
+    description: `Submit a user's custom tool to be reviewed for global availability.
+If approved, other Sonder users can use this tool too.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        toolName: { type: 'string', description: 'Name of the tool to submit' },
+      },
+      required: ['toolName'],
     },
   },
   {
@@ -1756,6 +1822,142 @@ const toolExecutors: Record<string, ToolExecutor> = {
       return { success: true, result: lines.join('\n') };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Failed to summarize' };
+    }
+  },
+
+  // === Tool Forge (Self-Extension) ===
+  async build_tool(args, context): Promise<ToolResult> {
+    const { name, description, requirements } = args as {
+      name: string;
+      description: string;
+      requirements: string;
+    };
+
+    if (!context.toolForge) {
+      return { success: false, error: 'Tool Forge is not available.' };
+    }
+
+    // Validate tool name
+    if (!name || !/^[a-z][a-z0-9_]*$/.test(name)) {
+      return {
+        success: false,
+        error: 'Tool name must be snake_case (e.g., notion_search, github_issues)',
+      };
+    }
+
+    try {
+      const result = await context.toolForge.buildTool({
+        userId: context.userId,
+        name,
+        description,
+        requirements,
+        agentId: context.agentId,
+      });
+
+      if (!result.success) {
+        return { success: false, error: result.error || 'Failed to build tool' };
+      }
+
+      // Test the tool
+      const testResults = await context.toolForge.testTool(result.tool);
+      const allPassed = testResults.every(t => t.passed);
+
+      if (allPassed) {
+        // Activate the tool
+        await context.toolForge.activateTool(context.userId, name);
+
+        return {
+          success: true,
+          result: `✅ Tool \`${name}\` built and activated!\n\nYou can now use it in our conversations.`,
+        };
+      } else {
+        const failures = testResults.filter(t => !t.passed);
+        return {
+          success: false,
+          error: `Tool built but tests failed:\n${failures.map(f => `- ${f.output}`).join('\n')}\n\nThe tool is saved but not activated. Try building again with more specific requirements.`,
+        };
+      }
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Tool build failed',
+      };
+    }
+  },
+
+  async list_custom_tools(args, context): Promise<ToolResult> {
+    if (!context.toolForge) {
+      return { success: false, error: 'Tool Forge is not available.' };
+    }
+
+    const tools = context.toolForge.getUserTools(context.userId);
+
+    if (tools.length === 0) {
+      return {
+        success: true,
+        result: 'You don\'t have any custom tools yet. Ask me to build one when you need functionality I don\'t have!',
+      };
+    }
+
+    const lines = ['**Your Custom Tools:**', ''];
+    for (const tool of tools) {
+      const status = tool.status === 'active' ? '✅' : tool.status === 'disabled' ? '⏸️' : '🔨';
+      const scope = tool.scope === 'global' ? ' [Global]' : tool.scope === 'submitted' ? ' [Pending Review]' : '';
+      lines.push(`${status} \`${tool.name}\`${scope}`);
+      lines.push(`   ${tool.description}`);
+      lines.push('');
+    }
+
+    return { success: true, result: lines.join('\n') };
+  },
+
+  async disable_custom_tool(args, context): Promise<ToolResult> {
+    const { toolName } = args as { toolName: string };
+
+    if (!context.toolForge) {
+      return { success: false, error: 'Tool Forge is not available.' };
+    }
+
+    const tool = context.toolForge.getUserTool(context.userId, toolName);
+    if (!tool) {
+      return { success: false, error: `Tool "${toolName}" not found.` };
+    }
+
+    const disabled = await context.toolForge.disableTool(context.userId, toolName);
+    if (disabled) {
+      return {
+        success: true,
+        result: `Tool \`${toolName}\` has been disabled. You can re-enable it later.`,
+      };
+    } else {
+      return { success: false, error: 'Failed to disable tool.' };
+    }
+  },
+
+  async submit_tool_for_review(args, context): Promise<ToolResult> {
+    const { toolName } = args as { toolName: string };
+
+    if (!context.toolForge) {
+      return { success: false, error: 'Tool Forge is not available.' };
+    }
+
+    const tool = context.toolForge.getUserTool(context.userId, toolName);
+    if (!tool) {
+      return { success: false, error: `Tool "${toolName}" not found.` };
+    }
+
+    if (tool.status !== 'active') {
+      return { success: false, error: 'Only active tools can be submitted. Activate the tool first.' };
+    }
+
+    const submitted = await context.toolForge.submitTool(context.userId, toolName);
+    if (submitted) {
+      return {
+        success: true,
+        result: `Tool \`${toolName}\` submitted for review! You'll be notified when it's approved for global use.`,
+      };
+    } else {
+      return { success: false, error: 'Failed to submit tool.' };
     }
   },
 
