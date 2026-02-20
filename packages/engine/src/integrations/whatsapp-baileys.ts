@@ -14,9 +14,31 @@ import makeWASocket, {
 } from '@whiskeysockets/baileys';
 import { Boom } from '@hapi/boom';
 import qrcode from 'qrcode-terminal';
-import { existsSync, mkdirSync } from 'fs';
+import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { actionLog } from '../action-log.js';
+
+/**
+ * Bootstrap WhatsApp credentials from environment variable
+ * This allows Railway deployments to work without QR scanning on each deploy
+ */
+function bootstrapCredsFromEnv(authDir: string): void {
+  const credsPath = join(authDir, 'creds.json');
+  const credsB64 = process.env.WHATSAPP_CREDS_B64;
+
+  // Only write if creds don't exist and env var is set
+  if (!existsSync(credsPath) && credsB64) {
+    try {
+      const credsJson = Buffer.from(credsB64, 'base64').toString('utf-8');
+      // Validate it's valid JSON
+      JSON.parse(credsJson);
+      writeFileSync(credsPath, credsJson, 'utf-8');
+      console.log('[WhatsApp] Bootstrapped credentials from WHATSAPP_CREDS_B64');
+    } catch (error) {
+      console.error('[WhatsApp] Failed to bootstrap credentials from env:', error);
+    }
+  }
+}
 
 export interface BaileysConfig {
   authDir?: string;           // Where to store auth state (default: .sonder/whatsapp-auth)
@@ -64,6 +86,9 @@ export class BaileysWhatsAppAdapter {
     if (!existsSync(this.config.authDir!)) {
       mkdirSync(this.config.authDir!, { recursive: true });
     }
+
+    // Bootstrap credentials from env var (for Railway/cloud deployments)
+    bootstrapCredsFromEnv(this.config.authDir!);
   }
 
   /**
