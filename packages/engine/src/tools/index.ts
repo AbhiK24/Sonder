@@ -35,6 +35,7 @@ import {
   listContactsFormatted,
   getContactsByCategory,
   getContactById,
+  getContacts,
   getInteractionHistory,
   markContacted,
   recordEmailSent,
@@ -80,10 +81,13 @@ export type ToolExecutor = (
 export interface ToolContext {
   userId: string;
   userName?: string;  // User's actual name for emails
+  userEmail?: string; // User's email (for calendar invites, etc.)
   agentId?: string;
   agentName?: string;
   timezone?: string;
   emailDomain?: string;
+  // WhatsApp
+  whatsappAllowlist?: string[];  // Numbers the agent can message
   // Adapters
   emailAdapter?: {
     sendEmail: (opts: {
@@ -558,6 +562,15 @@ Examples: "What's the weather in Mumbai?", "Latest news about AI", "How to make 
         query: { type: 'string', description: 'Search query - be specific and include context' },
       },
       required: ['query'],
+    },
+  },
+  {
+    name: 'get_whatsapp_contacts',
+    description: 'Get list of contacts that can receive WhatsApp messages. Use this before sending WhatsApp to see who you can message.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
     },
   },
 ];
@@ -1564,7 +1577,38 @@ const toolExecutors: Record<string, ToolExecutor> = {
       return { success: false, error: error instanceof Error ? error.message : 'Search failed' };
     }
   },
+
+  // === WhatsApp Contacts ===
+  async get_whatsapp_contacts(args, context): Promise<ToolResult> {
+    if (!context.whatsappAdapter) {
+      return { success: false, error: 'WhatsApp not configured.' };
+    }
+
+    const allowlist = context.whatsappAllowlist;
+    if (!allowlist || allowlist.length === 0) {
+      return { success: true, result: 'No WhatsApp contacts configured. Ask user to add numbers to the allowlist.' };
+    }
+
+    // Try to match allowlist numbers to saved contacts
+    const contacts = getContacts();
+    const lines: string[] = ['WhatsApp-allowed contacts:'];
+
+    for (const number of allowlist) {
+      const contact = contacts.find(c => c.phone && normalizePhone(c.phone) === normalizePhone(number));
+      if (contact) {
+        lines.push(`• ${contact.name}: ${number}`);
+      } else {
+        lines.push(`• ${number} (no saved contact)`);
+      }
+    }
+
+    return { success: true, result: lines.join('\n') };
+  },
 };
+
+// Helper to normalize phone numbers for comparison
+function normalizePhone(phone: string): string {
+  return phone.replace(/[\s\-\(\)]/g, '').replace(/^\+/, '');
 
 // Helper: Parse date strings
 function parseDate(dateStr: string, timezone?: string): Date {
@@ -1656,16 +1700,29 @@ export async function executeTool(
 /**
  * Format tools for LLM prompt (for models that don't support native tool calling)
  */
-export function formatToolsForPrompt(userName?: string): string {
+export function formatToolsForPrompt(userInfo?: {
+  name?: string;
+  email?: string;
+  whatsappAllowlist?: string[];
+}): string {
+  const userLines: string[] = [];
+  if (userInfo?.name) userLines.push(`Name: ${userInfo.name}`);
+  if (userInfo?.email) userLines.push(`Email: ${userInfo.email}`);
+  if (userInfo?.whatsappAllowlist?.length) {
+    userLines.push(`WhatsApp contacts: ${userInfo.whatsappAllowlist.join(', ')}`);
+  }
+
+  const userSection = userLines.length > 0
+    ? `## User Info\n${userLines.join('\n')}\n\n`
+    : '';
+
   return `## Available Tools
 You can use these tools by responding with a JSON tool call. Format:
 \`\`\`tool
 {"name": "tool_name", "arguments": {...}}
 \`\`\`
 
-${userName ? `## User Info\nUser's name: ${userName}` : ''}
-
-Tools:
+${userSection}Tools:
 ${TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description}
   Parameters: ${Object.entries(t.parameters.properties).map(([k, v]) => `${k} (${v.type}): ${v.description}`).join(', ')}`).join('\n\n')}
 
@@ -1674,7 +1731,8 @@ ${TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description}
 2. Only use tools when user explicitly asks for an action
 3. Wait for tool result before confirming to user
 4. NEVER claim to have done something without calling the tool
-5. For emails: Signature is auto-added. Don't include one in the body.`;
+5. For emails: Signature is auto-added. Don't include one in the body.
+6. For calendar invites: Use the user's email from User Info above when inviting them.`;
 }
 
 /**

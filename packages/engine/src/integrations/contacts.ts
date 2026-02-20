@@ -52,6 +52,9 @@ export interface Contact {
   relationship?: string;      // "college friend", "client", "manager at X", etc.
   notes?: string;
 
+  // Communication permissions
+  whatsappAllowed?: boolean;  // Whether we can message them on WhatsApp
+
   // Interaction history
   interactions: Interaction[];
   interactionCount: number;

@@ -121,6 +121,7 @@ let insightEngine: InsightEngine;
 let emailAdapter: ResendAdapter | null = null;
 let taskAdapter: TodoistAdapter | null = null;
 let whatsappAdapter: UnifiedWhatsApp | null = null;
+let whatsappAllowlist: string[] | undefined = undefined;  // Numbers agents can message
 let calendarAdapter: ICSFeedAdapter | null = null;
 let engineContext: EngineContext;
 let memory: Memory;
@@ -322,9 +323,12 @@ ${extraContext.reunionContext}`;
     systemPrompt += `\n\n${contextSummary}`;
   }
 
-  // Add available tools (with user's name for proper email composition)
-  const userName = state.profile.name || 'the user';
-  systemPrompt += `\n\n${formatToolsForPrompt(userName)}`;
+  // Add available tools (with user info for proper email/calendar composition)
+  systemPrompt += `\n\n${formatToolsForPrompt({
+    name: state.profile.name,
+    email: state.userEmail || state.profile.email,
+    whatsappAllowlist: whatsappAllowlist,
+  })}`;
 
   // Build conversation prompt
   const prompt = `${systemPrompt}
@@ -377,10 +381,12 @@ If the user asks you to take an action (send email, etc.), use the appropriate t
       const toolContext: ToolContext = {
         userId: String(state.profile.id),
         userName: state.profile.name,
+        userEmail: state.userEmail || state.profile.email,
         agentId: agent.id,
         agentName: agent.name,
         timezone: process.env.TIMEZONE || 'UTC',
         emailDomain: process.env.SONDER_EMAIL_DOMAIN,
+        whatsappAllowlist: whatsappAllowlist,
         emailAdapter: emailAdapter || undefined,
         whatsappAdapter: whatsappAdapter ? {
           sendMessage: async (to: string, message: string) => {
@@ -847,11 +853,17 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
         agentId: action.agentId,
         agentName: agent.name,
         userName: state.profile.name,
-        userEmail: state.userEmail,
+        userEmail: state.userEmail || state.profile.email,
         timezone: CONFIG.timezone,
+        whatsappAllowlist: whatsappAllowlist,
         emailAdapter: emailAdapter || undefined,
         taskAdapter: taskAdapter || undefined,
-        whatsappAdapter: whatsappAdapter,
+        whatsappAdapter: whatsappAdapter ? {
+          sendMessage: async (to: string, message: string) => {
+            const result = await whatsappAdapter.sendAsAgent(action.agentId, to, message, true);
+            return result;
+          }
+        } : undefined,
       };
 
       const result = await executeTool(action.tool, action.args, toolContext);
@@ -1193,6 +1205,9 @@ async function setupIntegrations(): Promise<void> {
   const allowlist = allowlistEnv
     ? allowlistEnv.split(',').map(n => n.trim()).filter(Boolean)
     : undefined; // undefined = allow all (for now)
+
+  // Store at module level so agents can access it
+  whatsappAllowlist = allowlist;
 
   const rateLimit = parseInt(process.env.WHATSAPP_RATE_LIMIT || '20'); // 20/hour default
 
