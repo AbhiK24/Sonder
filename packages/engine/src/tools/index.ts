@@ -117,6 +117,11 @@ export interface ToolContext {
     remember: (text: string, metadata?: any) => Promise<void>;
     recall: (query: string, opts?: any) => Promise<{ entry: { text: string } }[]>;
   };
+  reminderEngine?: {
+    createReminder: (userId: string, content: string, time: string, agentId?: string) => { reminder: { id: string; content: string; dueAt: Date }; interpretation: string };
+    getReminders: (userId: string) => { id: string; content: string; dueAt: Date; fired: boolean }[];
+    cancelReminderByContent: (userId: string, search: string) => { id: string; content: string } | undefined;
+  };
 }
 
 // =============================================================================
@@ -571,6 +576,40 @@ Examples: "What's the weather in Mumbai?", "Latest news about AI", "How to make 
       type: 'object',
       properties: {},
       required: [],
+    },
+  },
+
+  // === Reminders ===
+  {
+    name: 'create_reminder',
+    description: `Create a reminder for the user at a specific time. Use when user says "remind me to...", "don't let me forget...", etc.`,
+    parameters: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', description: 'What to remind about (e.g., "call mom", "take medicine")' },
+        time: { type: 'string', description: 'When to remind (e.g., "in 30 minutes", "at 5pm", "tomorrow at 9am", "in 2 hours")' },
+      },
+      required: ['content', 'time'],
+    },
+  },
+  {
+    name: 'list_reminders',
+    description: 'List all pending reminders for the user.',
+    parameters: {
+      type: 'object',
+      properties: {},
+      required: [],
+    },
+  },
+  {
+    name: 'cancel_reminder',
+    description: 'Cancel a reminder. Can search by content.',
+    parameters: {
+      type: 'object',
+      properties: {
+        search: { type: 'string', description: 'Search term to find the reminder (e.g., "mom", "medicine")' },
+      },
+      required: ['search'],
     },
   },
 ];
@@ -1033,8 +1072,13 @@ const toolExecutors: Record<string, ToolExecutor> = {
     // Parse start time
     const start = parseDateTime(startTime, context.timezone);
 
-    // Parse invitees
-    const inviteeList = invitees ? invitees.split(',').map(e => e.trim()).filter(e => e.includes('@')) : [];
+    // Parse invitees - auto-add user's email so they get invited to their own events
+    let inviteeList = invitees ? invitees.split(',').map(e => e.trim()).filter(e => e.includes('@')) : [];
+
+    // Always invite the user to their own events
+    if (context.userEmail && !inviteeList.includes(context.userEmail)) {
+      inviteeList.push(context.userEmail);
+    }
 
     // Try to resolve venue if location provided
     let resolvedLocation = location;
@@ -1604,6 +1648,82 @@ const toolExecutors: Record<string, ToolExecutor> = {
 
     return { success: true, result: lines.join('\n') };
   },
+
+  // === Reminders ===
+  async create_reminder(args, context): Promise<ToolResult> {
+    const { content, time } = args as { content: string; time: string };
+
+    if (!context.reminderEngine) {
+      return { success: false, error: 'Reminder system not available.' };
+    }
+
+    try {
+      const result = context.reminderEngine.createReminder(
+        context.userId,
+        content,
+        time,
+        context.agentId
+      );
+
+      const formattedTime = result.reminder.dueAt.toLocaleString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+
+      return {
+        success: true,
+        result: `✓ Reminder set: "${content}" at ${formattedTime}`,
+      };
+    } catch (error) {
+      return { success: false, error: error instanceof Error ? error.message : 'Failed to create reminder' };
+    }
+  },
+
+  async list_reminders(args, context): Promise<ToolResult> {
+    if (!context.reminderEngine) {
+      return { success: false, error: 'Reminder system not available.' };
+    }
+
+    const reminders = context.reminderEngine.getReminders(context.userId);
+
+    if (reminders.length === 0) {
+      return { success: true, result: 'No pending reminders.' };
+    }
+
+    const lines = reminders.map(r => {
+      const time = new Date(r.dueAt).toLocaleString('en-US', {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      });
+      return `• ${r.content} — ${time}`;
+    });
+
+    return { success: true, result: `Pending reminders:\n${lines.join('\n')}` };
+  },
+
+  async cancel_reminder(args, context): Promise<ToolResult> {
+    const { search } = args as { search: string };
+
+    if (!context.reminderEngine) {
+      return { success: false, error: 'Reminder system not available.' };
+    }
+
+    const cancelled = context.reminderEngine.cancelReminderByContent(context.userId, search);
+
+    if (cancelled) {
+      return { success: true, result: `✓ Cancelled reminder: "${cancelled.content}"` };
+    } else {
+      return { success: false, error: `No pending reminder found matching "${search}"` };
+    }
+  },
 };
 
 // Helper to normalize phone numbers for comparison
@@ -1689,7 +1809,6 @@ export async function executeTool(
 
   try {
     const result = await executor(toolCall.arguments, context);
-    console.log(`[Tool] Result: ${result.success ? '✓' : '✗'} ${result.result || result.error}`);
     return result;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Tool execution failed';
@@ -1727,13 +1846,20 @@ ${userSection}Tools:
 ${TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description}
   Parameters: ${Object.entries(t.parameters.properties).map(([k, v]) => `${k} (${v.type}): ${v.description}`).join(', ')}`).join('\n\n')}
 
+## Capabilities
+- **Web Search**: You have real-time web search BUILT IN. When asked about current events, weather, news, properties, prices, or ANY current information - just answer directly. The system automatically searches the web.
+- **DO NOT use the web_search tool** - it's deprecated. Just answer search questions directly with your built-in web access.
+
 ## CRITICAL Rules:
-1. **Call tools directly** - The system will automatically ask user for confirmation before executing sensitive actions (emails, calendar events, WhatsApp messages). Just call the tool when appropriate.
-2. Only use tools when user explicitly asks for an action
-3. Wait for tool result before confirming to user
-4. NEVER claim to have done something without calling the tool
+1. **YOU MUST USE TOOL CALLS** - When user asks to create events, send emails, etc., you MUST output a tool call block. Do NOT just say you did it.
+2. Tool call format (MUST follow exactly):
+   \`\`\`tool
+   {"name": "google_create_event", "arguments": {"title": "Meeting", "startTime": "2026-02-23T09:00:00", "duration": 60}}
+   \`\`\`
+3. The system asks user for confirmation before executing. Just call the tool.
+4. **NEVER say "I've created" or "Done" without outputting a tool call block first**
 5. For emails: Signature is auto-added. Don't include one in the body.
-6. For calendar invites: Use the user's email from User Info above when inviting them.`;
+6. For calendar invites: Use ISO 8601 format for times (e.g., 2026-02-23T15:00:00).`;
 }
 
 /**
@@ -1742,11 +1868,11 @@ ${TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description}
 export function parseToolCalls(response: string): ToolCall[] {
   const toolCalls: ToolCall[] = [];
 
-  // Look for ```tool blocks
-  const toolBlockRegex = /```tool\s*\n?([\s\S]*?)```/g;
+  // Look for ```tool or ```json blocks containing tool calls
+  const codeBlockRegex = /```(?:tool|json)\s*\n?([\s\S]*?)```/g;
   let match;
 
-  while ((match = toolBlockRegex.exec(response)) !== null) {
+  while ((match = codeBlockRegex.exec(response)) !== null) {
     try {
       const parsed = JSON.parse(match[1].trim());
       if (parsed.name && parsed.arguments) {
@@ -1757,16 +1883,20 @@ export function parseToolCalls(response: string): ToolCall[] {
     }
   }
 
-  // Also check for inline JSON tool calls
-  const inlineRegex = /\{"name":\s*"(\w+)",\s*"arguments":\s*(\{[^}]+\})\}/g;
-  while ((match = inlineRegex.exec(response)) !== null) {
-    try {
-      toolCalls.push({
-        name: match[1],
-        arguments: JSON.parse(match[2]),
-      });
-    } catch {
-      // Invalid JSON, skip
+  // Also check for standalone JSON objects with name/arguments structure
+  // This handles cases where the model outputs JSON without code blocks
+  if (toolCalls.length === 0) {
+    const jsonObjectRegex = /\{\s*"name"\s*:\s*"([^"]+)"\s*,\s*"arguments"\s*:\s*(\{[\s\S]*?\})\s*\}/g;
+    while ((match = jsonObjectRegex.exec(response)) !== null) {
+      try {
+        const args = JSON.parse(match[2]);
+        toolCalls.push({
+          name: match[1],
+          arguments: args,
+        });
+      } catch {
+        // Invalid JSON, skip
+      }
     }
   }
 

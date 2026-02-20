@@ -39,6 +39,9 @@ import { startUpdateChecker, stopUpdateChecker, getCurrentVersion } from './upda
 // Action logging for transparency
 import { actionLog } from './action-log.js';
 
+// Reminder engine
+import { ReminderEngine } from './reminders/index.js';
+
 // Tools for agent actions
 import {
   formatToolsForPrompt,
@@ -125,6 +128,7 @@ let whatsappAdapter: UnifiedWhatsApp | null = null;
 let whatsappAllowlist: string[] | undefined = undefined;  // Numbers agents can message
 let calendarAdapter: ICSFeedAdapter | null = null;
 let engineContext: EngineContext;
+let reminderEngine: ReminderEngine;
 let memory: Memory;
 let bot: Bot;
 
@@ -285,6 +289,26 @@ function getUserContext(state: UserState, awayMinutes: number): UserContext {
 // LLM Response Generation
 // =============================================================================
 
+/**
+ * Strip any leading agent name prefix from LLM response
+ * e.g. "Luna: Hello" -> "Hello", "**Luna:** Hello" -> "Hello"
+ */
+function stripAgentNamePrefix(response: string, agentName: string): string {
+  // Common patterns LLMs might use
+  const patterns = [
+    new RegExp(`^\\*\\*${agentName}:\\*\\*\\s*`, 'i'),  // **Luna:**
+    new RegExp(`^\\*${agentName}:\\*\\s*`, 'i'),        // *Luna:*
+    new RegExp(`^${agentName}:\\s*`, 'i'),              // Luna:
+    new RegExp(`^${agentName}\\s*-\\s*`, 'i'),          // Luna -
+  ];
+
+  let cleaned = response;
+  for (const pattern of patterns) {
+    cleaned = cleaned.replace(pattern, '');
+  }
+  return cleaned;
+}
+
 async function generateAgentResponse(
   agent: ChorusAgent,
   userMessage: string,
@@ -358,17 +382,24 @@ ${recentHistory || '(This is the start of the conversation)'}
 ${userMessage}
 
 ## Your Response
-Respond as ${agent.name}. Be warm, supportive, and true to your role. Keep responses concise (1-3 sentences unless more is needed). Don't be overly effusive.
-If the user asks you to take an action (send email, etc.), use the appropriate tool.`;
+You ARE ${agent.name}. Stay in character - be warm, supportive, and true to your role. Keep responses concise (1-3 sentences unless more is needed). Don't be overly effusive. Do NOT prefix your response with your name - just respond directly.
+If the user asks you to take an action (send email, etc.), use the appropriate tool.
+
+IMPORTANT: You have real-time web search built in. When asked about current events, weather, news, or any current information, just answer directly - you already have web access. Never say you can't search the web or need permission.`;
 
   try {
     const response = await provider.generate(prompt, {
       temperature: 0.8,
       maxTokens: 500,
+      useSearch: true,  // Enable Kimi's native web search for grounded responses
     });
+
+    // DEBUG: Log raw response to see if tool calls are generated
+    console.log(`[DEBUG] Raw LLM response:\n${response.slice(0, 500)}${response.length > 500 ? '...' : ''}`);
 
     // Check for tool calls
     const toolCalls = parseToolCalls(response);
+    console.log(`[DEBUG] Parsed tool calls: ${toolCalls.length}`, toolCalls.map(t => t.name));
 
     // Tools that require confirmation before executing
     const CONFIRMATION_REQUIRED_TOOLS = ['send_email', 'send_whatsapp', 'google_create_event', 'google_update_event'];
@@ -428,7 +459,17 @@ If the user asks you to take an action (send email, etc.), use the appropriate t
           remember: async (text: string, metadata?: any) => { await memory.remember(text, metadata); },
           recall: async (query: string, opts?: any) => memory.recall(query, opts),
         },
+        reminderEngine: {
+          createReminder: (userId: string, content: string, time: string, agentId?: string) =>
+            reminderEngine.createReminder(userId, content, time, agentId),
+          getReminders: (userId: string) => reminderEngine.getReminders(userId),
+          cancelReminderByContent: (userId: string, search: string) =>
+            reminderEngine.cancelReminderByContent(userId, search),
+        },
       };
+
+      // Register user for reminders
+      reminderEngine.registerUser(String(state.profile.id));
 
       const toolResults: string[] = [];
       for (const toolCall of toolCalls) {
@@ -452,13 +493,16 @@ Based on the tool results above, give a brief response confirming what happened.
       const followUp = await provider.generate(followUpPrompt, {
         temperature: 0.7,
         maxTokens: 200,
+        useSearch: true,
       });
 
-      return followUp.trim();
+      const cleaned = removeToolCallsFromResponse(followUp).trim();
+      return stripAgentNamePrefix(cleaned, agent.name);
     }
 
     // No tool calls - return cleaned response
-    return removeToolCallsFromResponse(response).trim();
+    const cleaned = removeToolCallsFromResponse(response).trim();
+    return stripAgentNamePrefix(cleaned, agent.name);
   } catch (error) {
     console.error('[Chorus] LLM error:', error);
     return `*${agent.name} pauses thoughtfully* I'm here for you. What's on your mind?`;
@@ -468,6 +512,25 @@ Based on the tool results above, give a brief response confirming what happened.
 // =============================================================================
 // Off-topic Detection (during FTUE)
 // =============================================================================
+
+/**
+ * Format time in human-readable format
+ */
+function formatTimeHuman(timeStr: string): string {
+  try {
+    const date = new Date(timeStr);
+    return date.toLocaleString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    });
+  } catch {
+    return timeStr;
+  }
+}
 
 /**
  * Format a human-readable description of a pending action for confirmation
@@ -483,9 +546,11 @@ function formatPendingActionDescription(toolCall: { name: string; arguments: Rec
       return `I'll send a WhatsApp message to **${args.to}**\nMessage: "${String(args.message).slice(0, 100)}${String(args.message).length > 100 ? '...' : ''}"`;
 
     case 'google_create_event':
+      const startTime = formatTimeHuman(String(args.startTime));
+      const duration = args.durationMinutes ? ` (${args.durationMinutes} min)` : '';
       const location = args.location ? `\nLocation: ${args.location}` : '';
       const invitees = args.invitees ? `\nInvitees: ${args.invitees}` : '';
-      return `I'll create a calendar event:\n**${args.title}**\nTime: ${args.startTime}${location}${invitees}`;
+      return `I'll create a calendar event:\n**${args.title}**\nTime: ${startTime}${duration}${location}${invitees}`;
 
     case 'google_update_event':
       return `I'll update the calendar event "${args.eventId}" with your changes`;
@@ -865,7 +930,7 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
       console.log(`[${chatId}] Executing confirmed action: ${action.tool}`);
 
       // Execute the pending action
-      const agent = agents[action.agentId];
+      const agent = chorusAgents[action.agentId];
       const toolContext: ToolContext = {
         userId: String(chatId),
         agentId: action.agentId,
@@ -884,19 +949,19 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
         } : undefined,
       };
 
-      const result = await executeTool(action.tool, action.args, toolContext);
+      const result = await executeTool({ name: action.tool, arguments: action.args }, toolContext);
       console.log(`[Tool] Result: ${result.success ? '✓' : '✗'} ${result.result || result.error}`);
-
-      actionLog.agentResponse({
-        agent: agent.name,
-        userId: String(chatId),
-        action: 'executed_confirmed_action',
-        context: action.tool,
-      });
 
       const resultMsg = result.success
         ? `✓ Done! ${result.result}`
         : `Something went wrong: ${result.error}`;
+
+      actionLog.agentResponse({
+        agent: agent.name,
+        userId: String(chatId),
+        messagePreview: resultMsg,
+        toolsUsed: [action.tool],
+      });
 
       state.history.push({
         role: 'agent',
@@ -914,7 +979,7 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
       state.pendingAction = undefined;
       saveState(chatId);
 
-      const agent = agents[action.agentId];
+      const agent = chorusAgents[action.agentId];
       return `${agent.emoji} *${agent.name}:* Okay, cancelled. Let me know if you need anything else!`;
     }
 
@@ -958,6 +1023,9 @@ async function processMessage(
   message: string,
   agent: ChorusAgent
 ): Promise<string> {
+  // Register user for reminders
+  reminderEngine.registerUser(String(chatId));
+
   // Update state
   state.lastAgent = agent.id;
   state.lastSeen = new Date();
@@ -1402,6 +1470,25 @@ async function main() {
   // Setup engines
   setupIdleEngine();
   setupInsightEngine();
+
+  // Setup reminder engine
+  reminderEngine = new ReminderEngine({
+    meetingReminderMinutes: 15,
+    checkIntervalSeconds: 60,
+    timezone: process.env.TIMEZONE || 'UTC',
+    quietHoursStart: parseInt(process.env.QUIET_HOURS_START || '22', 10),
+    quietHoursEnd: parseInt(process.env.QUIET_HOURS_END || '8', 10),
+    getUpcomingEvents: (hours: number) => engineContext.getUpcomingEvents(hours),
+    onReminder: async (userId: string, message: string, type: string, agentId?: string) => {
+      const chatId = parseInt(userId, 10);
+      if (isNaN(chatId)) return;
+
+      const agent = agentId ? chorusAgents[agentId as ChorusAgentId] : chorusAgents.luna;
+      await sendProactiveMessage(chatId, `${agent.emoji} **${agent.name}:** ${message}`);
+    },
+  });
+  reminderEngine.start();
+  console.log('[Chorus] ReminderEngine started');
 
   // Create bot
   bot = new Bot(botToken);

@@ -81,54 +81,67 @@ async function searchWithTavily(query: string, maxResults = 5): Promise<SearchRe
 }
 
 // =============================================================================
-// DuckDuckGo Instant Answers (Fallback - free, no API key)
+// DuckDuckGo HTML Search (Fallback - free, no API key)
 // =============================================================================
 
 async function searchWithDuckDuckGo(query: string): Promise<SearchResponse> {
   try {
-    // DuckDuckGo Instant Answer API (free, no auth required)
+    // Use DuckDuckGo HTML search (lite version)
     const encoded = encodeURIComponent(query);
-    const response = await fetch(`https://api.duckduckgo.com/?q=${encoded}&format=json&no_html=1&skip_disambig=1`);
+    const response = await fetch(`https://html.duckduckgo.com/html/?q=${encoded}`, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+      },
+    });
 
     if (!response.ok) {
-      return { success: false, results: [], error: 'DuckDuckGo API error' };
+      return { success: false, results: [], error: 'DuckDuckGo search failed' };
     }
 
-    const data = await response.json() as {
-      Abstract?: string;
-      AbstractText?: string;
-      AbstractSource?: string;
-      AbstractURL?: string;
-      Answer?: string;
-      AnswerType?: string;
-      RelatedTopics?: Array<{
-        Text?: string;
-        FirstURL?: string;
-        Icon?: { URL?: string };
-      }>;
-    };
-
+    const html = await response.text();
     const results: SearchResult[] = [];
 
-    // Add abstract if available
-    if (data.AbstractText && data.AbstractURL) {
-      results.push({
-        title: data.AbstractSource || 'Wikipedia',
-        url: data.AbstractURL,
-        snippet: data.AbstractText.slice(0, 300),
-        source: data.AbstractSource,
-      });
+    // Parse search results from HTML
+    // Results are in <a class="result__a"> with href and title
+    // Snippets are in <a class="result__snippet">
+    const resultRegex = /<a[^>]*class="result__a"[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>[\s\S]*?<a[^>]*class="result__snippet"[^>]*>([^<]*)/g;
+
+    let match;
+    while ((match = resultRegex.exec(html)) !== null && results.length < 5) {
+      let url = match[1];
+      const title = match[2].trim();
+      const snippet = match[3].trim();
+
+      // DuckDuckGo uses redirect URLs, extract actual URL
+      if (url.includes('uddg=')) {
+        const urlMatch = url.match(/uddg=([^&]*)/);
+        if (urlMatch) {
+          url = decodeURIComponent(urlMatch[1]);
+        }
+      }
+
+      if (title && url && url.startsWith('http')) {
+        results.push({
+          title,
+          url,
+          snippet: snippet.slice(0, 300),
+          source: new URL(url).hostname.replace('www.', ''),
+        });
+      }
     }
 
-    // Add related topics
-    if (data.RelatedTopics) {
-      for (const topic of data.RelatedTopics.slice(0, 4)) {
-        if (topic.Text && topic.FirstURL) {
+    // If regex didn't work, try simpler pattern
+    if (results.length === 0) {
+      const simpleRegex = /<a[^>]*class="result__url"[^>]*href="([^"]*)"[^>]*>([^<]*)<\/a>/g;
+      while ((match = simpleRegex.exec(html)) !== null && results.length < 5) {
+        const url = match[1];
+        const domain = match[2].trim();
+        if (url && url.startsWith('http')) {
           results.push({
-            title: topic.Text.split(' - ')[0] || topic.Text.slice(0, 50),
-            url: topic.FirstURL,
-            snippet: topic.Text,
-            source: 'DuckDuckGo',
+            title: domain,
+            url,
+            snippet: 'Search result from ' + domain,
+            source: domain,
           });
         }
       }
@@ -136,8 +149,8 @@ async function searchWithDuckDuckGo(query: string): Promise<SearchResponse> {
 
     return {
       success: true,
-      answer: data.Answer || data.AbstractText?.slice(0, 200),
       results,
+      answer: results.length > 0 ? results[0].snippet : undefined,
     };
   } catch (error) {
     return { success: false, results: [], error: error instanceof Error ? error.message : 'DuckDuckGo search failed' };
@@ -192,20 +205,88 @@ async function searchWithSerpAPI(query: string, maxResults = 5): Promise<SearchR
 }
 
 // =============================================================================
+// Perplexity Search (Best for AI - returns synthesized answers)
+// =============================================================================
+
+async function searchWithPerplexity(query: string): Promise<SearchResponse> {
+  const apiKey = process.env.PERPLEXITY_API_KEY;
+  if (!apiKey) {
+    return { success: false, results: [], error: 'Perplexity API key not configured' };
+  }
+
+  try {
+    const response = await fetch('https://api.perplexity.ai/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`,
+      },
+      body: JSON.stringify({
+        model: 'llama-3.1-sonar-small-128k-online', // Online model with search
+        messages: [
+          {
+            role: 'system',
+            content: 'You are a helpful search assistant. Provide specific, factual answers with sources. Be concise but comprehensive.',
+          },
+          {
+            role: 'user',
+            content: query,
+          },
+        ],
+        max_tokens: 1000,
+        return_citations: true,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      return { success: false, results: [], error: `Perplexity error: ${error}` };
+    }
+
+    const data = await response.json() as {
+      choices: Array<{ message: { content: string } }>;
+      citations?: string[];
+    };
+
+    const answer = data.choices[0]?.message?.content || '';
+    const citations = data.citations || [];
+
+    // Convert citations to search results
+    const results: SearchResult[] = citations.slice(0, 5).map((url, i) => ({
+      title: `Source ${i + 1}`,
+      url,
+      snippet: '',
+      source: new URL(url).hostname.replace('www.', ''),
+    }));
+
+    return {
+      success: true,
+      answer,
+      results,
+    };
+  } catch (error) {
+    return { success: false, results: [], error: error instanceof Error ? error.message : 'Perplexity search failed' };
+  }
+}
+
+// =============================================================================
 // Main Search Function (cascading fallback)
 // =============================================================================
 
 /**
  * Search the web using available providers
- * Tries in order: Tavily → SerpAPI → DuckDuckGo
+ * Tries in order: Perplexity → Tavily → SerpAPI → DuckDuckGo
  */
 export async function webSearch(query: string, options: {
   maxResults?: number;
-  provider?: 'tavily' | 'serpapi' | 'duckduckgo' | 'auto';
+  provider?: 'perplexity' | 'tavily' | 'serpapi' | 'duckduckgo' | 'auto';
 } = {}): Promise<SearchResponse> {
   const { maxResults = 5, provider = 'auto' } = options;
 
   // Direct provider selection
+  if (provider === 'perplexity') {
+    return searchWithPerplexity(query);
+  }
   if (provider === 'tavily') {
     return searchWithTavily(query, maxResults);
   }
@@ -217,7 +298,15 @@ export async function webSearch(query: string, options: {
   }
 
   // Auto mode: try providers in order
-  // 1. Try Tavily first (best for AI)
+  // 1. Try Perplexity first (best quality, synthesized answers)
+  if (process.env.PERPLEXITY_API_KEY) {
+    const result = await searchWithPerplexity(query);
+    if (result.success && (result.answer || result.results.length > 0)) {
+      return result;
+    }
+  }
+
+  // 2. Try Tavily (good for AI)
   if (process.env.TAVILY_API_KEY) {
     const result = await searchWithTavily(query, maxResults);
     if (result.success && result.results.length > 0) {
@@ -225,7 +314,7 @@ export async function webSearch(query: string, options: {
     }
   }
 
-  // 2. Try SerpAPI
+  // 3. Try SerpAPI
   if (process.env.SERPAPI_KEY) {
     const result = await searchWithSerpAPI(query, maxResults);
     if (result.success && result.results.length > 0) {
@@ -233,7 +322,7 @@ export async function webSearch(query: string, options: {
     }
   }
 
-  // 3. Fallback to DuckDuckGo (always available, free)
+  // 4. Fallback to DuckDuckGo (always available, free but poor quality)
   return searchWithDuckDuckGo(query);
 }
 

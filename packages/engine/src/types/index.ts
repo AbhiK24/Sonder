@@ -444,6 +444,7 @@ export interface GenerateOptions {
   temperature?: number;
   maxTokens?: number;
   stopSequences?: string[];
+  useSearch?: boolean;  // Enable web search grounding (Kimi, Perplexity)
 }
 
 export interface ModelConfig {

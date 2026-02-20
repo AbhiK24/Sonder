@@ -150,18 +150,40 @@ class KimiProvider implements LLMProvider {
   }
 
   async generate(prompt: string, options?: GenerateOptions): Promise<string> {
+    const messages: Array<{ role: string; content: string; tool_call_id?: string }> = [
+      { role: 'user', content: prompt }
+    ];
+
+    const body: Record<string, unknown> = {
+      model: this.model,
+      messages,
+      temperature: options?.temperature ?? 0.8,
+      max_tokens: options?.maxTokens ?? 500,
+    };
+
+    // Kimi supports web search via builtin_function tool (K2 models) or use_search (v1 models)
+    if (options?.useSearch) {
+      // For K2 models, use builtin tool calling
+      if (this.model.includes('k2') || this.model.includes('kimi-k2')) {
+        body.tools = [{
+          type: 'builtin_function',
+          function: { name: '$web_search' }
+        }];
+        console.log('[Kimi] Using $web_search tool (K2 model)');
+      } else {
+        // For v1 models, use use_search parameter
+        body.use_search = true;
+        console.log('[Kimi] Using use_search parameter (v1 model)');
+      }
+    }
+
     const response = await fetch(`${this.endpoint}/chat/completions`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${this.apiKey}`,
       },
-      body: JSON.stringify({
-        model: this.model,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: options?.temperature ?? 0.8,
-        max_tokens: options?.maxTokens ?? 500,
-      }),
+      body: JSON.stringify(body),
     });
 
     if (!response.ok) {
@@ -169,8 +191,74 @@ class KimiProvider implements LLMProvider {
       throw new Error(`Kimi API error: ${response.status} - ${error}`);
     }
 
-    const data = await response.json() as { choices: Array<{ message: { content: string } }> };
-    return data.choices[0].message.content;
+    interface KimiResponse {
+      choices: Array<{
+        message: {
+          content: string | null;
+          tool_calls?: Array<{
+            id: string;
+            type: string;
+            function: { name: string; arguments: string };
+          }>;
+        };
+        finish_reason: string;
+      }>;
+    }
+
+    const data = await response.json() as KimiResponse;
+    const choice = data.choices[0];
+
+    // Handle tool calls (for K2 models with $web_search)
+    if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls) {
+      console.log('[Kimi] Processing tool calls:', choice.message.tool_calls.map(t => t.function.name));
+
+      // For $web_search, Kimi executes it internally and returns results
+      // We need to send the tool results back and get final response
+      const toolResults: Array<{ role: string; tool_call_id: string; content: string }> = [];
+
+      for (const toolCall of choice.message.tool_calls) {
+        console.log('[Kimi] Tool call:', toolCall.function.name, 'args:', toolCall.function.arguments);
+        if (toolCall.function.name === '$web_search') {
+          // Kimi handles $web_search internally - we just acknowledge it
+          toolResults.push({
+            role: 'tool',
+            tool_call_id: toolCall.id,
+            content: toolCall.function.arguments || '{}',
+          });
+        }
+      }
+
+      // Make follow-up call to get final response with search results
+      const followUpBody = {
+        model: this.model,
+        messages: [
+          ...messages,
+          { role: 'assistant', content: null, tool_calls: choice.message.tool_calls },
+          ...toolResults,
+        ],
+        temperature: options?.temperature ?? 0.8,
+        max_tokens: options?.maxTokens ?? 500,
+      };
+
+      const followUpResponse = await fetch(`${this.endpoint}/chat/completions`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${this.apiKey}`,
+        },
+        body: JSON.stringify(followUpBody),
+      });
+
+      if (!followUpResponse.ok) {
+        const error = await followUpResponse.text();
+        throw new Error(`Kimi API error on follow-up: ${followUpResponse.status} - ${error}`);
+      }
+
+      const followUpData = await followUpResponse.json() as KimiResponse;
+      return followUpData.choices[0].message.content || '';
+    }
+
+    return choice.message.content || '';
   }
 
   async generateJSON<T>(prompt: string, options?: GenerateOptions): Promise<T> {
