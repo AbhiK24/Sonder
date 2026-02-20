@@ -123,7 +123,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   // === Communication ===
   {
     name: 'send_email',
-    description: 'Send an email. REQUIRES CONFIRMATION: Before calling this, tell the user exactly what you\'re about to send (to, subject, summary of body) and wait for their "yes" or "go ahead". Signature is auto-added.',
+    description: 'Send an email. System will ask user for confirmation before sending. Signature is auto-added.',
     parameters: {
       type: 'object',
       properties: {
@@ -137,7 +137,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'send_whatsapp',
-    description: 'Send a WhatsApp message. REQUIRES CONFIRMATION: Before calling, show user the message and recipient, wait for "yes".',
+    description: 'Send a WhatsApp message. System will ask user for confirmation before sending.',
     parameters: {
       type: 'object',
       properties: {
@@ -270,7 +270,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'google_create_event',
-    description: 'Create a calendar event. REQUIRES CONFIRMATION: Before calling, tell user the details (title, time, location, invitees) and wait for "yes" or "go ahead".',
+    description: 'Create a calendar event. System will ask user for confirmation before creating.',
     parameters: {
       type: 'object',
       properties: {
@@ -310,7 +310,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
   {
     name: 'google_update_event',
-    description: 'Update/edit an existing calendar event. First use google_search_events to find the event ID. REQUIRES CONFIRMATION: Show user what changes you\'ll make before calling.',
+    description: 'Update/edit an existing calendar event. First use google_search_events to find the event ID. System will ask for confirmation before updating.',
     parameters: {
       type: 'object',
       properties: {
@@ -1670,12 +1670,7 @@ ${TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description}
   Parameters: ${Object.entries(t.parameters.properties).map(([k, v]) => `${k} (${v.type}): ${v.description}`).join(', ')}`).join('\n\n')}
 
 ## CRITICAL Rules:
-1. **CONFIRMATION REQUIRED** for send_email, send_whatsapp, google_create_event, google_update_event:
-   - BEFORE calling these tools, tell user exactly what you're about to do
-   - Include: recipient, subject/title, summary of content, time/location
-   - WAIT for user to say "yes", "go ahead", "do it", or similar
-   - Only then call the tool
-
+1. **Call tools directly** - The system will automatically ask user for confirmation before executing sensitive actions (emails, calendar events, WhatsApp messages). Just call the tool when appropriate.
 2. Only use tools when user explicitly asks for an action
 3. Wait for tool result before confirming to user
 4. NEVER claim to have done something without calling the tool

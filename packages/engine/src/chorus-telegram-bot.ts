@@ -78,6 +78,14 @@ const CONFIG = {
 // Types
 // =============================================================================
 
+interface PendingAction {
+  tool: string;
+  args: Record<string, unknown>;
+  description: string;
+  proposedAt: Date;
+  agentId: ChorusAgentId;
+}
+
 interface UserState {
   id: number;
   lastAgent: ChorusAgentId;
@@ -95,6 +103,9 @@ interface UserState {
   ftueRunner?: FTUERunner;
   inFTUE: boolean;
   savedFtueProgress?: { stepIndex: number; responses: Record<string, string>; waitingForResponse: boolean };
+
+  // Pending action awaiting user confirmation
+  pendingAction?: PendingAction;
 }
 
 // =============================================================================
@@ -337,8 +348,32 @@ If the user asks you to take an action (send email, etc.), use the appropriate t
     // Check for tool calls
     const toolCalls = parseToolCalls(response);
 
+    // Tools that require confirmation before executing
+    const CONFIRMATION_REQUIRED_TOOLS = ['send_email', 'send_whatsapp', 'google_create_event', 'google_update_event'];
+
     if (toolCalls.length > 0) {
-      // Execute tools
+      // Check if any tool requires confirmation
+      const confirmationTool = toolCalls.find(tc => CONFIRMATION_REQUIRED_TOOLS.includes(tc.name));
+
+      if (confirmationTool) {
+        // Store as pending action and ask for confirmation
+        const description = formatPendingActionDescription(confirmationTool);
+        state.pendingAction = {
+          tool: confirmationTool.name,
+          args: confirmationTool.arguments,
+          description,
+          proposedAt: new Date(),
+          agentId: agent.id,
+        };
+        saveState(state.id);
+
+        console.log(`[${state.id}] Stored pending action: ${confirmationTool.name}`);
+
+        // Return a confirmation prompt
+        return `${agent.emoji} *${agent.name}:* ${description}\n\nShould I go ahead? (Reply **yes** to confirm or **no** to cancel)`;
+      }
+
+      // Execute non-confirmation tools immediately
       const toolContext: ToolContext = {
         userId: String(state.profile.id),
         userName: state.profile.name,
@@ -409,6 +444,32 @@ Based on the tool results above, give a brief response confirming what happened.
 // =============================================================================
 // Off-topic Detection (during FTUE)
 // =============================================================================
+
+/**
+ * Format a human-readable description of a pending action for confirmation
+ */
+function formatPendingActionDescription(toolCall: { name: string; arguments: Record<string, unknown> }): string {
+  const args = toolCall.arguments;
+
+  switch (toolCall.name) {
+    case 'send_email':
+      return `I'll send an email to **${args.to}**\nSubject: "${args.subject}"`;
+
+    case 'send_whatsapp':
+      return `I'll send a WhatsApp message to **${args.to}**\nMessage: "${String(args.message).slice(0, 100)}${String(args.message).length > 100 ? '...' : ''}"`;
+
+    case 'google_create_event':
+      const location = args.location ? `\nLocation: ${args.location}` : '';
+      const invitees = args.invitees ? `\nInvitees: ${args.invitees}` : '';
+      return `I'll create a calendar event:\n**${args.title}**\nTime: ${args.startTime}${location}${invitees}`;
+
+    case 'google_update_event':
+      return `I'll update the calendar event "${args.eventId}" with your changes`;
+
+    default:
+      return `I'll execute: ${toolCall.name}`;
+  }
+}
 
 /**
  * Check if a message looks like an off-topic question rather than an FTUE answer.
@@ -759,6 +820,79 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
     if (handled) {
       saveState(chatId);
       return ''; // Messages sent by FTUE runner
+    }
+  }
+
+  // ============================================================
+  // PENDING ACTION - Check if user is confirming a pending action
+  // ============================================================
+  const confirmationWords = ['YES', 'YEP', 'YEAH', 'YA', 'GO AHEAD', 'DO IT', 'PROCEED', 'OK', 'OKAY', 'SURE', 'CONFIRM', 'APPROVED', 'GO FOR IT'];
+  const cancelWords = ['NO', 'NOPE', 'CANCEL', 'STOP', 'NEVERMIND', 'NEVER MIND', 'DON\'T', 'DONT'];
+
+  if (state.pendingAction) {
+    const isConfirmation = confirmationWords.some(w => upper === w || upper.startsWith(w + ' '));
+    const isCancellation = cancelWords.some(w => upper === w || upper.startsWith(w + ' '));
+
+    if (isConfirmation) {
+      const action = state.pendingAction;
+      state.pendingAction = undefined;
+      saveState(chatId);
+
+      console.log(`[${chatId}] Executing confirmed action: ${action.tool}`);
+
+      // Execute the pending action
+      const agent = agents[action.agentId];
+      const toolContext: ToolContext = {
+        userId: String(chatId),
+        agentId: action.agentId,
+        agentName: agent.name,
+        userName: state.profile.name,
+        userEmail: state.userEmail,
+        timezone: CONFIG.timezone,
+        emailAdapter: emailAdapter || undefined,
+        taskAdapter: taskAdapter || undefined,
+        whatsappAdapter: whatsappAdapter,
+      };
+
+      const result = await executeTool(action.tool, action.args, toolContext);
+      console.log(`[Tool] Result: ${result.success ? '✓' : '✗'} ${result.result || result.error}`);
+
+      actionLog.agentResponse({
+        agent: agent.name,
+        userId: String(chatId),
+        action: 'executed_confirmed_action',
+        context: action.tool,
+      });
+
+      const resultMsg = result.success
+        ? `✓ Done! ${result.result}`
+        : `Something went wrong: ${result.error}`;
+
+      state.history.push({
+        role: 'agent',
+        agentId: action.agentId,
+        content: resultMsg,
+        timestamp: new Date(),
+      });
+      saveState(chatId);
+
+      return `${agent.emoji} *${agent.name}:* ${resultMsg}`;
+    }
+
+    if (isCancellation) {
+      const action = state.pendingAction;
+      state.pendingAction = undefined;
+      saveState(chatId);
+
+      const agent = agents[action.agentId];
+      return `${agent.emoji} *${agent.name}:* Okay, cancelled. Let me know if you need anything else!`;
+    }
+
+    // If neither confirm nor cancel, clear pending and continue (user is asking something else)
+    // Only clear if the action is older than 5 minutes
+    const actionAge = Date.now() - state.pendingAction.proposedAt.getTime();
+    if (actionAge > 5 * 60 * 1000) {
+      state.pendingAction = undefined;
     }
   }
 
