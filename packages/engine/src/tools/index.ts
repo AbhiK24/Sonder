@@ -2236,23 +2236,29 @@ Example: "Email John, remind me at 5pm to call mom, and check my meetings tomorr
 Always handle ALL requests in a single response. Don't ask which one to do first - do them all.
 
 ## MISSING CAPABILITIES - CRITICAL
-**NEVER HALLUCINATE OR MAKE UP RESULTS.** If user asks for something you cannot do with existing tools:
+**ONLY USE TOOLS LISTED ABOVE.** Do NOT invent or call tools that don't exist in the list!
 
-1. **Be honest**: Tell user you don't have that capability yet
-2. **Offer to build**: You can create custom tools using \`build_tool\`!
-3. **Examples of things to build tools for**:
-   - YouTube video summarization (no existing tool for this!)
-   - Notion/Airtable search
-   - Spotify control
-   - Custom API integrations
+1. **Check the tool list**: Before calling ANY tool, verify it exists in "Available Tools" above
+2. **No youtube_summarizer exists**: There is NO built-in YouTube tool. Do not pretend one exists.
+3. **No Notion/Spotify/etc tools exist**: Unless listed above, these tools don't exist
+4. **To add new capabilities**: Use \`build_tool\` FIRST to create the tool, THEN use it
 
-**WRONG** (hallucinating):
-User: "Summarize this YouTube video"
-Agent: "The video discusses..." ❌ (you can't access YouTube!)
+**CRITICAL: When outputting a tool call, do NOT include fake results after it!**
+- Output ONLY the tool call block
+- Wait for the actual result
+- NEVER write "Here's the summary..." or similar fake output
 
-**RIGHT** (honest + offer to build):
-User: "Summarize this YouTube video"
-Agent: "I don't have YouTube access yet. Want me to build a youtube_summarizer tool? It would extract transcripts and create summaries." ✅`;
+**WRONG** (inventing a tool):
+\`\`\`tool
+{"name": "youtube_summarizer", "arguments": {...}}  ← TOOL DOESN'T EXIST!
+\`\`\`
+**Summary: The video discusses...** ← HALLUCINATED RESULTS!
+
+**RIGHT** (honest):
+"I don't have a YouTube summarizer yet. Want me to build one? It would:
+- Extract video transcripts
+- Create structured summaries
+Reply 'yes' to build it!"`;
 }
 
 /**
@@ -2300,10 +2306,24 @@ export function parseToolCalls(response: string): ToolCall[] {
  * Remove tool call blocks from response (for display to user)
  */
 export function removeToolCallsFromResponse(response: string): string {
-  return response
-    .replace(/```tool\s*\n?[\s\S]*?```/g, '')
-    .replace(/\{"name":\s*"\w+",\s*"arguments":\s*\{[^}]+\}\}/g, '')
-    .trim();
+  // Find the first tool call block
+  const toolCallMatch = response.match(/```tool\s*\n?[\s\S]*?```/);
+
+  if (toolCallMatch && toolCallMatch.index !== undefined) {
+    // Keep only the text BEFORE the first tool call
+    // Everything after the tool call is likely hallucinated results
+    const beforeToolCall = response.substring(0, toolCallMatch.index).trim();
+    return beforeToolCall;
+  }
+
+  // No tool call blocks found - check for inline JSON tool calls
+  const jsonToolMatch = response.match(/\{"name":\s*"\w+",\s*"arguments":\s*\{/);
+  if (jsonToolMatch && jsonToolMatch.index !== undefined) {
+    const beforeJson = response.substring(0, jsonToolMatch.index).trim();
+    return beforeJson;
+  }
+
+  return response.trim();
 }
 
 /**
