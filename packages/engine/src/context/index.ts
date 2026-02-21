@@ -261,8 +261,8 @@ export class EngineContext {
   getContextSummary(): string {
     const parts: string[] = [];
 
-    // Current time - always include so agents know the time
-    const timezone = process.env.TIMEZONE || 'UTC';
+    // Current time and user timezone (all times below shown in this zone)
+    const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
     const now = new Date();
     const timeStr = now.toLocaleString('en-US', {
       timeZone: timezone,
@@ -276,14 +276,15 @@ export class EngineContext {
     });
     parts.push(`## Current Time\n${timeStr} (${timezone})`);
 
-    // Calendar summary - show full 2-week view
+    // Calendar summary - show full 2-week view (times in user timezone)
     const allEvents = this.getCalendarEvents(); // Full 2 weeks
     const hasCalendar = this.config.calendarAdapter?.isConnected();
+    const tzOpt = { timeZone: timezone };
 
     if (allEvents.length > 0) {
       const eventLines = allEvents.map(e => {
-        const dateStr = e.startTime.toLocaleDateString([], { weekday: 'short', month: 'short', day: 'numeric' });
-        const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const dateStr = e.startTime.toLocaleDateString('en-US', { ...tzOpt, weekday: 'short', month: 'short', day: 'numeric' });
+        const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString('en-US', { ...tzOpt, hour: '2-digit', minute: '2-digit', hour12: true });
 
         // Build rich event info
         const parts: string[] = [`- ${dateStr} ${timeStr}: ${e.title}`];
@@ -365,6 +366,9 @@ export class EngineContext {
       return '';
     }
 
+    const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
+    const tzOpt = { timeZone: timezone };
+
     // Group by date
     const byDate = new Map<string, CalendarEvent[]>();
 
@@ -376,19 +380,18 @@ export class EngineContext {
       byDate.get(dateKey)!.push(event);
     }
 
-    // Format
+    // Format (times in user timezone)
     const lines: string[] = ['## Calendar (next 2 weeks)'];
 
     const sortedDates = Array.from(byDate.keys()).sort();
     for (const dateKey of sortedDates) {
-      const events = byDate.get(dateKey)!;
-      const date = new Date(dateKey);
-      const dateStr = date.toLocaleDateString([], { weekday: 'long', month: 'short', day: 'numeric' });
+      const dayEvents = byDate.get(dateKey)!;
+      const dateStr = dayEvents[0].startTime.toLocaleDateString('en-US', { ...tzOpt, weekday: 'long', month: 'short', day: 'numeric' });
 
       lines.push(`\n**${dateStr}**`);
 
-      for (const e of events) {
-        const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      for (const e of dayEvents) {
+        const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString('en-US', { ...tzOpt, hour: '2-digit', minute: '2-digit', hour12: true });
         const calName = e.calendarName ? ` [${e.calendarName}]` : '';
         lines.push(`- ${timeStr}: ${e.title}${calName}`);
       }

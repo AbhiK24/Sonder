@@ -331,8 +331,16 @@ function parseTimeMatch(match: RegExpMatchArray): TimeComponents | null {
   return { hours, minutes };
 }
 
+const DEFAULT_TZ = 'Asia/Kolkata';
+
+function getTimezone(): string {
+  return process.env.TIMEZONE || DEFAULT_TZ;
+}
+
 function formatTime(date: Date): string {
+  const tz = getTimezone();
   return date.toLocaleString('en-US', {
+    timeZone: tz,
     weekday: 'short',
     month: 'short',
     day: 'numeric',
@@ -343,14 +351,19 @@ function formatTime(date: Date): string {
 }
 
 export function formatReminderTime(date: Date): string {
+  const tz = getTimezone();
+  const tzOpt = { timeZone: tz };
   const now = new Date();
-  const isToday = date.toDateString() === now.toDateString();
+  const nowInTz = new Date(now.toLocaleString('en-US', { timeZone: tz }));
+  const dateInTz = new Date(date.toLocaleString('en-US', { timeZone: tz }));
+  const isToday = dateInTz.toDateString() === nowInTz.toDateString();
 
-  const tomorrow = new Date(now);
+  const tomorrow = new Date(nowInTz);
   tomorrow.setDate(tomorrow.getDate() + 1);
-  const isTomorrow = date.toDateString() === tomorrow.toDateString();
+  const isTomorrow = dateInTz.toDateString() === tomorrow.toDateString();
 
   const timeStr = date.toLocaleTimeString('en-US', {
+    ...tzOpt,
     hour: 'numeric',
     minute: '2-digit',
     hour12: true,
@@ -362,6 +375,7 @@ export function formatReminderTime(date: Date): string {
     return `tomorrow at ${timeStr}`;
   } else {
     return date.toLocaleDateString('en-US', {
+      ...tzOpt,
       weekday: 'short',
       month: 'short',
       day: 'numeric',

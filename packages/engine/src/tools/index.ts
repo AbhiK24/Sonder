@@ -929,9 +929,11 @@ export const toolExecutors: Record<string, ToolExecutor> = {
         return { success: true, result: 'No events found in that time range.' };
       }
 
+      const tz = context.timezone || process.env.TIMEZONE || 'Asia/Kolkata';
+      const tzOpt = { timeZone: tz };
       const formatted = events.map(e => {
-        const dateStr = e.startTime.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
-        const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+        const dateStr = e.startTime.toLocaleDateString('en-US', { ...tzOpt, weekday: 'short', month: 'short', day: 'numeric' });
+        const timeStr = e.isAllDay ? 'All day' : e.startTime.toLocaleTimeString('en-US', { ...tzOpt, hour: '2-digit', minute: '2-digit', hour12: true });
         return `- ${dateStr} ${timeStr}: ${e.title}`;
       }).join('\n');
 
@@ -965,11 +967,13 @@ export const toolExecutors: Record<string, ToolExecutor> = {
         return { success: true, result: `No event found matching "${eventTitle}"` };
       }
 
-      // Format full details
+      // Format full details (user timezone)
+      const tz = context.timezone || process.env.TIMEZONE || 'Asia/Kolkata';
+      const tzOpt = { timeZone: tz };
       const lines = [
         `**${match.title}**`,
-        `Date: ${match.startTime.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' })}`,
-        `Time: ${match.isAllDay ? 'All day' : `${match.startTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })} - ${match.endTime.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}`}`,
+        `Date: ${match.startTime.toLocaleDateString('en-US', { ...tzOpt, weekday: 'long', month: 'long', day: 'numeric' })}`,
+        `Time: ${match.isAllDay ? 'All day' : `${match.startTime.toLocaleTimeString('en-US', { ...tzOpt, hour: '2-digit', minute: '2-digit', hour12: true })} - ${match.endTime.toLocaleTimeString('en-US', { ...tzOpt, hour: '2-digit', minute: '2-digit', hour12: true })}`}`,
       ];
 
       if (match.organizer) {
@@ -2045,7 +2049,9 @@ export const toolExecutors: Record<string, ToolExecutor> = {
         context.agentId
       );
 
+      const tz = context.timezone || process.env.TIMEZONE || 'Asia/Kolkata';
       const formattedTime = result.reminder.dueAt.toLocaleString('en-US', {
+        timeZone: tz,
         weekday: 'short',
         month: 'short',
         day: 'numeric',
@@ -2074,8 +2080,10 @@ export const toolExecutors: Record<string, ToolExecutor> = {
       return { success: true, result: 'No pending reminders.' };
     }
 
+    const tz = context.timezone || process.env.TIMEZONE || 'Asia/Kolkata';
     const lines = reminders.map(r => {
       const time = new Date(r.dueAt).toLocaleString('en-US', {
+        timeZone: tz,
         weekday: 'short',
         month: 'short',
         day: 'numeric',

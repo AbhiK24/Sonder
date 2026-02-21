@@ -764,7 +764,9 @@ RULES:
 function formatTimeHuman(timeStr: string): string {
   try {
     const date = new Date(timeStr);
+    const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
     return date.toLocaleString('en-US', {
+      timeZone: timezone,
       weekday: 'short',
       month: 'short',
       day: 'numeric',
