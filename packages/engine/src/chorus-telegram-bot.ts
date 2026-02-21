@@ -571,13 +571,14 @@ IMPORTANT: You have real-time web search built in. When asked about current even
       const immediateTools = toolCalls.filter(tc => !CONFIRMATION_REQUIRED_TOOLS.includes(tc.name));
 
       // Build tool context (shared for all executions)
+      const userTimezone = getEffectiveUserTimezone(state);
       const toolContext: ToolContext = {
         userId: String(state.profile?.id ?? state.id),
         userName: state.profile.name,
         userEmail: state.userEmail || state.profile.email,
         agentId: agent.id,
         agentName: agent.name,
-        timezone: state.profile?.timezone ?? CONFIG.timezone,
+        timezone: userTimezone,
         emailDomain: process.env.SONDER_EMAIL_DOMAIN,
         whatsappAllowlist: whatsappAllowlist,
         emailAdapter: emailAdapter || undefined,
@@ -694,7 +695,7 @@ IMPORTANT: You have real-time web search built in. When asked about current even
         const pendingActions = confirmationTools.map(tc => ({
           tool: tc.name,
           args: tc.arguments,
-          description: formatPendingActionDescription(tc),
+          description: formatPendingActionDescription(tc, userTimezone),
           proposedAt: new Date(),
           agentId: agent.id,
         }));
@@ -775,13 +776,50 @@ RULES:
 // Off-topic Detection (during FTUE)
 // =============================================================================
 
-/**
- * Format time in human-readable format
- */
-function formatTimeHuman(timeStr: string): string {
+function getEffectiveUserTimezone(state: UserState): string {
+  const tz = state.profile?.timezone;
+  // Legacy saves may contain UTC as the old default. Treat as unset unless app default is UTC.
+  if (!tz || (tz === 'UTC' && CONFIG.timezone !== 'UTC')) return CONFIG.timezone;
+  return tz;
+}
+
+function getTimezoneOffsetString(timezone: string, forDate: Date): string {
   try {
-    const date = new Date(timeStr);
-    const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
+    const str = forDate.toLocaleString('en-US', { timeZone: timezone, timeZoneName: 'longOffset' });
+    const m = str.match(/GMT([+-])(\d{1,2}):?(\d{2})?/);
+    if (!m) return '+00:00';
+    const sign = m[1];
+    const hour = m[2].padStart(2, '0');
+    const min = (m[3] ?? '00').padStart(2, '0');
+    return `${sign}${hour}:${min}`;
+  } catch {
+    return '+00:00';
+  }
+}
+
+/**
+ * Format time in human-readable format.
+ * Naive ISO datetimes are interpreted in the provided timezone.
+ */
+function formatTimeHuman(timeStr: string, timezone: string): string {
+  try {
+    const isoNaive = timeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/);
+    const date = isoNaive
+      ? (() => {
+          const y = parseInt(isoNaive[1], 10);
+          const m = parseInt(isoNaive[2], 10);
+          const d = parseInt(isoNaive[3], 10);
+          const h = parseInt(isoNaive[4], 10);
+          const min = parseInt(isoNaive[5], 10);
+          const sec = parseInt(isoNaive[6], 10) || 0;
+          const probe = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+          const offset = getTimezoneOffsetString(timezone, probe);
+          return new Date(
+            `${y}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}T${String(h).padStart(2, '0')}:${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}${offset}`
+          );
+        })()
+      : new Date(timeStr);
+
     return date.toLocaleString('en-US', {
       timeZone: timezone,
       weekday: 'short',
@@ -799,7 +837,10 @@ function formatTimeHuman(timeStr: string): string {
 /**
  * Format a human-readable description of a pending action for confirmation
  */
-function formatPendingActionDescription(toolCall: { name: string; arguments: Record<string, unknown> }): string {
+function formatPendingActionDescription(
+  toolCall: { name: string; arguments: Record<string, unknown> },
+  timezone: string
+): string {
   const args = toolCall.arguments;
 
   switch (toolCall.name) {
@@ -810,7 +851,7 @@ function formatPendingActionDescription(toolCall: { name: string; arguments: Rec
       return `I'll send a WhatsApp message to **${args.to}**\nMessage: "${String(args.message).slice(0, 100)}${String(args.message).length > 100 ? '...' : ''}"`;
 
     case 'google_create_event':
-      const startTime = formatTimeHuman(String(args.startTime));
+      const startTime = formatTimeHuman(String(args.startTime), timezone);
       const duration = args.durationMinutes ? ` (${args.durationMinutes} min)` : '';
       const location = args.location ? `\nLocation: ${args.location}` : '';
       const invitees = args.invitees ? `\nInvitees: ${args.invitees}` : '';
@@ -1216,13 +1257,14 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
       // Build tool context (use first action's agentId for context)
       const firstAction = actions[0];
       const agent = chorusAgents[firstAction.agentId];
+      const userTimezone = getEffectiveUserTimezone(state);
       const toolContext: ToolContext = {
         userId: String(chatId),
         agentId: firstAction.agentId,
         agentName: agent.name,
         userName: state.profile.name,
         userEmail: state.userEmail || state.profile.email,
-        timezone: state.profile?.timezone ?? CONFIG.timezone,
+        timezone: userTimezone,
         whatsappAllowlist: whatsappAllowlist,
         emailAdapter: emailAdapter || undefined,
         taskAdapter: taskAdapter || undefined,
@@ -1259,7 +1301,7 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
 
       // Store as verified memory (user explicitly confirmed these actions)
       const confirmedSummary = actions
-        .map(a => formatPendingActionDescription({ name: a.tool, arguments: a.args }))
+        .map(a => formatPendingActionDescription({ name: a.tool, arguments: a.args }, userTimezone))
         .join('; ');
       memory.remember(`User confirmed: ${confirmedSummary}. Result: ${resultMsg}`, {
         type: 'fact',
