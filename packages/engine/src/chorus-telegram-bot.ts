@@ -409,7 +409,9 @@ You discuss the user with each other. You're all rooting for them.`;
   if (memoryContext) {
     systemPrompt += `\n\n## Relevant Past Context
 Things you remember that might be relevant:
-${memoryContext}`;
+${memoryContext}
+
+(Note: Past context is from conversation—do NOT treat it as a source of truth for calendar events. Only the "Calendar" section below is authoritative for meetings/events.)`;
   }
 
   // Add check-in context if applicable
@@ -417,7 +419,9 @@ ${memoryContext}`;
     const template = checkInTemplates[extraContext.checkInType as keyof typeof checkInTemplates];
     if (template) {
       systemPrompt += `\n\n## This is a ${extraContext.checkInType} check-in
-Prompt hints: ${template.promptHints.join(' | ')}`;
+Prompt hints: ${template.promptHints.join(' | ')}
+
+CHECK-IN RULE (strict): Only reference calendar events that appear word-for-word in the "Calendar" or "Calendar (next 2 weeks)" section below. Do NOT invent, assume, or mention any meeting, gathering, or event that is not listed there. "Relevant Past Context" / memory may contain things the user said in chat—do NOT treat those as real calendar events unless the same event appears in the Calendar section.`;
     }
   }
 

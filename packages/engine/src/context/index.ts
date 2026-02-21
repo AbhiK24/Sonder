@@ -321,8 +321,8 @@ export class EngineContext {
       parts.push(`## Calendar\nNo calendar connected. If user asks about calendar/meetings, tell them to connect one in settings.`);
     }
 
-    // Add general grounding instruction
-    parts.push(`\n## CRITICAL: Never hallucinate data\nOnly state facts from the context above. If you don't have information about something (calendar events, tasks, etc.), say "I don't have that information" - NEVER make up data.`);
+    // Add general grounding instruction (prevents inventing events like "Pratik sthala gathering at 3.30")
+    parts.push(`\n## CRITICAL: Never hallucinate data\nOnly state facts from the context above. CALENDAR: Only mention events that are explicitly listed in the "Calendar" section above—never invent event names, times, locations, or gatherings. If the Calendar section is empty or says "No events", do not mention any specific meeting or event. If you don't have information about something (calendar, tasks, etc.), say so—NEVER make up data.`);
 
     // Tasks summary - ALWAYS include to prevent hallucination
     const todayTasks = this.getTodayTasks();
