@@ -138,7 +138,7 @@ export class IdleEngine {
     this.presence.startChecking(5);  // Check every 5 minutes
 
     // Start idle tick
-    const tickMinutes = this.config.tickIntervalMinutes || 30;
+    const tickMinutes = this.config.tickIntervalMinutes || 10;  // Generate thoughts every 10 min
     this.tickInterval = setInterval(
       () => this.idleTick(),
       tickMinutes * 60 * 1000
@@ -206,8 +206,19 @@ export class IdleEngine {
 
     const allAwayUsers = [...awayUsers, ...dormantUsers];
 
+    console.log(`[IdleEngine] Tick: ${awayUsers.length} away, ${dormantUsers.length} dormant`);
+
+    if (allAwayUsers.length === 0) {
+      // Log all known users and their status for debugging
+      const allPresence = this.presence.debug();
+      for (const [userId, p] of allPresence) {
+        console.log(`[IdleEngine] User ${userId}: status=${p.status}, away=${this.presence.awayDuration(userId)}m`);
+      }
+    }
+
     for (const userPresence of allAwayUsers) {
       try {
+        console.log(`[IdleEngine] Generating for ${userPresence.userId} (away ${this.presence.awayDuration(userPresence.userId)}m)`);
         await this.generateForUser(userPresence.userId);
       } catch (error) {
         console.error(`[IdleEngine] Failed to generate for ${userPresence.userId}:`, error);
@@ -223,14 +234,18 @@ export class IdleEngine {
     const agents = await this.hooks.getAgents(userId);
     const userContext = await this.hooks.getUserContext(userId, awayMinutes);
 
+    console.log(`[IdleEngine] generateForUser ${userId}: ${agents.length} agents, away ${awayMinutes}m`);
+
     const trigger: IdleTrigger = {
       type: 'time',
       afterMinutes: awayMinutes,
     };
 
     // Generate thoughts for each agent (round-robin)
+    let totalThoughts = 0;
     for (const agent of agents) {
       const thoughts = await this.generator.generateThoughts(agent, userContext, trigger);
+      console.log(`[IdleEngine] ${agent.agentName} generated ${thoughts.length} thoughts`);
 
       for (const thought of thoughts) {
         const accumulated = this.accumulator.add({
@@ -242,6 +257,7 @@ export class IdleEngine {
           aboutUser: thought.aboutUser,
           triggeredBy: thought.triggeredBy,
         });
+        totalThoughts++;
 
         // Fire hook
         if (this.hooks.onThoughtGenerated) {
@@ -249,6 +265,8 @@ export class IdleEngine {
         }
       }
     }
+
+    console.log(`[IdleEngine] Total ${totalThoughts} thoughts generated for ${userId}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -274,13 +292,16 @@ export class IdleEngine {
     awayMinutes: number,
     previousStatus: PresenceStatus
   ): Promise<void> {
-    console.log(`[IdleEngine] User returned: ${userId} (away ${awayMinutes}m)`);
+    console.log(`[IdleEngine] User returned: ${userId} (away ${awayMinutes}m, was ${previousStatus})`);
 
     // Get accumulated thoughts
     const thoughts = this.accumulator.getUnshared(userId);
+    console.log(`[IdleEngine] Found ${thoughts.length} unshared thoughts for ${userId}`);
 
-    if (thoughts.length === 0 && awayMinutes < 60) {
-      // Not enough time away, no thoughts accumulated - skip reunion
+    // Always send reunion if away 30+ minutes (the threshold for "away" status)
+    if (thoughts.length === 0 && awayMinutes < 30) {
+      // Brief absence, no thoughts - skip reunion
+      console.log(`[IdleEngine] Skipping reunion: no thoughts and away only ${awayMinutes}m`);
       return;
     }
 

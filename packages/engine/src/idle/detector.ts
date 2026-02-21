@@ -75,6 +75,7 @@ export class PresenceDetector {
 
       // Was away, now returning
       if (previousStatus !== 'active' && awayMinutes >= this.thresholds.awayAfterMinutes) {
+        console.log(`[PresenceDetector] ${userId} returned after ${awayMinutes}m (was ${previousStatus})`);
         this.fireReturn(userId, awayMinutes, previousStatus);
 
         // Update session stats
@@ -86,6 +87,7 @@ export class PresenceDetector {
       existing.status = 'active';
     } else {
       // New user
+      console.log(`[PresenceDetector] New user: ${userId}`);
       this.presence.set(userId, {
         userId,
         lastSeen: now,
@@ -205,6 +207,9 @@ export class PresenceDetector {
 
   private checkForDepartures(): void {
     const now = new Date();
+    const userCount = this.presence.size;
+
+    console.log(`[PresenceDetector] Checking ${userCount} users for departures`);
 
     for (const [userId, presence] of this.presence.entries()) {
       const minutesAway = this.minutesSince(presence.lastSeen);
@@ -212,6 +217,7 @@ export class PresenceDetector {
 
       // Transition from active → away
       if (presence.status === 'active' && newStatus === 'away') {
+        console.log(`[PresenceDetector] ${userId}: active → away (${minutesAway}m)`);
         presence.status = 'away';
         this.fireDeparture(userId, presence.lastSeen);
         this.save();
@@ -219,6 +225,7 @@ export class PresenceDetector {
 
       // Transition from away → dormant
       if (presence.status === 'away' && newStatus === 'dormant') {
+        console.log(`[PresenceDetector] ${userId}: away → dormant (${minutesAway}m)`);
         presence.status = 'dormant';
         // Could fire a separate "gone dormant" event here
       }
@@ -261,6 +268,9 @@ export class PresenceDetector {
             lastSessionStart: new Date(p.lastSessionStart),
           });
         }
+        console.log(`[PresenceDetector] Loaded ${this.presence.size} users from ${this.storagePath}`);
+      } else {
+        console.log(`[PresenceDetector] No presence file at ${this.storagePath}`);
       }
     } catch (error) {
       console.warn('[PresenceDetector] Failed to load presence data:', error);
@@ -271,6 +281,7 @@ export class PresenceDetector {
     try {
       const dir = dirname(this.storagePath);
       if (!existsSync(dir)) {
+        console.log(`[PresenceDetector] Creating directory: ${dir}`);
         mkdirSync(dir, { recursive: true });
       }
 

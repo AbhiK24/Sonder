@@ -145,7 +145,7 @@ Keep it to 1-2 sentences. Don't be generic.`;
 
   shouldGenerate(agent, user, trigger) {
     // Don't generate if user was only away briefly
-    if (user.awayMinutes < 30) return false;
+    if (user.awayMinutes < 15) return false;  // Generate after 15 min away
     return true;
   },
 };
@@ -203,11 +203,13 @@ export class IdleThoughtGenerator {
   ): Promise<GeneratedThought[]> {
     // Check if we should generate
     if (!this.promptBuilder.shouldGenerate(agent, user, trigger)) {
+      console.log(`[IdleGenerator] ${agent.agentName}: shouldGenerate=false (away ${user.awayMinutes}m)`);
       return [];
     }
 
     // Check rate limits
     if (!this.checkRateLimits(agent.agentId)) {
+      console.log(`[IdleGenerator] ${agent.agentName}: rate limited`);
       return [];
     }
 
