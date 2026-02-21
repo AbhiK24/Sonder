@@ -356,6 +356,19 @@ function getUserContext(state: UserState, awayMinutes: number): UserContext {
 // =============================================================================
 
 /**
+ * Escape text so it can be safely embedded in a Telegram Markdown message.
+ * Prevents "can't parse entities" when tool names (e.g. add_contact) or results contain _ * ` [
+ */
+function escapeForTelegramMarkdown(text: string): string {
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/_/g, '\\_')
+    .replace(/\*/g, '\\*')
+    .replace(/`/g, '\\`')
+    .replace(/\[/g, '\\[');
+}
+
+/**
  * Strip any leading agent name prefix from LLM response
  * e.g. "Luna: Hello" -> "Hello", "**Luna:** Hello" -> "Hello"
  */
@@ -708,7 +721,8 @@ IMPORTANT: You have real-time web search built in. When asked about current even
         if (immediateResults.length > 0) {
           const hasFailure = immediateResults.some(r => r.startsWith('✗'));
           const doneLabel = hasFailure ? '**What happened:**' : '**Done:**';
-          return `${doneLabel}\n${immediateResults.join('\n')}\n\n${agent.emoji} *${agent.name}:* ${confirmMsg}\n\nReply **yes** to confirm or **no** to cancel.`;
+          const safeResults = escapeForTelegramMarkdown(immediateResults.join('\n'));
+          return `${doneLabel}\n${safeResults}\n\n${agent.emoji} *${agent.name}:* ${confirmMsg}\n\nReply **yes** to confirm or **no** to cancel.`;
         }
 
         return `${agent.emoji} *${agent.name}:* ${confirmMsg}\n\nReply **yes** to confirm or **no** to cancel.`;
