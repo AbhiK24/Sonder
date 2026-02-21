@@ -728,7 +728,15 @@ If approved, other Sonder users can use this tool too.`,
 export const toolExecutors: Record<string, ToolExecutor> = {
   // === Communication ===
   async send_email(args, context): Promise<ToolResult> {
-    const { to, cc, subject, body } = args as { to: string; cc?: string; subject: string; body: string };
+    const raw = args as { to?: string; cc?: string; subject?: string; body?: string; content?: string };
+    const to = raw.to ?? '';
+    const cc = raw.cc;
+    const subject = raw.subject ?? '(No subject)';
+    const body = (raw.body ?? raw.content ?? '').trim();
+
+    if (!to || !body) {
+      return { success: false, error: 'Missing required fields: need "to" and "body" (or "content")' };
+    }
 
     // Check if we have any way to send email
     const google = getGoogleOAuth();
@@ -1547,27 +1555,36 @@ export const toolExecutors: Record<string, ToolExecutor> = {
 
   // === Contacts ===
   async save_contact(args, context): Promise<ToolResult> {
-    const { name, nickname, email, phone, category, company, role, relationship } = args as {
-      name: string;
+    const raw = args as {
+      name?: string;
       nickname?: string;
       email?: string;
       phone?: string;
-      category: ContactCategory;
+      category?: string;
       company?: string;
       role?: string;
       relationship?: string;
     };
+    const name = (raw.name ?? '').trim();
+    const category = (raw.category ?? 'acquaintance') as ContactCategory;
+    const validCategories: ContactCategory[] = ['friend', 'family', 'business', 'acquaintance'];
+    if (!name) {
+      return { success: false, error: 'Contact name is required' };
+    }
+    if (!validCategories.includes(category)) {
+      return { success: false, error: `Category must be one of: ${validCategories.join(', ')}` };
+    }
 
     try {
       const contact = addContact({
         name,
-        nickname,
-        email,
-        phone,
+        nickname: raw.nickname,
+        email: raw.email,
+        phone: raw.phone,
         category,
-        company,
-        role,
-        relationship,
+        company: raw.company,
+        role: raw.role,
+        relationship: raw.relationship,
       });
 
       const details = [
@@ -2289,8 +2306,9 @@ ${TOOL_DEFINITIONS.map(t => `- ${t.name}: ${t.description}
 5. For emails: Signature is auto-added. Don't include one in the body.
 6. For calendar invites: Use ISO 8601 format for times (e.g., 2026-02-23T15:00:00).
 
-## MULTIPLE ACTIONS - IMPORTANT
-When the user asks for multiple things at once, output MULTIPLE tool calls in sequence:
+## MULTIPLE ACTIONS - CRITICAL
+When the user asks for multiple things at once, you MUST output MULTIPLE tool calls (one per action) in the same response. This applies to both text \`\`\`tool\`\`\` blocks and native tool calls.
+Do NOT do only the first action. Do NOT ask "which one first?" — do them all.
 
 Example: "Email John, remind me at 5pm to call mom, and check my meetings tomorrow"
 \`\`\`tool
@@ -2303,7 +2321,7 @@ Example: "Email John, remind me at 5pm to call mom, and check my meetings tomorr
 {"name": "google_get_events", "arguments": {"date": "tomorrow"}}
 \`\`\`
 
-Always handle ALL requests in a single response. Don't ask which one to do first - do them all.
+Always handle ALL requests in a single response. One tool call per action. Don't ask which one to do first - do them all.
 
 ## YOUTUBE VIDEOS - LIMITATIONS
 For YouTube links, use \`summarize_link\` - but be aware it can ONLY get title and description.
@@ -2477,6 +2495,7 @@ const ACTION_TOOLS = new Set([
   'create_reminder',
   'cancel_reminder',
   'add_contact',
+  'save_contact',
   'add_venue',
   'log_interaction',
 ]);

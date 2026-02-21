@@ -494,6 +494,7 @@ ${userMessage}
 ## Your Response
 You ARE ${agent.name}. Stay in character - be warm, supportive, and true to your role. Keep responses concise (1-3 sentences unless more is needed). Don't be overly effusive. Do NOT prefix your response with your name - just respond directly.
 If the user asks you to take an action (send email, etc.), use the appropriate tool.
+**If the user asked for MULTIPLE things (e.g. "send this email and save that contact"), you MUST call a tool for EACH of them in this same response. Do not do only one.**
 
 IMPORTANT: You have real-time web search built in. When asked about current events, weather, news, or any current information, just answer directly - you already have web access. Never say you can't search the web or need permission.`;
 
@@ -558,7 +559,7 @@ IMPORTANT: You have real-time web search built in. When asked about current even
 
       // Build tool context (shared for all executions)
       const toolContext: ToolContext = {
-        userId: String(state.profile.id),
+        userId: String(state.profile?.id ?? state.id),
         userName: state.profile.name,
         userEmail: state.userEmail || state.profile.email,
         agentId: agent.id,
@@ -703,12 +704,14 @@ IMPORTANT: You have real-time web search built in. When asked about current even
           confirmMsg = `I'll do ${pendingActions.length} things:\n\n${pendingActions.map((a, i) => `${i + 1}. ${a.description}`).join('\n')}`;
         }
 
-        // If we also executed immediate tools, include those results
+        // If we also executed immediate tools, surface both clearly so nothing is "not noticed"
         if (immediateResults.length > 0) {
-          return `${immediateResults.join('\n')}\n\n${agent.emoji} *${agent.name}:* ${confirmMsg}\n\nShould I go ahead? (Reply **yes** to confirm or **no** to cancel)`;
+          const hasFailure = immediateResults.some(r => r.startsWith('✗'));
+          const doneLabel = hasFailure ? '**What happened:**' : '**Done:**';
+          return `${doneLabel}\n${immediateResults.join('\n')}\n\n${agent.emoji} *${agent.name}:* ${confirmMsg}\n\nReply **yes** to confirm or **no** to cancel.`;
         }
 
-        return `${agent.emoji} *${agent.name}:* ${confirmMsg}\n\nShould I go ahead? (Reply **yes** to confirm or **no** to cancel)`;
+        return `${agent.emoji} *${agent.name}:* ${confirmMsg}\n\nReply **yes** to confirm or **no** to cancel.`;
       }
 
       // No confirmation needed - just return results from immediate tools
