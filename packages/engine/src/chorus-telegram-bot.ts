@@ -31,7 +31,7 @@ import type { UserProfile, Goal } from './user/types.js';
 import { createUserProfile } from './user/types.js';
 
 // Memory (local embeddings + vector store)
-import { createMemory, Memory } from './memory/index.js';
+import { createMemory, Memory, type SearchResult } from './memory/index.js';
 
 // Auto-updater
 import { startUpdateChecker, stopUpdateChecker, getCurrentVersion } from './updater/index.js';
@@ -297,6 +297,28 @@ function getAgentContext(agent: ChorusAgent): AgentContext {
   };
 }
 
+/**
+ * Format recalled memories with source labels for the prompt.
+ * Enables source-of-truth rules: only treat verified/calendar/user_confirmed as factual.
+ */
+function formatMemoryContextForPrompt(results: SearchResult[]): string {
+  return results.map((r) => {
+    const src = r.entry.metadata?.source as string | undefined;
+    const factual = r.entry.metadata?.factual as boolean | undefined;
+    const label =
+      factual === true || src === 'user_confirmed'
+        ? 'Verified (user confirmed or factual)'
+        : src === 'calendar' || src === 'tool_result'
+          ? 'From calendar/tools'
+          : src === 'user_message'
+            ? 'User said (not verified)'
+            : src === 'agent_message'
+              ? 'Agent said (not verified)'
+              : 'Past context (not verified)';
+    return `${label}: ${r.entry.text}`;
+  }).join('\n');
+}
+
 function getUserContext(state: UserState, awayMinutes: number): UserContext {
   const recentHistory = state.history.slice(-20);
 
@@ -360,16 +382,21 @@ async function generateAgentResponse(
   memoryContext?: string,
   extraContext?: { checkInType?: string; reunionContext?: string }
 ): Promise<string> {
-  // Build context from history
-  const recentHistory = state.history.slice(-10)
-    .map(h => {
-      if (h.role === 'agent') {
-        const a = chorusAgents[h.agentId as ChorusAgentId];
-        return `${a?.name || 'Agent'}: ${h.content}`;
-      }
-      return `User: ${h.content}`;
-    })
-    .join('\n');
+  // For check-ins and reunions: do NOT feed conversation history. It often contains
+  // wrong or outdated event names (e.g. hallucinated "Pratik sthala gathering") that
+  // the model then repeats. Use only Calendar section as source of truth.
+  const isCalendarSensitive = !!(extraContext?.checkInType || extraContext?.reunionContext);
+  const recentHistory = isCalendarSensitive
+    ? ''
+    : state.history.slice(-10)
+        .map(h => {
+          if (h.role === 'agent') {
+            const a = chorusAgents[h.agentId as ChorusAgentId];
+            return `${a?.name || 'Agent'}: ${h.content}`;
+          }
+          return `User: ${h.content}`;
+        })
+        .join('\n');
 
   // Build prompt
   let systemPrompt = agent.systemPrompt;
@@ -405,13 +432,10 @@ ${agentList.map(a => `- ${a.emoji} ${a.name} (${a.role}): ${a.description}`).joi
 
 You discuss the user with each other. You're all rooting for them.`;
 
-  // Add semantic memory context (relevant past conversations)
+  // Add semantic memory context (with source labels: Verified / User said / Agent said)
   if (memoryContext) {
-    systemPrompt += `\n\n## Relevant Past Context
-Things you remember that might be relevant:
-${memoryContext}
-
-(Note: Past context is from conversation—do NOT treat it as a source of truth for calendar events. Only the "Calendar" section below is authoritative for meetings/events.)`;
+    systemPrompt += `\n\n## Relevant Past Context (see Source of truth rules)
+${memoryContext}`;
   }
 
   // Add check-in context if applicable
@@ -439,6 +463,15 @@ CRITICAL: Do NOT mention or reference ANY calendar events, meetings, or appointm
     systemPrompt += `\n\n${contextSummary}`;
   }
 
+  // Source of truth (all messages): only state facts from these sources
+  systemPrompt += `\n\n## Source of truth (every message)
+Only mention events, meetings, or factual claims that come from:
+1. The "Calendar" section above (authoritative for schedule).
+2. The "Tasks" section above (authoritative for tasks).
+3. Something the user just said in this conversation.
+4. A memory labeled "Verified (user confirmed or factual)" or "From calendar/tools".
+Do NOT treat "User said (not verified)" or "Agent said (not verified)" memories as facts for events/meetings—they may be wrong or outdated. If you need to refer to an event, it must appear in the Calendar section or be explicitly confirmed by the user in this chat. Never invent events, times, or locations.`;
+
   // Add available tools (with user info for proper email/calendar composition)
   systemPrompt += `\n\n${formatToolsForPrompt({
     name: state.profile.name,
@@ -447,10 +480,13 @@ CRITICAL: Do NOT mention or reference ANY calendar events, meetings, or appointm
   })}`;
 
   // Build conversation prompt
+  const recentSection = isCalendarSensitive
+    ? `## Recent Conversation\n(Proactive check-in/reunion. For meetings and events use ONLY the "Calendar" section above—do not mention any event, meeting, or gathering that is not listed there. Prior chat is not in context.)`
+    : `## Recent Conversation\n${recentHistory || '(This is the start of the conversation)'}`;
+
   const prompt = `${systemPrompt}
 
-## Recent Conversation
-${recentHistory || '(This is the start of the conversation)'}
+${recentSection}
 
 ## User's Message
 ${userMessage}
@@ -1202,6 +1238,17 @@ async function handleMessage(chatId: number, text: string): Promise<string> {
 
       console.log(`[Tool] Results: ${resultLines.join(' | ')}`);
 
+      // Store as verified memory (user explicitly confirmed these actions)
+      const confirmedSummary = actions
+        .map(a => formatPendingActionDescription({ name: a.tool, arguments: a.args }))
+        .join('; ');
+      memory.remember(`User confirmed: ${confirmedSummary}. Result: ${resultMsg}`, {
+        type: 'fact',
+        userId: String(chatId),
+        source: 'user_confirmed',
+        factual: true,
+      }).catch(() => {});
+
       actionLog.agentResponse({
         agent: agent.name,
         userId: String(chatId),
@@ -1292,17 +1339,19 @@ async function processMessage(
     timestamp: new Date(),
   });
 
-  // Store in semantic memory (async, don't wait)
+  // Store in semantic memory (async, don't wait). source/factual for source-of-truth rules.
   memory.remember(message, {
     type: 'message',
     userId: String(chatId),
     role: 'user',
+    source: 'user_message',
+    factual: false,
   }).catch(() => {}); // Silently fail if memory unavailable
 
   // Recall relevant memories for context
   const relevantMemories = await memory.recall(message, {
     userId: String(chatId),
-    limit: 3,
+    limit: 5,
   });
 
   // Detect emotional state from message (simple heuristics)
@@ -1317,9 +1366,9 @@ async function processMessage(
     state.emotionalState = 'spiraling';
   }
 
-  // Generate response (with memory context if available)
+  // Format recalled memories with source labels so the model knows what is verified
   const memoryContext = relevantMemories.length > 0
-    ? relevantMemories.map(r => r.entry.text).join('\n')
+    ? formatMemoryContextForPrompt(relevantMemories)
     : undefined;
   const response = await generateAgentResponse(agent, message, state, memoryContext);
 
@@ -1331,12 +1380,14 @@ async function processMessage(
     timestamp: new Date(),
   });
 
-  // Store agent response in memory too
+  // Store agent response in memory (not verified—agent could be wrong)
   memory.remember(response, {
     type: 'message',
     userId: String(chatId),
     agentId: agent.id,
     role: 'agent',
+    source: 'agent_message',
+    factual: false,
   }).catch(() => {});
 
   // Log the action for transparency
