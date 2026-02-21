@@ -2235,30 +2235,21 @@ Example: "Email John, remind me at 5pm to call mom, and check my meetings tomorr
 
 Always handle ALL requests in a single response. Don't ask which one to do first - do them all.
 
-## MISSING CAPABILITIES - CRITICAL
-**ONLY USE TOOLS LISTED ABOVE.** Do NOT invent or call tools that don't exist in the list!
+## YOUTUBE VIDEOS
+For YouTube links, use the \`summarize_link\` tool - it extracts the FULL TRANSCRIPT and creates a real summary.
+Do NOT use web search for YouTube - use the summarize_link tool!
 
-1. **Check the tool list**: Before calling ANY tool, verify it exists in "Available Tools" above
-2. **No youtube_summarizer exists**: There is NO built-in YouTube tool. Do not pretend one exists.
-3. **No Notion/Spotify/etc tools exist**: Unless listed above, these tools don't exist
-4. **To add new capabilities**: Use \`build_tool\` FIRST to create the tool, THEN use it
+**CORRECT:**
+User: "Summarize this YouTube video: https://youtube.com/..."
+Agent: *uses summarize_link tool*
+
+## MISSING CAPABILITIES
+**ONLY USE TOOLS LISTED ABOVE.** Do NOT invent or call tools that don't exist in the list!
 
 **CRITICAL: When outputting a tool call, do NOT include fake results after it!**
 - Output ONLY the tool call block
 - Wait for the actual result
-- NEVER write "Here's the summary..." or similar fake output
-
-**WRONG** (inventing a tool):
-\`\`\`tool
-{"name": "youtube_summarizer", "arguments": {...}}  ← TOOL DOESN'T EXIST!
-\`\`\`
-**Summary: The video discusses...** ← HALLUCINATED RESULTS!
-
-**RIGHT** (honest):
-"I don't have a YouTube summarizer yet. Want me to build one? It would:
-- Extract video transcripts
-- Create structured summaries
-Reply 'yes' to build it!"`;
+- NEVER write fake output before the tool returns`;
 }
 
 /**

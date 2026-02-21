@@ -5,8 +5,10 @@
  * Supports:
  * - Regular web articles
  * - X/Twitter posts and threads
- * - YouTube videos (extracts description/title)
+ * - YouTube videos (extracts FULL TRANSCRIPT for real summarization)
  */
+
+import { YoutubeTranscript } from 'youtube-transcript';
 
 // =============================================================================
 // Types
@@ -312,9 +314,12 @@ async function fetchYouTubeContent(url: string): Promise<LinkContent | null> {
   }
 
   const videoId = videoIdMatch[1];
+  let title = '';
+  let author = '';
+  let transcript = '';
 
+  // 1. Get video metadata via oEmbed API
   try {
-    // Use oEmbed API (no API key needed)
     const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
     const response = await fetch(oembedUrl);
 
@@ -324,41 +329,66 @@ async function fetchYouTubeContent(url: string): Promise<LinkContent | null> {
         author_name: string;
         author_url: string;
       };
-
-      // Also try to get page HTML for description
-      let description = '';
-      try {
-        const pageResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
-          headers: {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
-          },
-        });
-        if (pageResponse.ok) {
-          const html = await pageResponse.text();
-          const descMatch = html.match(/"description":{"simpleText":"([^"]+)"}/);
-          if (descMatch) {
-            description = descMatch[1]
-              .replace(/\\n/g, '\n')
-              .replace(/\\u0026/g, '&');
-          }
-        }
-      } catch {
-        // Couldn't get description
-      }
-
-      return {
-        url,
-        type: 'youtube',
-        title: data.title,
-        author: data.author_name,
-        content: description || `YouTube video: ${data.title} by ${data.author_name}`,
-      };
+      title = data.title;
+      author = data.author_name;
     }
   } catch {
-    // oEmbed failed
+    // oEmbed failed, continue anyway
   }
 
-  return null;
+  // 2. Get FULL TRANSCRIPT using youtube-transcript
+  try {
+    console.log(`[YouTube] Fetching transcript for ${videoId}...`);
+    const transcriptItems = await YoutubeTranscript.fetchTranscript(videoId);
+
+    if (transcriptItems && transcriptItems.length > 0) {
+      // Combine all transcript segments into one text
+      transcript = transcriptItems
+        .map(item => item.text)
+        .join(' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+      console.log(`[YouTube] Got transcript: ${transcript.length} chars`);
+    }
+  } catch (err) {
+    console.log(`[YouTube] Transcript not available: ${err instanceof Error ? err.message : 'unknown error'}`);
+    // Transcript not available (disabled, private, etc.)
+  }
+
+  // 3. If no transcript, try to get description from page
+  if (!transcript) {
+    try {
+      const pageResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+        headers: {
+          'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
+        },
+      });
+      if (pageResponse.ok) {
+        const html = await pageResponse.text();
+        const descMatch = html.match(/"description":{"simpleText":"([^"]+)"}/);
+        if (descMatch) {
+          transcript = descMatch[1]
+            .replace(/\\n/g, '\n')
+            .replace(/\\u0026/g, '&');
+        }
+      }
+    } catch {
+      // Couldn't get description either
+    }
+  }
+
+  if (!title && !transcript) {
+    return null;
+  }
+
+  return {
+    url,
+    type: 'youtube',
+    title: title || 'YouTube Video',
+    author: author || 'Unknown Channel',
+    content: transcript || `YouTube video: ${title} by ${author} (transcript not available)`,
+  };
 }
 
 // =============================================================================
@@ -417,14 +447,40 @@ ${content.content}
 
 Provide a concise summary (2-3 sentences). If it's a thread or has multiple parts, capture the main argument.`;
   } else if (content.type === 'youtube') {
-    prompt = `Summarize this YouTube video based on its title and description.
+    // Check if we have actual transcript or just description
+    const hasTranscript = content.content.length > 500;
+
+    if (hasTranscript) {
+      // Full transcript available - provide rich summary
+      const transcriptPreview = content.content.length > 15000
+        ? content.content.slice(0, 15000) + '... [transcript truncated]'
+        : content.content;
+
+      prompt = `Summarize this YouTube video based on its FULL TRANSCRIPT.
 
 Title: ${content.title}
 Channel: ${content.author || 'Unknown'}
-Description:
-${content.content}
 
-Provide a concise summary (2-3 sentences) of what this video is about.`;
+TRANSCRIPT:
+${transcriptPreview}
+
+Provide a comprehensive summary including:
+1. **Main Topic**: What is this video about? (1 sentence)
+2. **Key Points**: The 3-5 most important insights or takeaways (bullet points)
+3. **Actionable Advice**: Any specific recommendations or action items mentioned
+4. **Notable Quotes**: 1-2 memorable quotes if any stand out
+
+Be specific - use actual details from the transcript, not generic descriptions.`;
+    } else {
+      prompt = `I only have the title and description for this YouTube video (no transcript available).
+
+Title: ${content.title}
+Channel: ${content.author || 'Unknown'}
+Description: ${content.content}
+
+Based on this limited info, explain what the video appears to be about.
+Note: I couldn't access the full transcript, so this is based on metadata only.`;
+    }
   } else {
     prompt = `Summarize this article. Focus on the key points and main argument.
 
