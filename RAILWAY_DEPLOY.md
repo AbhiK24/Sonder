@@ -96,6 +96,7 @@ RESEND_API_KEY=re_your-key
 SONDER_EMAIL_DOMAIN=yourdomain.com
 USER_EMAIL=your@email.com
 ```
+**SONDER_EMAIL_DOMAIN** is already used in the app. It must be a domain you have **verified in Resend** (resend.com/domains). If you only set the env and never verify the domain, Resend stays in test mode and you can only send to your own email.
 
 ### For Google Calendar/Gmail
 ```
@@ -103,6 +104,15 @@ GOOGLE_CLIENT_ID=your-client-id
 GOOGLE_CLIENT_SECRET=your-secret
 GOOGLE_EMAIL=your@gmail.com
 ```
+
+**Gmail send auth (if you get "insufficient authentication scopes"):**
+1. **Google Cloud Console** → your project → **APIs & Services** → **Library** → enable **Gmail API** (not just Calendar/Tasks).
+2. **OAuth consent screen** → ensure your app has **Send email on your behalf** (scope `gmail.send`). The dashboard now requests this when you connect.
+3. **Reconnect Google** so the new token includes send permission:
+   - Open your Sonder setup/dashboard (e.g. `https://your-app.up.railway.app/setup.html` or localhost).
+   - **Disconnect Google**, then **Connect Google** again and sign in.
+   - Tokens are stored in `~/.sonder/google-tokens.json` (or the encrypted file). After reconnect, sending via Gmail should work.
+4. On Railway, if you use a volume for `/home/sonder/.sonder`, the token file is persisted. Reconnect once from a browser that can hit your dashboard (or run the OAuth flow locally and copy the token file into the volume).
 
 ### For WhatsApp (Baileys - FREE)
 ```

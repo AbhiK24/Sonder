@@ -2157,6 +2157,56 @@ function normalizePhone(phone: string): string {
   return phone.replace(/[\s\-\(\)]/g, '').replace(/^\+/, '');
 }
 
+/** Get ISO offset string for a timezone at a given date (e.g. "+05:30"). Used so naive datetimes are interpreted in user TZ. */
+function getTimezoneOffsetString(timezone: string, forDate: Date): string {
+  try {
+    const str = forDate.toLocaleString('en-US', { timeZone: timezone, timeZoneName: 'longOffset' });
+    // Match GMT+5:30, GMT-08, GMT+0530, etc.
+    const m = str.match(/GMT([+-])(\d{1,2}):?(\d{2})?/);
+    if (!m) return '+00:00';
+    const sign = m[1];
+    const hour = m[2].padStart(2, '0');
+    const min = (m[3] ?? '00').padStart(2, '0');
+    return `${sign}${hour}:${min}`;
+  } catch {
+    return '+00:00';
+  }
+}
+
+/** Interpret a naive datetime (no Z or ±offset) as being in the given timezone, return a UTC Date. */
+function parseNaiveInTimezone(
+  y: number, m: number, d: number, h: number, min: number, s: number,
+  timezone: string
+): Date {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  const probe = new Date(Date.UTC(y, m - 1, d, 12, 0, 0));
+  const offset = getTimezoneOffsetString(timezone, probe);
+  const iso = `${y}-${pad(m)}-${pad(d)}T${pad(h)}:${pad(min)}:${pad(s)}${offset}`;
+  const parsed = new Date(iso);
+  if (!isNaN(parsed.getTime())) return parsed;
+  return new Date(Date.UTC(y, m - 1, d, h, min, s));
+}
+
+/** Return today's calendar date (y, m, d) in the given timezone. */
+function getTodayInTimezone(timezone: string): { y: number; m: number; d: number } {
+  const now = new Date();
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const parts = formatter.formatToParts(now);
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)!.value, 10);
+  return { y: get('year'), m: get('month'), d: get('day') };
+}
+
+/** Return tomorrow's calendar date (y, m, d) in the given timezone. */
+function getTomorrowInTimezone(timezone: string): { y: number; m: number; d: number } {
+  const { y, m, d } = getTodayInTimezone(timezone);
+  const midnight = parseNaiveInTimezone(y, m, d, 0, 0, 0, timezone);
+  const nextDay = new Date(midnight.getTime() + 24 * 60 * 60 * 1000);
+  const formatter = new Intl.DateTimeFormat('en-CA', { timeZone: timezone, year: 'numeric', month: '2-digit', day: '2-digit' });
+  const parts = formatter.formatToParts(nextDay);
+  const get = (type: string) => parseInt(parts.find(p => p.type === type)!.value, 10);
+  return { y: get('year'), m: get('month'), d: get('day') };
+}
+
 // Helper: Parse date strings
 function parseDate(dateStr: string, timezone?: string): Date {
   const lower = dateStr.toLowerCase();
@@ -2177,38 +2227,48 @@ function parseDate(dateStr: string, timezone?: string): Date {
   return now;
 }
 
-// Helper: Parse datetime strings (more flexible)
+// Helper: Parse datetime strings (more flexible). Naive times (no Z/offset) are interpreted in context timezone.
 function parseDateTime(dateTimeStr: string, timezone?: string): Date {
-  const lower = dateTimeStr.toLowerCase();
+  const lower = dateTimeStr.toLowerCase().trim();
   const now = new Date();
+  const tz = timezone || 'UTC';
 
-  // Handle "tomorrow 3pm", "today at 2:30pm", etc.
+  // Handle "tomorrow 3pm", "today at 2:30pm", etc. — calendar date and time in user's timezone
   const tomorrowMatch = lower.match(/tomorrow\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
   if (tomorrowMatch) {
-    const d = new Date(now);
-    d.setDate(d.getDate() + 1);
-    let hour = parseInt(tomorrowMatch[1]);
-    const minute = tomorrowMatch[2] ? parseInt(tomorrowMatch[2]) : 0;
+    const { y, m, d } = getTomorrowInTimezone(tz);
+    let hour = parseInt(tomorrowMatch[1], 10);
+    const minute = tomorrowMatch[2] ? parseInt(tomorrowMatch[2], 10) : 0;
     const ampm = tomorrowMatch[3]?.toLowerCase();
     if (ampm === 'pm' && hour < 12) hour += 12;
     if (ampm === 'am' && hour === 12) hour = 0;
-    d.setHours(hour, minute, 0, 0);
-    return d;
+    return parseNaiveInTimezone(y, m, d, hour, minute, 0, tz);
   }
 
   const todayMatch = lower.match(/today\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
   if (todayMatch) {
-    const d = new Date(now);
-    let hour = parseInt(todayMatch[1]);
-    const minute = todayMatch[2] ? parseInt(todayMatch[2]) : 0;
+    const { y, m, d } = getTodayInTimezone(tz);
+    let hour = parseInt(todayMatch[1], 10);
+    const minute = todayMatch[2] ? parseInt(todayMatch[2], 10) : 0;
     const ampm = todayMatch[3]?.toLowerCase();
     if (ampm === 'pm' && hour < 12) hour += 12;
     if (ampm === 'am' && hour === 12) hour = 0;
-    d.setHours(hour, minute, 0, 0);
-    return d;
+    return parseNaiveInTimezone(y, m, d, hour, minute, 0, tz);
   }
 
-  // Try ISO format
+  // ISO format: if string has no timezone (no Z, no trailing ±HH:MM), interpret in user's timezone
+  const isoNaive = dateTimeStr.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})(?::(\d{2}))?(?:\.\d+)?$/);
+  if (isoNaive && tz) {
+    const y = parseInt(isoNaive[1], 10);
+    const m = parseInt(isoNaive[2], 10);
+    const day = parseInt(isoNaive[3], 10);
+    const h = parseInt(isoNaive[4], 10);
+    const min = parseInt(isoNaive[5], 10);
+    const sec = parseInt(isoNaive[6], 10) || 0;
+    return parseNaiveInTimezone(y, m, day, h, min, sec, tz);
+  }
+
+  // Explicit timezone in string: let Date parse as-is
   const parsed = new Date(dateTimeStr);
   if (!isNaN(parsed.getTime())) return parsed;
 
