@@ -344,6 +344,30 @@ async function generateAgentResponse(
   // Build prompt
   let systemPrompt = agent.systemPrompt;
 
+  // Add current time awareness - CRITICAL for temporal logic
+  const now = new Date();
+  const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
+  const timeStr = now.toLocaleString('en-US', {
+    timeZone: timezone,
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+    hour12: true
+  });
+
+  systemPrompt += `\n\n## Current Time
+RIGHT NOW it is: ${timeStr}
+
+CRITICAL TEMPORAL RULES:
+- NEVER ask about meetings/events that are in the FUTURE as if they already happened
+- NEVER ask "how did your meeting go?" for a meeting that hasn't occurred yet
+- Only ask about PAST events (before the current time)
+- For FUTURE events, you can remind about them or ask if they're prepared
+- Use common sense about time - if it's 10 AM, don't ask about an 11 AM meeting as if it's done`;
+
   // Add context about other agents
   systemPrompt += `\n\n## The Chorus
 You are part of a team of 5 agents who support this user together:

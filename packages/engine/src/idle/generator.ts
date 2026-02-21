@@ -101,14 +101,31 @@ export const defaultPromptBuilder: ThoughtPromptBuilder = {
       discussion: `What would you discuss about the user with your fellow agents?`,
     };
 
+    // Get current time for temporal awareness
+    const now = new Date();
+    const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
+    const timeStr = now.toLocaleString('en-US', {
+      timeZone: timezone,
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+
     return `You are ${agent.agentName}, ${agent.role}.
 Personality: ${agent.personality.join(', ')}
+
+CURRENT TIME: ${timeStr}
 
 The user has been away for ${user.awayMinutes} minutes.
 ${user.lastConversationSummary ? `Last conversation: ${user.lastConversationSummary}` : ''}
 ${user.recentTopics?.length ? `Recent topics: ${user.recentTopics.join(', ')}` : ''}
 
 ${typePrompts[thoughtType]}
+
+IMPORTANT: Only reference PAST events. NEVER ask about future meetings/events as if they happened.
 
 Respond with a single thought in first person. Be genuine and in character.
 Keep it to 1-2 sentences. Don't be generic.`;
