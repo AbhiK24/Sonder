@@ -40,7 +40,6 @@
     "qrcode": "^1.5.4",
     "qrcode-terminal": "^0.12.0",
     "rrule": "^2.8.1",
-    "youtube-transcript": "^1.2.1",
     "zod": "^3.22.4"
   },
   "devDependencies": {
