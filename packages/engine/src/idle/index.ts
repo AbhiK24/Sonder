@@ -309,13 +309,21 @@ export class IdleEngine {
     const payload = this.reunion.build(userId, thoughts, awayMinutes, previousStatus);
     const message = this.reunion.format(payload);
 
-    // Mark thoughts as shared
-    this.accumulator.markAllShared(userId);
+    // DON'T mark thoughts shared yet - wait until reunion actually sends
+    // The bot will call markThoughtsShared() after successful send
 
     // Fire hook
     if (this.hooks.onReunion) {
       await this.hooks.onReunion(payload, message);
     }
+  }
+
+  /**
+   * Mark thoughts as shared (call after reunion successfully sent)
+   */
+  markThoughtsShared(userId: string): void {
+    this.accumulator.markAllShared(userId);
+    console.log(`[IdleEngine] Marked thoughts shared for ${userId}`);
   }
 
   // ---------------------------------------------------------------------------

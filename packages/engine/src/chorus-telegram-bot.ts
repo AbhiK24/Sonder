@@ -120,6 +120,9 @@ interface UserState {
   // Pending action(s) awaiting user confirmation
   pendingAction?: PendingAction;
   pendingActions?: PendingAction[];  // For batch confirmations (multiple tools)
+
+  // Pending reunion (persisted so survives restart)
+  pendingReunion?: { awayMinutes: number; thoughts: string };
 }
 
 // =============================================================================
@@ -127,9 +130,6 @@ interface UserState {
 // =============================================================================
 
 const userStates = new Map<number, UserState>();
-
-// Pending reunions - sent AFTER processing user's request
-const pendingReunions = new Map<number, { awayMinutes: number; thoughts: string }>();
 
 // Services
 let provider: LLMProvider;
@@ -1375,11 +1375,26 @@ function setupIdleEngine(): void {
       },
       onReunion: async (payload, message) => {
         const chatId = parseInt(payload.userId);
-        // Store reunion - will be sent AFTER processing user's request
-        pendingReunions.set(chatId, {
+        const state = getState(chatId);
+
+        // Skip reunion for FTUE users - don't interrupt onboarding
+        if (state.inFTUE) {
+          console.log(`[IdleEngine] Skipping reunion for ${chatId} - in FTUE`);
+          return;
+        }
+
+        // Skip if no meaningful thoughts (empty reunion feels broken)
+        if (!message.text || message.text.trim().length < 10) {
+          console.log(`[IdleEngine] Skipping reunion for ${chatId} - no meaningful thoughts`);
+          return;
+        }
+
+        // Store in state (persists with user data, survives restart)
+        state.pendingReunion = {
           awayMinutes: payload.awayDuration,
           thoughts: message.text,
-        });
+        };
+        saveState(chatId);
         console.log(`[IdleEngine] Reunion queued for ${chatId} (away ${payload.awayDuration}m)`);
       },
       onThoughtGenerated: async (thought) => {
@@ -1764,12 +1779,23 @@ async function main() {
       }
 
       // Send pending reunion AFTER processing user's request
-      const pendingReunion = pendingReunions.get(chatId);
-      if (pendingReunion) {
-        pendingReunions.delete(chatId);
+      const state = getState(chatId);
+      if (state.pendingReunion && !state.inFTUE) {
+        const reunion = state.pendingReunion;
+        state.pendingReunion = undefined;
+        saveState(chatId);
         // Small delay so reunion feels separate from the response
         await new Promise(resolve => setTimeout(resolve, 1500));
-        await handleReunion(chatId, pendingReunion.awayMinutes, pendingReunion.thoughts);
+        try {
+          await handleReunion(chatId, reunion.awayMinutes, reunion.thoughts);
+          // Only mark thoughts shared AFTER successful send
+          idleEngine.markThoughtsShared(String(chatId));
+        } catch (error) {
+          console.error(`[${chatId}] Reunion failed, thoughts preserved:`, error);
+          // Restore pending reunion so it can retry next time
+          state.pendingReunion = reunion;
+          saveState(chatId);
+        }
       }
     } catch (error) {
       console.error(`[${chatId}] Error:`, error);
