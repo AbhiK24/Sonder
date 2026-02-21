@@ -125,7 +125,10 @@ ${user.recentTopics?.length ? `Recent topics: ${user.recentTopics.join(', ')}` :
 
 ${typePrompts[thoughtType]}
 
-IMPORTANT: Only reference PAST events. NEVER ask about future meetings/events as if they happened.
+CRITICAL RULES:
+- Only reference PAST events. NEVER ask about future meetings/events as if they happened.
+- NEVER invent or assume calendar events, meetings, or people the user is meeting with.
+- Only mention specific events if they were explicitly discussed in recent conversation.
 
 Respond with a single thought in first person. Be genuine and in character.
 Keep it to 1-2 sentences. Don't be generic.`;

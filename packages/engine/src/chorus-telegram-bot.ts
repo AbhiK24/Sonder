@@ -394,7 +394,9 @@ Prompt hints: ${template.promptHints.join(' | ')}`;
   // Add reunion context if applicable
   if (extraContext?.reunionContext) {
     systemPrompt += `\n\n## The user just returned
-${extraContext.reunionContext}`;
+${extraContext.reunionContext}
+
+CRITICAL: Do NOT mention or reference ANY calendar events, meetings, or appointments unless they appear in the "Today's Schedule" or "Upcoming Events" section below. NEVER invent or assume meetings exist.`;
   }
 
   // Add engine context (calendar, tasks, etc.)
