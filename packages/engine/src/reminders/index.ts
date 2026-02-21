@@ -24,6 +24,8 @@ export class ReminderEngine {
   private nudgeState: Map<string, NudgeState> = new Map();
   private checkInterval: NodeJS.Timeout | null = null;
   private registeredUsers: Set<string> = new Set();
+  private isTickRunning: boolean = false;  // Mutex for tick
+  private isFirstTick: boolean = true;     // Track first tick for batching
 
   private config: Required<Omit<ReminderEngineConfig, 'onReminder' | 'getUpcomingEvents'>> & {
     onReminder: ReminderEngineConfig['onReminder'];
@@ -34,7 +36,7 @@ export class ReminderEngine {
     this.config = {
       meetingReminderMinutes: config.meetingReminderMinutes ?? 15,
       checkIntervalSeconds: config.checkIntervalSeconds ?? 60,
-      savePath: config.savePath,
+      savePath: config.savePath || '',
       timezone: config.timezone ?? 'UTC',
       quietHoursStart: config.quietHoursStart ?? 22,
       quietHoursEnd: config.quietHoursEnd ?? 8,
@@ -98,18 +100,34 @@ export class ReminderEngine {
   // =============================================================================
 
   private async tick(): Promise<void> {
+    // Mutex: prevent overlapping ticks
+    if (this.isTickRunning) {
+      console.log('[ReminderEngine] Tick already running, skipping');
+      return;
+    }
+
+    this.isTickRunning = true;
     const now = new Date();
 
-    for (const userId of this.registeredUsers) {
-      try {
-        // Check user reminders
-        await this.checkUserReminders(userId, now);
+    try {
+      // Copy users to avoid mutation during iteration
+      const users = Array.from(this.registeredUsers);
 
-        // Check calendar nudges (meetings always fire, even in quiet hours)
-        await this.checkCalendarNudges(userId, now);
-      } catch (error) {
-        console.error(`[ReminderEngine] Error for user ${userId}:`, error);
+      for (const userId of users) {
+        try {
+          // Check user reminders (with batching on first tick)
+          await this.checkUserReminders(userId, now, this.isFirstTick);
+
+          // Check calendar nudges (meetings always fire, even in quiet hours)
+          await this.checkCalendarNudges(userId, now);
+        } catch (error) {
+          console.error(`[ReminderEngine] Error for user ${userId}:`, error);
+        }
       }
+
+      this.isFirstTick = false;
+    } finally {
+      this.isTickRunning = false;
     }
   }
 
@@ -117,24 +135,54 @@ export class ReminderEngine {
   // User Reminders
   // =============================================================================
 
-  private async checkUserReminders(userId: string, now: Date): Promise<void> {
+  private async checkUserReminders(userId: string, now: Date, batchOverdue: boolean = false): Promise<void> {
     // Respect quiet hours for user reminders
     if (this.isQuietHours(now)) {
       return;
     }
 
     const pending = this.storage.getPendingReminders(userId);
+    const overdueReminders = pending.filter(r => r.dueAt <= now);
 
-    for (const reminder of pending) {
-      if (reminder.dueAt <= now) {
-        // Fire the reminder
+    if (overdueReminders.length === 0) return;
+
+    // On restart, batch multiple overdue reminders into one message
+    if (batchOverdue && overdueReminders.length > 1) {
+      const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000);
+      const veryOverdue = overdueReminders.filter(r => r.dueAt < fiveMinAgo);
+
+      if (veryOverdue.length > 1) {
+        // Batch them into a single message
+        const batchMessage = `⏰ **${veryOverdue.length} Reminders** (from while I was offline):\n` +
+          veryOverdue.map(r => `• ${r.content}`).join('\n');
+
+        try {
+          await this.config.onReminder(userId, batchMessage, 'user', 'luna');
+          // Mark all as fired only after successful delivery
+          for (const r of veryOverdue) {
+            this.storage.markFired(userId, r.id);
+          }
+          console.log(`[ReminderEngine] Batched ${veryOverdue.length} overdue reminders for user ${userId}`);
+        } catch (error) {
+          console.error(`[ReminderEngine] Failed to deliver batch, will retry:`, error);
+          // Don't mark as fired - will retry on next tick
+        }
+        return;
+      }
+    }
+
+    // Process reminders one by one
+    for (const reminder of overdueReminders) {
+      try {
         const message = this.formatUserReminder(reminder);
         await this.config.onReminder(userId, message, 'user', reminder.createdBy);
 
-        // Mark as fired
+        // Mark as fired only after successful delivery
         this.storage.markFired(userId, reminder.id);
-
         console.log(`[ReminderEngine] Fired reminder: "${reminder.content}" for user ${userId}`);
+      } catch (error) {
+        console.error(`[ReminderEngine] Failed to deliver reminder "${reminder.content}", will retry:`, error);
+        // Don't mark as fired - will retry on next tick
       }
     }
   }

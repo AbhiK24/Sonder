@@ -6,6 +6,7 @@
  */
 
 import * as fs from 'fs';
+import { copyFileSync } from 'fs';
 import * as path from 'path';
 import * as os from 'os';
 import type { Reminder, ReminderStore, ReminderSettings } from './types.js';

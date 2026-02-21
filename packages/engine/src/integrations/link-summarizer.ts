@@ -32,6 +32,34 @@ export interface SummarizeResult {
 }
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+const FETCH_TIMEOUT_MS = 15000; // 15 second timeout for all fetches
+
+/**
+ * Fetch with timeout using AbortController
+ */
+async function fetchWithTimeout(
+  url: string,
+  options: RequestInit = {},
+  timeoutMs: number = FETCH_TIMEOUT_MS
+): Promise<Response> {
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const response = await fetchWithTimeout(url, {
+      ...options,
+      signal: controller.signal,
+    });
+    return response;
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+// =============================================================================
 // URL Type Detection
 // =============================================================================
 
@@ -58,7 +86,7 @@ async function fetchTwitterContent(url: string): Promise<LinkContent | null> {
   const tweetUrl = url.replace('twitter.com', 'api.fxtwitter.com').replace('x.com', 'api.fxtwitter.com');
 
   try {
-    const response = await fetch(tweetUrl, {
+    const response = await fetchWithTimeout(tweetUrl, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; Sonder/1.0)',
       },
@@ -104,7 +132,7 @@ async function fetchTwitterContent(url: string): Promise<LinkContent | null> {
         .replace('twitter.com', nitter)
         .replace('x.com', nitter);
 
-      const response = await fetch(nitterUrl, {
+      const response = await fetchWithTimeout(nitterUrl, {
         headers: {
           'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
         },
@@ -146,7 +174,7 @@ async function fetchTwitterContent(url: string): Promise<LinkContent | null> {
 
   // Method 3: Fallback to basic scraping
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (compatible; Googlebot/2.1; +http://www.google.com/bot.html)',
       },
@@ -183,7 +211,7 @@ async function fetchArticleContent(url: string): Promise<LinkContent | null> {
   // Method 1: Try Jina Reader API (best for articles, free tier available)
   try {
     const jinaUrl = `https://r.jina.ai/${url}`;
-    const response = await fetch(jinaUrl, {
+    const response = await fetchWithTimeout(jinaUrl, {
       headers: {
         'Accept': 'application/json',
       },
@@ -217,7 +245,7 @@ async function fetchArticleContent(url: string): Promise<LinkContent | null> {
 
   // Method 2: Direct fetch with basic HTML parsing
   try {
-    const response = await fetch(url, {
+    const response = await fetchWithTimeout(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml',
@@ -319,7 +347,7 @@ async function fetchYouTubeContent(url: string): Promise<LinkContent | null> {
   // Get video metadata via oEmbed API
   try {
     const oembedUrl = `https://www.youtube.com/oembed?url=https://www.youtube.com/watch?v=${videoId}&format=json`;
-    const response = await fetch(oembedUrl);
+    const response = await fetchWithTimeout(oembedUrl);
 
     if (response.ok) {
       const data = await response.json() as {
@@ -336,7 +364,7 @@ async function fetchYouTubeContent(url: string): Promise<LinkContent | null> {
 
   // Try to get description from page
   try {
-    const pageResponse = await fetch(`https://www.youtube.com/watch?v=${videoId}`, {
+    const pageResponse = await fetchWithTimeout(`https://www.youtube.com/watch?v=${videoId}`, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36',
       },

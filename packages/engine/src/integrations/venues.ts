@@ -5,7 +5,7 @@
  * Stores user's known venues for quick lookup.
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'fs';
 import { resolve } from 'path';
 
 // =============================================================================
@@ -33,21 +33,50 @@ export interface VenueMatch {
 
 const sonderDir = resolve(process.env.HOME || '', '.sonder');
 const venuesPath = resolve(sonderDir, 'venues.json');
+const venuesBackupPath = venuesPath + '.backup';
 
 function loadVenues(): Venue[] {
-  try {
-    if (existsSync(venuesPath)) {
-      return JSON.parse(readFileSync(venuesPath, 'utf-8'));
+  // Try main file first, then backup
+  for (const filePath of [venuesPath, venuesBackupPath]) {
+    try {
+      if (existsSync(filePath)) {
+        const data = JSON.parse(readFileSync(filePath, 'utf-8'));
+
+        // If we loaded from backup, restore main file
+        if (filePath === venuesBackupPath) {
+          console.warn('[Venues] Recovered from backup file');
+          writeFileSync(venuesPath, JSON.stringify(data, null, 2));
+        }
+
+        return data;
+      }
+    } catch (error) {
+      console.error(`[Venues] Failed to load ${filePath}:`, error);
     }
-  } catch {}
+  }
   return [];
 }
 
 function saveVenues(venues: Venue[]): void {
-  if (!existsSync(sonderDir)) {
-    mkdirSync(sonderDir, { recursive: true });
+  try {
+    if (!existsSync(sonderDir)) {
+      mkdirSync(sonderDir, { recursive: true });
+    }
+
+    // Create backup before overwriting
+    if (existsSync(venuesPath)) {
+      try {
+        copyFileSync(venuesPath, venuesBackupPath);
+      } catch (backupError) {
+        console.warn('[Venues] Failed to create backup:', backupError);
+      }
+    }
+
+    writeFileSync(venuesPath, JSON.stringify(venues, null, 2));
+  } catch (error) {
+    console.error('[Venues] Failed to save venues:', error);
+    throw error;
   }
-  writeFileSync(venuesPath, JSON.stringify(venues, null, 2));
 }
 
 // =============================================================================

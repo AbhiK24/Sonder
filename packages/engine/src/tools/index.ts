@@ -762,9 +762,11 @@ export const toolExecutors: Record<string, ToolExecutor> = {
       return { email: null };
     };
 
-    // Check for disambiguation needs first
+    // Check for disambiguation needs first (both TO and CC)
     const toRecipients = to.split(/[,;]/).map(r => r.trim()).filter(Boolean);
-    for (const recipient of toRecipients) {
+    const ccRecipients = cc ? cc.split(/[,;]/).map(r => r.trim()).filter(Boolean) : [];
+
+    for (const recipient of [...toRecipients, ...ccRecipients]) {
       const result = resolveRecipient(recipient);
       if (result.needsDisambiguation && result.message) {
         return { success: false, error: result.message };
@@ -773,7 +775,7 @@ export const toolExecutors: Record<string, ToolExecutor> = {
 
     // Parse and resolve recipients
     const toList = toRecipients.map(r => resolveRecipient(r).email).filter((e): e is string => e !== null);
-    const ccList = cc ? cc.split(/[,;]/).map(r => resolveRecipient(r.trim()).email).filter((e): e is string => e !== null) : [];
+    const ccList = ccRecipients.map(r => resolveRecipient(r).email).filter((e): e is string => e !== null);
 
     if (toList.length === 0) {
       return { success: false, error: 'No valid email addresses provided' };
@@ -871,6 +873,19 @@ export const toolExecutors: Record<string, ToolExecutor> = {
 
     if (!context.whatsappAdapter) {
       return { success: false, error: 'WhatsApp not configured' };
+    }
+
+    // Validate phone number format
+    // Accept: +91XXXXXXXXXX, 91XXXXXXXXXX, XXXXXXXXXX (10 digits)
+    const phoneRegex = /^\+?(\d{1,3})?[-.\s]?(\d{10,15})$/;
+    const cleanPhone = to.replace(/[-.\s]/g, '');
+
+    if (!phoneRegex.test(cleanPhone) && !to.includes('@')) {
+      // Not a valid phone number or contact name
+      return {
+        success: false,
+        error: `Invalid phone number format: "${to}". Please provide a valid phone number (e.g., +91XXXXXXXXXX) or contact name.`
+      };
     }
 
     try {

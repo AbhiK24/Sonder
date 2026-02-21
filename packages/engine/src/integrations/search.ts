@@ -7,6 +7,21 @@
  */
 
 // =============================================================================
+// Helpers
+// =============================================================================
+
+/**
+ * Safely extract hostname from URL
+ */
+function safeHostname(url: string): string {
+  try {
+    return new URL(url).hostname.replace('www.', '');
+  } catch {
+    return 'unknown';
+  }
+}
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -72,7 +87,7 @@ async function searchWithTavily(query: string, maxResults = 5): Promise<SearchRe
         title: r.title,
         url: r.url,
         snippet: r.content.slice(0, 300),
-        source: new URL(r.url).hostname,
+        source: safeHostname(r.url),
       })),
     };
   } catch (error) {
@@ -125,7 +140,7 @@ async function searchWithDuckDuckGo(query: string): Promise<SearchResponse> {
           title,
           url,
           snippet: snippet.slice(0, 300),
-          source: new URL(url).hostname.replace('www.', ''),
+          source: safeHostname(url),
         });
       }
     }
@@ -256,7 +271,7 @@ async function searchWithPerplexity(query: string): Promise<SearchResponse> {
       title: `Source ${i + 1}`,
       url,
       snippet: '',
-      source: new URL(url).hostname.replace('www.', ''),
+      source: safeHostname(url),
     }));
 
     return {
@@ -348,7 +363,7 @@ export function formatSearchResults(response: SearchResponse): string {
     for (const result of response.results) {
       lines.push(`• ${result.title}`);
       lines.push(`  ${result.snippet}`);
-      lines.push(`  Source: ${result.source || new URL(result.url).hostname}`);
+      lines.push(`  Source: ${result.source || safeHostname(result.url)}`);
       lines.push('');
     }
   }

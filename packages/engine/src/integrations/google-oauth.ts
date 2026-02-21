@@ -360,8 +360,15 @@ export class GoogleOAuth {
         this.tokens = JSON.parse(decrypted);
         console.log('[GoogleOAuth] Loaded tokens from encrypted file');
         return;
-      } catch {
-        // Invalid or corrupted tokens
+      } catch (error) {
+        // Token file corrupted or encryption key changed
+        console.error('[GoogleOAuth] Token file corrupted or encryption key mismatch. Deleting corrupted file.');
+        console.error('[GoogleOAuth] Error:', error instanceof Error ? error.message : 'Unknown error');
+        try {
+          // Remove corrupted file so user knows to re-authenticate
+          unlinkSync(this.tokenPath);
+          console.log('[GoogleOAuth] Deleted corrupted token file. Please re-authenticate with Google.');
+        } catch {}
       }
     }
 

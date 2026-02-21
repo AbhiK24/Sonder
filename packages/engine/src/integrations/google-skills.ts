@@ -8,6 +8,45 @@
 import { getGoogleOAuth, CalendarEvent, GmailMessage, GoogleTask } from './google-oauth.js';
 
 // =============================================================================
+// Rate Limiting
+// =============================================================================
+
+/**
+ * Simple rate limiter to prevent hitting Google API quotas
+ * Default: 60 requests per minute
+ */
+class RateLimiter {
+  private requests: number[] = [];
+  private readonly maxRequests: number;
+  private readonly windowMs: number;
+
+  constructor(maxRequests: number = 60, windowMs: number = 60000) {
+    this.maxRequests = maxRequests;
+    this.windowMs = windowMs;
+  }
+
+  canMakeRequest(): boolean {
+    const now = Date.now();
+    // Remove old requests outside the window
+    this.requests = this.requests.filter(t => now - t < this.windowMs);
+    return this.requests.length < this.maxRequests;
+  }
+
+  recordRequest(): void {
+    this.requests.push(Date.now());
+  }
+
+  async waitForSlot(): Promise<void> {
+    while (!this.canMakeRequest()) {
+      await new Promise(r => setTimeout(r, 1000));
+    }
+    this.recordRequest();
+  }
+}
+
+const googleRateLimiter = new RateLimiter(60, 60000); // 60 requests per minute
+
+// =============================================================================
 // Types
 // =============================================================================
 
@@ -37,6 +76,9 @@ export async function getUpcomingEvents(options: {
   }
 
   try {
+    // Rate limiting
+    await googleRateLimiter.waitForSlot();
+
     const timeMax = new Date();
     timeMax.setDate(timeMax.getDate() + days);
 
@@ -78,9 +120,14 @@ export async function getTodayEvents(): Promise<SkillResult<CalendarEvent[]>> {
     });
     const todayIST = istFormatter.format(now); // YYYY-MM-DD in IST
 
-    // Create start/end of day in IST, then convert to UTC for API
-    const startOfDay = new Date(`${todayIST}T00:00:00+05:30`);
-    const endOfDay = new Date(`${todayIST}T23:59:59+05:30`);
+    // Create start/end of day in user's timezone
+    // Get timezone offset dynamically instead of hardcoding IST
+    const tzOffset = new Date().toLocaleString('en-US', { timeZone: timezone, timeZoneName: 'longOffset' });
+    const offsetMatch = tzOffset.match(/GMT([+-]\d{2}):?(\d{2})?/);
+    const offset = offsetMatch ? `${offsetMatch[1]}:${offsetMatch[2] || '00'}` : '+00:00';
+
+    const startOfDay = new Date(`${todayIST}T00:00:00${offset}`);
+    const endOfDay = new Date(`${todayIST}T23:59:59${offset}`);
 
     console.log(`[GoogleSkills] Today in IST: ${todayIST}, range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
 

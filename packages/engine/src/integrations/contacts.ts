@@ -6,7 +6,7 @@
  * Categories: friends, family, business, acquaintance
  */
 
-import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { existsSync, readFileSync, writeFileSync, mkdirSync, copyFileSync } from 'fs';
 import { resolve } from 'path';
 
 // =============================================================================
@@ -98,32 +98,63 @@ function generateInteractionId(): string {
   return `int_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 6)}`;
 }
 
+const contactsBackupPath = contactsPath + '.backup';
+
 function loadContacts(): Contact[] {
-  try {
-    if (existsSync(contactsPath)) {
-      const data = JSON.parse(readFileSync(contactsPath, 'utf-8'));
-      // Rehydrate dates
-      return data.map((c: any) => ({
-        ...c,
-        interactions: (c.interactions || []).map((i: any) => ({
-          ...i,
-          date: new Date(i.date),
-        })),
-        createdAt: new Date(c.createdAt),
-        updatedAt: new Date(c.updatedAt),
-        lastInteraction: c.lastInteraction ? new Date(c.lastInteraction) : undefined,
-        firstInteraction: c.firstInteraction ? new Date(c.firstInteraction) : undefined,
-      }));
+  // Try main file first, then backup
+  for (const filePath of [contactsPath, contactsBackupPath]) {
+    try {
+      if (existsSync(filePath)) {
+        const data = JSON.parse(readFileSync(filePath, 'utf-8'));
+        // Rehydrate dates
+        const contacts = data.map((c: any) => ({
+          ...c,
+          interactions: (c.interactions || []).map((i: any) => ({
+            ...i,
+            date: new Date(i.date),
+          })),
+          createdAt: new Date(c.createdAt),
+          updatedAt: new Date(c.updatedAt),
+          lastInteraction: c.lastInteraction ? new Date(c.lastInteraction) : undefined,
+          firstInteraction: c.firstInteraction ? new Date(c.firstInteraction) : undefined,
+        }));
+
+        // If we loaded from backup, restore main file
+        if (filePath === contactsBackupPath) {
+          console.warn('[Contacts] Recovered from backup file');
+          writeFileSync(contactsPath, JSON.stringify(data, null, 2));
+        }
+
+        return contacts;
+      }
+    } catch (error) {
+      console.error(`[Contacts] Failed to load ${filePath}:`, error);
+      // Continue to try backup
     }
-  } catch {}
+  }
   return [];
 }
 
 function saveContacts(contacts: Contact[]): void {
-  if (!existsSync(sonderDir)) {
-    mkdirSync(sonderDir, { recursive: true });
+  try {
+    if (!existsSync(sonderDir)) {
+      mkdirSync(sonderDir, { recursive: true });
+    }
+
+    // Create backup of existing file before overwriting
+    if (existsSync(contactsPath)) {
+      try {
+        copyFileSync(contactsPath, contactsBackupPath);
+      } catch (backupError) {
+        console.warn('[Contacts] Failed to create backup:', backupError);
+      }
+    }
+
+    writeFileSync(contactsPath, JSON.stringify(contacts, null, 2));
+  } catch (error) {
+    console.error('[Contacts] Failed to save contacts:', error);
+    throw error; // Re-throw so caller knows save failed
   }
-  writeFileSync(contactsPath, JSON.stringify(contacts, null, 2));
 }
 
 // =============================================================================

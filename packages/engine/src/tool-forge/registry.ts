@@ -257,37 +257,68 @@ export class DynamicToolRegistry {
 
   /**
    * Compile TypeScript source and extract executor
-   * Note: In production, use proper sandboxing!
+   * Security: Blocks dangerous patterns and adds execution timeout
    */
   private async compileAndGetExecutor(
     source: string,
     toolName: string
   ): Promise<ToolExecutor | null> {
     try {
-      // Simple approach: Look for exported execute function
-      // The source should export: export async function execute(args, context) { ... }
+      // Security checks - block dangerous patterns
+      const dangerousPatterns = [
+        /\brequire\s*\(/,           // No require()
+        /\bprocess\./,              // No process access
+        /\b__dirname\b/,            // No path access
+        /\b__filename\b/,
+        /\beval\s*\(/,              // No eval
+        /\bFunction\s*\(/,          // No Function constructor
+        /child_process/,            // No spawning
+        /\bfs\b/,                   // No filesystem
+        /\.env\b/,                  // No env access
+      ];
 
-      // For safety, we wrap in a function and eval
-      // TODO: Use proper TypeScript compilation and sandboxing
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(source)) {
+          console.error(`[ToolRegistry] Security violation in ${toolName}: ${pattern}`);
+          return null;
+        }
+      }
+
+      // Wrap source with limited globals
       const wrappedSource = `
         const module = { exports: {} };
         const exports = module.exports;
+        const console = { log: (...args) => {}, warn: (...args) => {}, error: (...args) => {} };
         ${source.replace(/export\s+/g, 'module.exports.')}
         return module.exports;
       `;
 
       const moduleExports = new Function(wrappedSource)();
 
+      let executor: ToolExecutor | null = null;
+
       if (typeof moduleExports.execute === 'function') {
-        return moduleExports.execute;
+        executor = moduleExports.execute;
+      } else if (typeof moduleExports.default?.execute === 'function') {
+        executor = moduleExports.default.execute;
       }
 
-      if (typeof moduleExports.default?.execute === 'function') {
-        return moduleExports.default.execute;
+      if (!executor) {
+        console.error(`[ToolRegistry] No execute function found in ${toolName}`);
+        return null;
       }
 
-      console.error(`[ToolRegistry] No execute function found in ${toolName}`);
-      return null;
+      // Wrap with timeout
+      const originalExecutor = executor;
+      return async (args, context) => {
+        const timeoutMs = 10000; // 10 second timeout
+        return Promise.race([
+          originalExecutor(args, context),
+          new Promise<ToolResult>((_, reject) =>
+            setTimeout(() => reject(new Error('Tool execution timed out')), timeoutMs)
+          )
+        ]);
+      };
     } catch (error) {
       console.error(`[ToolRegistry] Failed to compile ${toolName}:`, error);
       return null;

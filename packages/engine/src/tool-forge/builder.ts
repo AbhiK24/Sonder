@@ -411,10 +411,17 @@ Return ONLY the fixed TypeScript code, no explanations.`;
 
     if (defMatch) {
       try {
-        // This is a simplified extraction - in production use proper AST parsing
-        parameters = eval(`(${defMatch[1]})`);
+        // Safe parameter extraction - no eval()
+        // Parse the object literal string safely
+        const paramStr = defMatch[1]
+          .replace(/'/g, '"')  // Convert single quotes to double
+          .replace(/(\w+):/g, '"$1":')  // Quote unquoted keys
+          .replace(/,\s*}/g, '}')  // Remove trailing commas
+          .replace(/,\s*]/g, ']');
+        parameters = JSON.parse(paramStr);
       } catch {
         // Use default parameters if extraction fails
+        console.warn('[ToolBuilder] Could not parse parameters, using defaults');
       }
     }
 
@@ -423,10 +430,32 @@ Return ONLY the fixed TypeScript code, no explanations.`;
 
   private async compileExecutor(source: string): Promise<((args: any, context: any) => Promise<any>) | null> {
     try {
-      // Wrap source to extract exports
+      // Security checks - block dangerous patterns
+      const dangerousPatterns = [
+        /\brequire\s*\(/,           // No require()
+        /\bprocess\./,              // No process access
+        /\b__dirname\b/,            // No path access
+        /\b__filename\b/,
+        /\beval\s*\(/,              // No eval
+        /\bFunction\s*\(/,          // No Function constructor
+        /child_process/,            // No spawning
+        /\bfs\b/,                   // No filesystem (except fetch)
+        /\.env\b/,                  // No env access directly
+      ];
+
+      for (const pattern of dangerousPatterns) {
+        if (pattern.test(source)) {
+          console.error(`[ToolBuilder] Security violation: ${pattern}`);
+          return null;
+        }
+      }
+
+      // Wrap source with limited globals
       const wrappedSource = `
         const module = { exports: {} };
         const exports = module.exports;
+        // Limited global access - only safe APIs
+        const console = { log: (...args) => {}, warn: (...args) => {}, error: (...args) => {} };
         ${source.replace(/export\s+const\s+/g, 'module.exports.').replace(/export\s+(async\s+)?function\s+/g, 'module.exports.')}
         return module.exports;
       `;
@@ -434,7 +463,17 @@ Return ONLY the fixed TypeScript code, no explanations.`;
       const moduleExports = new Function(wrappedSource)();
 
       if (typeof moduleExports.execute === 'function') {
-        return moduleExports.execute;
+        // Wrap executor with timeout
+        const originalExecute = moduleExports.execute;
+        return async (args: any, context: any) => {
+          const timeoutMs = 10000; // 10 second timeout for user tools
+          return Promise.race([
+            originalExecute(args, context),
+            new Promise((_, reject) =>
+              setTimeout(() => reject(new Error('Tool execution timed out')), timeoutMs)
+            )
+          ]);
+        };
       }
 
       return null;
