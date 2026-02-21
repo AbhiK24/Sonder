@@ -794,24 +794,25 @@ export const toolExecutors: Record<string, ToolExecutor> = {
       let sentVia = '';
 
       // Prefer Gmail (sends from user's actual email address)
+      let gmailError: string | undefined;
       console.log(`[send_email] Gmail available: ${canUseGmail}`);
       if (canUseGmail) {
         console.log(`[send_email] Trying Gmail...`);
-        const result = await sendGmailEmail({
+        const gmailResult = await sendGmailEmail({
           to: [...toList, ...ccList],
           subject,
           body: body,  // Gmail sends from their email, no need for special signature
         });
-        console.log(`[send_email] Gmail result: ${result.success}, error: ${result.error || 'none'}`);
+        console.log(`[send_email] Gmail result: ${gmailResult.success}, error: ${gmailResult.error || 'none'}`);
 
-        if (result.success) {
+        if (gmailResult.success) {
           sentVia = 'Gmail';
           actionLog.emailSent({
             userId: context.userId,
             agent: context.agentName,
             to: toList,
             subject,
-            messageId: result.data?.messageId,
+            messageId: gmailResult.data?.messageId,
             userRequested: true,
             userConfirmed: true,
           });
@@ -826,9 +827,13 @@ export const toolExecutors: Record<string, ToolExecutor> = {
           const ccMsg = ccList.length > 0 ? ` (CC: ${ccList.join(', ')})` : '';
           return { success: true, result: `Email sent via Gmail to ${toList.join(', ')}${ccMsg}` };
         }
-        // Gmail failed, try Resend as fallback
+        gmailError = gmailResult.error || 'Gmail send failed';
+        // Gmail failed, try Resend as fallback (if we have it)
         if (!context.emailAdapter) {
-          return { success: false, error: result.error || 'Gmail send failed' };
+          const scopeHint = /insufficient|scope|403/i.test(gmailError)
+            ? ' Reconnect your Google account in settings and grant "Send email" permission.'
+            : '';
+          return { success: false, error: gmailError + scopeHint };
         }
       }
 
@@ -870,7 +875,23 @@ export const toolExecutors: Record<string, ToolExecutor> = {
         const ccMsg = ccList.length > 0 ? ` (CC: ${ccList.join(', ')})` : '';
         return { success: true, result: `Email sent to ${toList.join(', ')}${ccMsg}` };
       }
-      return { success: false, error: result.error || 'Failed to send' };
+      const resendError = result.error || 'Failed to send';
+      if (gmailError && /insufficient|scope|403/i.test(gmailError)) {
+        const resendTestMode = /your own email|verify a domain|resend\.com\/domains/i.test(resendError);
+        if (resendTestMode) {
+          return {
+            success: false,
+            error: 'Gmail couldn\'t send (reconnect Google with "Send email" permission in settings). Resend is in test mode — verify a domain at resend.com/domains to send to other addresses.',
+          };
+        }
+      }
+      if (/your own email|verify a domain|resend\.com\/domains/i.test(resendError)) {
+        return {
+          success: false,
+          error: 'Resend is in test mode. To send to other people, add and verify a domain at resend.com/domains, then set SONDER_EMAIL_DOMAIN to that domain.',
+        };
+      }
+      return { success: false, error: resendError };
     } catch (error) {
       return { success: false, error: error instanceof Error ? error.message : 'Email failed' };
     }
