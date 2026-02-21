@@ -1803,6 +1803,34 @@ async function main() {
     }
   });
 
+  // Handle non-text messages (photos, stickers, voice, etc.) - track presence
+  bot.on('message', async (ctx) => {
+    // Skip text messages (handled above)
+    if (ctx.message && 'text' in ctx.message) return;
+
+    const chatId = ctx.chat.id;
+
+    // Record activity for idle engine (presence tracking)
+    idleEngine.recordActivity(String(chatId));
+
+    // Check for pending reunion on any message type
+    const state = getState(chatId);
+    if (state.pendingReunion && !state.inFTUE) {
+      const reunion = state.pendingReunion;
+      state.pendingReunion = undefined;
+      saveState(chatId);
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      try {
+        await handleReunion(chatId, reunion.awayMinutes, reunion.thoughts);
+        idleEngine.markThoughtsShared(String(chatId));
+      } catch (error) {
+        console.error(`[${chatId}] Reunion failed on non-text:`, error);
+        state.pendingReunion = reunion;
+        saveState(chatId);
+      }
+    }
+  });
+
   // Start bot
   console.log('');
   console.log('✓ Bot starting...');

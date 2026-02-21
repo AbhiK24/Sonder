@@ -83,6 +83,9 @@ export class ThoughtAccumulator {
   // Core Methods
   // ---------------------------------------------------------------------------
 
+  // Max unshared thoughts per user (prevent overwhelming reunions)
+  private static MAX_UNSHARED_PER_USER = 10;
+
   /**
    * Add a new thought
    */
@@ -93,6 +96,23 @@ export class ThoughtAccumulator {
       generatedAt: new Date(),
       shared: false,
     };
+
+    // Cap unshared thoughts - remove oldest low-importance ones if over limit
+    const unshared = this.getUnshared(thought.userId);
+    if (unshared.length >= ThoughtAccumulator.MAX_UNSHARED_PER_USER) {
+      // Sort by importance (ascending), then by age (oldest first)
+      const toRemove = [...unshared]
+        .sort((a, b) => {
+          if (a.importance !== b.importance) return a.importance - b.importance;
+          return new Date(a.generatedAt).getTime() - new Date(b.generatedAt).getTime();
+        })
+        .slice(0, unshared.length - ThoughtAccumulator.MAX_UNSHARED_PER_USER + 1);
+
+      for (const t of toRemove) {
+        this.thoughts.delete(t.id);
+      }
+      console.log(`[ThoughtAccumulator] Removed ${toRemove.length} old thoughts for ${thought.userId} (capped at ${ThoughtAccumulator.MAX_UNSHARED_PER_USER})`);
+    }
 
     this.thoughts.set(full.id, full);
     this.save();

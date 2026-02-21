@@ -45,6 +45,9 @@ export class PresenceDetector {
 
   private checkInterval: NodeJS.Timeout | null = null;
 
+  // Debounce: prevent multiple return fires within 5 seconds
+  private recentReturns: Map<string, number> = new Map();
+
   constructor(
     storagePath: string,
     thresholds: Partial<PresenceThresholds> = {}
@@ -75,12 +78,21 @@ export class PresenceDetector {
 
       // Was away, now returning
       if (previousStatus !== 'active' && awayMinutes >= this.thresholds.awayAfterMinutes) {
-        console.log(`[PresenceDetector] ${userId} returned after ${awayMinutes}m (was ${previousStatus})`);
-        this.fireReturn(userId, awayMinutes, previousStatus);
+        // Debounce: prevent multiple returns within 5 seconds (race condition protection)
+        const lastReturn = this.recentReturns.get(userId) || 0;
+        const timeSinceLastReturn = Date.now() - lastReturn;
 
-        // Update session stats
-        existing.totalSessions += 1;
-        existing.lastSessionStart = now;
+        if (timeSinceLastReturn > 5000) {
+          console.log(`[PresenceDetector] ${userId} returned after ${awayMinutes}m (was ${previousStatus})`);
+          this.recentReturns.set(userId, Date.now());
+          this.fireReturn(userId, awayMinutes, previousStatus);
+
+          // Update session stats
+          existing.totalSessions += 1;
+          existing.lastSessionStart = now;
+        } else {
+          console.log(`[PresenceDetector] ${userId} return debounced (${timeSinceLastReturn}ms ago)`);
+        }
       }
 
       existing.lastSeen = now;

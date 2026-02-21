@@ -193,6 +193,10 @@ export class IdleThoughtGenerator {
   private hourlyCount: number = 0;
   private hourlyReset: Date = new Date();
 
+  // Per-user rate limiting
+  private userHourlyCount: Map<string, { count: number; resetAt: number }> = new Map();
+  private static MAX_THOUGHTS_PER_USER_PER_HOUR = 6;
+
   constructor(
     provider: LLMProvider,
     promptBuilder: ThoughtPromptBuilder = defaultPromptBuilder,
@@ -224,8 +228,8 @@ export class IdleThoughtGenerator {
       return [];
     }
 
-    // Check rate limits
-    if (!this.checkRateLimits(agent.agentId)) {
+    // Check rate limits (including per-user limit)
+    if (!this.checkRateLimits(agent.agentId, user.userId)) {
       console.log(`[IdleGenerator] ${agent.agentName}: rate limited`);
       return [];
     }
@@ -250,6 +254,11 @@ export class IdleThoughtGenerator {
     // Update tracking
     this.lastGeneration.set(agent.agentId, new Date());
     this.hourlyCount += thoughts.length;
+
+    // Track per-user count
+    if (thoughts.length > 0) {
+      this.incrementUserCount(user.userId);
+    }
 
     return thoughts;
   }
@@ -288,7 +297,7 @@ export class IdleThoughtGenerator {
   /**
    * Check rate limits
    */
-  private checkRateLimits(agentId: string): boolean {
+  private checkRateLimits(agentId: string, userId?: string): boolean {
     // Reset hourly count if needed
     const hourAgo = Date.now() - 60 * 60 * 1000;
     if (this.hourlyReset.getTime() < hourAgo) {
@@ -296,9 +305,23 @@ export class IdleThoughtGenerator {
       this.hourlyReset = new Date();
     }
 
-    // Check hourly limit
+    // Check global hourly limit
     if (this.hourlyCount >= this.config.maxThoughtsPerHour) {
       return false;
+    }
+
+    // Check per-user hourly limit
+    if (userId) {
+      const userRate = this.userHourlyCount.get(userId);
+      if (userRate) {
+        if (Date.now() > userRate.resetAt) {
+          // Reset user's hourly count
+          this.userHourlyCount.set(userId, { count: 0, resetAt: Date.now() + 60 * 60 * 1000 });
+        } else if (userRate.count >= IdleThoughtGenerator.MAX_THOUGHTS_PER_USER_PER_HOUR) {
+          console.log(`[IdleGenerator] User ${userId} rate limited (${userRate.count} thoughts this hour)`);
+          return false;
+        }
+      }
     }
 
     // Check per-agent interval
@@ -311,6 +334,18 @@ export class IdleThoughtGenerator {
     }
 
     return true;
+  }
+
+  /**
+   * Increment user's hourly count
+   */
+  private incrementUserCount(userId: string): void {
+    const userRate = this.userHourlyCount.get(userId);
+    if (userRate) {
+      userRate.count++;
+    } else {
+      this.userHourlyCount.set(userId, { count: 1, resetAt: Date.now() + 60 * 60 * 1000 });
+    }
   }
 
   /**
