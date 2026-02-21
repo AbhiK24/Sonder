@@ -57,6 +57,13 @@ This stores:
 
 ---
 
+## Context refresh (calendar & email)
+
+- **Calendar:** Refreshed every **15 minutes** and included in the agent’s context (ICS and/or Google). If the bot doesn’t see a new event, wait up to 15 min or send another message to trigger a refresh check. The fetch window includes the last 12 hours so “tonight” in your timezone is included.
+- **Email:** Not loaded into context automatically. The agent uses tools (e.g. Gmail) **on demand** when you ask. If we add email to context later: **main INBOX only**, **human messages only** (no folders like Sent/Promotions); store full metadata + content for those.
+
+---
+
 ## Step 3: Configure Environment Variables
 
 In Railway → Service → Variables, add:

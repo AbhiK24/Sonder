@@ -34,9 +34,11 @@ export interface EngineContextData {
 export interface EngineContextConfig {
   calendarAdapter?: ICSFeedAdapter | null;
   taskAdapter?: TodoistAdapter | null;
-  calendarRefreshMinutes?: number;  // Default: 15
+  calendarRefreshMinutes?: number;  // Default: 15 — context calendar refreshed this often
   tasksRefreshMinutes?: number;     // Default: 5
   calendarLookAheadDays?: number;   // Default: 14 (2 weeks)
+  // Email: not in context yet. When added: only main INBOX, human messages only;
+  // store metadata + content for context; no other folders (Sent, Promotions, etc.)
 }
 
 // =============================================================================
@@ -111,12 +113,15 @@ export class EngineContext {
   private async checkRefresh(): Promise<void> {
     const now = new Date();
 
-    // Check calendar
-    if (this.data.calendar && now >= this.data.calendar.nextRefresh) {
+    // Calendar: refresh every calendarRefreshMinutes, or when we have no data yet (adapter connected)
+    const calendarDue =
+      this.config.calendarAdapter?.isConnected() &&
+      (!this.data.calendar || now >= this.data.calendar.nextRefresh);
+    if (calendarDue) {
       await this.refreshCalendar();
     }
 
-    // Check tasks
+    // Tasks
     if (this.data.tasks && now >= this.data.tasks.nextRefresh) {
       await this.refreshTasks();
     }
@@ -137,9 +142,11 @@ export class EngineContext {
 
     try {
       const now = new Date();
+      // Start from 12h ago so we include "today" in user TZ (e.g. tonight's event) even if server is UTC
+      const startDate = new Date(now.getTime() - 12 * 60 * 60 * 1000);
       const endDate = new Date(now.getTime() + this.config.calendarLookAheadDays * 24 * 60 * 60 * 1000);
 
-      const result = await adapter.getEvents(now, endDate);
+      const result = await adapter.getEvents(startDate, endDate);
 
       if (result.success && result.data) {
         this.data.calendar = {
@@ -256,7 +263,8 @@ export class EngineContext {
   // ---------------------------------------------------------------------------
 
   /**
-   * Get a formatted summary for agent prompts
+   * Get a formatted summary for agent prompts.
+   * Calendar is refreshed every calendarRefreshMinutes (default 15); see checkRefresh().
    */
   getContextSummary(): string {
     const parts: string[] = [];
