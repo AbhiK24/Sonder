@@ -311,13 +311,22 @@ function parseTimeMatch(match: RegExpMatchArray): TimeComponents | null {
     return { hours, minutes };
   }
 
-  // Ambiguous (e.g., "at 5") - assume PM if hours < 12 and >= 7, else AM
+  // Ambiguous (e.g., "at 8") - use context-aware logic
+  // If current hour is past the given hour, assume PM (later today or tomorrow)
+  const currentHour = new Date().getHours();
+
   if (hours >= 1 && hours <= 6) {
-    // 1-6 without am/pm -> assume PM (afternoon/evening)
+    // 1-6 without am/pm -> almost always PM (afternoon/evening)
     hours += 12;
+  } else if (hours >= 7 && hours <= 11) {
+    // 7-11 is ambiguous - use current time as context
+    // If it's already past this hour in AM, assume PM
+    if (currentHour >= hours) {
+      hours += 12;  // e.g., it's 2pm and user says "at 8" → 8pm
+    }
+    // Otherwise keep as AM (e.g., it's 6am and user says "at 9" → 9am)
   }
-  // 7-11 without am/pm could be either, default to AM for morning reminders
-  // 12+ is already 24-hour
+  // 12+ is already 24-hour format
 
   return { hours, minutes };
 }

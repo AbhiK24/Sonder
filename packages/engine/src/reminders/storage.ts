@@ -103,10 +103,28 @@ export class ReminderStorage {
   // Reminder Operations
   // =============================================================================
 
-  addReminder(userId: string, reminder: Reminder): void {
+  addReminder(userId: string, reminder: Reminder): { added: boolean; duplicate?: Reminder } {
     const store = this.load(userId);
+
+    // Check for duplicates: same content within 5 minute window
+    const contentLower = reminder.content.toLowerCase().trim();
+    const fiveMinutes = 5 * 60 * 1000;
+
+    const duplicate = store.reminders.find(r => {
+      if (r.fired) return false;
+      const contentMatch = r.content.toLowerCase().trim() === contentLower;
+      const timeMatch = Math.abs(r.dueAt.getTime() - reminder.dueAt.getTime()) < fiveMinutes;
+      return contentMatch && timeMatch;
+    });
+
+    if (duplicate) {
+      console.log(`[ReminderStorage] Duplicate detected: "${reminder.content}" - skipping`);
+      return { added: false, duplicate };
+    }
+
     store.reminders.push(reminder);
     this.save(userId, store);
+    return { added: true };
   }
 
   getReminders(userId: string): Reminder[] {

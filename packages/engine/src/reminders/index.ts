@@ -249,11 +249,26 @@ export class ReminderEngine {
 
   private cleanupNotifiedEvents(state: NudgeState, currentEvents: CalendarEvent[]): void {
     const currentKeys = new Set(currentEvents.map(e => this.getEventKey(e)));
+    const now = Date.now();
+    const maxAge = 24 * 60 * 60 * 1000; // 24 hours
 
-    // Remove IDs for events no longer in upcoming list (they've passed or been cancelled)
+    // Remove IDs for events no longer in upcoming list OR older than 24 hours
     for (const key of state.notifiedEventIds) {
+      // Remove if not in current events
       if (!currentKeys.has(key)) {
         state.notifiedEventIds.delete(key);
+        continue;
+      }
+
+      // Also remove if the event timestamp is more than 24 hours old (safety net)
+      // Key format: ${id}-${isoTimestamp}
+      const parts = key.split('-');
+      if (parts.length >= 2) {
+        const isoStr = parts.slice(1).join('-'); // Handle IDs with dashes
+        const eventTime = new Date(isoStr).getTime();
+        if (!isNaN(eventTime) && now - eventTime > maxAge) {
+          state.notifiedEventIds.delete(key);
+        }
       }
     }
   }
@@ -263,7 +278,8 @@ export class ReminderEngine {
   // =============================================================================
 
   private isQuietHours(now: Date): boolean {
-    const hour = now.getHours();
+    // Get hour in user's timezone
+    const hour = this.getHourInTimezone(now, this.config.timezone);
     const { quietHoursStart, quietHoursEnd } = this.config;
 
     // Handle overnight quiet hours (e.g., 22:00 - 08:00)
@@ -275,6 +291,20 @@ export class ReminderEngine {
     return hour >= quietHoursStart && hour < quietHoursEnd;
   }
 
+  private getHourInTimezone(date: Date, timezone: string): number {
+    try {
+      const hourStr = date.toLocaleString('en-US', {
+        timeZone: timezone,
+        hour: 'numeric',
+        hour12: false,
+      });
+      return parseInt(hourStr, 10);
+    } catch {
+      // Fallback to system time if timezone is invalid
+      return date.getHours();
+    }
+  }
+
   // =============================================================================
   // Public API - User Reminders
   // =============================================================================
@@ -284,7 +314,7 @@ export class ReminderEngine {
     content: string,
     timeInput: string,
     agentId: string = 'luna'
-  ): { reminder: Reminder; interpretation: string } {
+  ): { reminder: Reminder; interpretation: string; isDuplicate?: boolean } {
     const parsed = parseReminderTime(timeInput, this.config.timezone);
 
     const reminder: Reminder = {
@@ -297,7 +327,16 @@ export class ReminderEngine {
       fired: false,
     };
 
-    this.storage.addReminder(userId, reminder);
+    const { added, duplicate } = this.storage.addReminder(userId, reminder);
+
+    if (!added && duplicate) {
+      console.log(`[ReminderEngine] Duplicate reminder: "${content}" - existing at ${duplicate.dueAt.toISOString()}`);
+      return {
+        reminder: duplicate,
+        interpretation: `Duplicate: you already have a reminder for "${duplicate.content}" at ${formatReminderTime(duplicate.dueAt)}`,
+        isDuplicate: true,
+      };
+    }
 
     console.log(`[ReminderEngine] Created reminder: "${content}" at ${parsed.date.toISOString()}`);
 

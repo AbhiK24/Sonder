@@ -91,6 +91,23 @@ const CONFIG = {
 // Types
 // =============================================================================
 
+// Saved state interface for type safety when loading from persistence
+interface ChorusSavedState {
+  chatId: number;
+  lastSeen: string;
+  savedAt: string;
+  lastAgent?: ChorusAgentId;
+  history?: Array<{ role: 'user' | 'agent'; agentId?: ChorusAgentId; content: string; timestamp: Date }>;
+  sessionCount?: number;
+  emotionalState?: 'calm' | 'stressed' | 'overwhelmed' | 'stuck' | 'spiraling';
+  taskContext?: 'planning' | 'starting' | 'working' | 'completing' | 'reflecting';
+  userEmail?: string;
+  userName?: string;
+  profile?: UserProfile;
+  ftueProgress?: { stepIndex: number; responses: Record<string, string>; waitingForResponse: boolean };
+  pendingReunion?: { awayMinutes: number; thoughts: string };
+}
+
 interface PendingAction {
   tool: string;
   args: Record<string, unknown>;
@@ -158,7 +175,7 @@ const persistence = new Persistence(saveDir);
 function getState(chatId: number): UserState {
   if (!userStates.has(chatId)) {
     // Try to load from persistence
-    const saved = persistence.load(chatId);
+    const saved = persistence.load(chatId) as ChorusSavedState | undefined;
 
     if (saved) {
       // Load existing user
@@ -275,27 +292,40 @@ function getAgentContext(agent: ChorusAgent): AgentContext {
   return {
     agentId: agent.id,
     agentName: agent.name,
-    agentRole: agent.role,
-    personality: agent.voiceTraits.join(', '),
-    preferredTopics: agent.speaksWhen,
+    role: agent.role,
+    personality: agent.voiceTraits,
   };
 }
 
 function getUserContext(state: UserState, awayMinutes: number): UserContext {
   const recentHistory = state.history.slice(-20);
 
+  // Summarize recent conversation
+  const lastConversationSummary = recentHistory.length > 0
+    ? recentHistory.slice(-5).map(h => h.content).join(' ').slice(0, 200)
+    : undefined;
+
+  // Extract topics from recent messages
+  const recentTopics = recentHistory
+    .map(h => h.content.toLowerCase())
+    .flatMap(c => {
+      const topics: string[] = [];
+      if (c.includes('work') || c.includes('meeting')) topics.push('work');
+      if (c.includes('task') || c.includes('todo')) topics.push('tasks');
+      if (c.includes('stress') || c.includes('overwhelm')) topics.push('emotions');
+      return topics;
+    })
+    .filter((v, i, a) => a.indexOf(v) === i) // unique
+    .slice(0, 5);
+
   return {
     userId: String(state.id),
-    recentMessages: recentHistory.map(h => ({
-      role: h.role,
-      content: h.content,
-      timestamp: h.timestamp,
-    })),
-    mood: state.emotionalState,
     awayMinutes,
-    lastInteractionType: state.taskContext || 'general',
-    facts: [], // TODO: integrate with fact store
-    patterns: [], // TODO: integrate with pattern store
+    lastConversationSummary,
+    recentTopics: recentTopics.length > 0 ? recentTopics : undefined,
+    currentMood: state.emotionalState,
+    currentTasks: state.taskContext ? [state.taskContext] : undefined,
+    userPatterns: [], // TODO: integrate with pattern store
   };
 }
 
@@ -497,12 +527,15 @@ IMPORTANT: You have real-time web search built in. When asked about current even
         emailDomain: process.env.SONDER_EMAIL_DOMAIN,
         whatsappAllowlist: whatsappAllowlist,
         emailAdapter: emailAdapter || undefined,
-        whatsappAdapter: whatsappAdapter ? {
-          sendMessage: async (to: string, message: string) => {
-            const result = await whatsappAdapter.sendAsAgent(agent.id, to, message, true);
-            return result;
-          }
-        } : undefined,
+        whatsappAdapter: (() => {
+          const wa = whatsappAdapter;
+          return wa ? {
+            sendMessage: async (to: string, message: string) => {
+              const result = await wa.sendAsAgent(agent.id, to, message, true);
+              return result;
+            }
+          } : undefined;
+        })(),
         engineContext: {
           getCalendarEvents: () => engineContext.getCalendarEvents(),
           getEventsForDate: (date: Date) => engineContext.getEventsForDate(date),
@@ -510,11 +543,14 @@ IMPORTANT: You have real-time web search built in. When asked about current even
           getTodayTasks: () => engineContext.getTodayTasks(),
           getOverdueTasks: () => engineContext.getOverdueTasks(),
         },
-        taskAdapter: taskAdapter ? {
-          createTask: async (task: any) => taskAdapter.createTask(task),
-          completeTask: async (taskId: string) => taskAdapter.completeTask(taskId),
-          getTasks: async (filter?: any) => taskAdapter.getTasks(filter),
-        } : undefined,
+        taskAdapter: (() => {
+          const ta = taskAdapter;
+          return ta ? {
+            createTask: async (task: { content: string; dueDate?: Date; priority?: number }) => ta.createTask(task as any),
+            completeTask: async (taskId: string) => ta.completeTask(taskId),
+            getTasks: async (filter?: any) => ta.getTasks(filter),
+          } : undefined;
+        })(),
         memory: {
           remember: async (text: string, metadata?: any) => { await memory.remember(text, metadata); },
           recall: async (query: string, opts?: any) => memory.recall(query, opts),
@@ -906,7 +942,8 @@ Or just talk to us. We're here. 💫`;
 
   // Test WhatsApp
   async TESTWHATSAPP(chatId, state) {
-    if (!whatsappAdapter) {
+    const wa = whatsappAdapter;
+    if (!wa) {
       return "❌ WhatsApp not configured. Set WHATSAPP_USE_BAILEYS=true or Twilio credentials in .env";
     }
 
@@ -915,13 +952,13 @@ Or just talk to us. We're here. 💫`;
       return "❌ No USER_WHATSAPP configured in .env";
     }
 
-    if (!whatsappAdapter.isReady()) {
+    if (!wa.isReady()) {
       return "⏳ WhatsApp is connecting... Scan QR code in terminal if using Baileys.";
     }
 
     try {
       const agent = chorusAgents.ember; // Ember for energy!
-      const result = await whatsappAdapter.sendAsAgent(
+      const result = await wa.sendAsAgent(
         agent.id,
         userPhone,
         `Hey! This is a test message from Chorus.\n\nEmber here - just checking that our WhatsApp channel is working. When you need a spark to get started, I'll be here! 🔥`,
@@ -1425,15 +1462,41 @@ function setupInsightEngine(): void {
         const chatId = parseInt(userId);
         const state = getState(chatId);
 
+        // Group messages by day for conversation summaries
+        const recentConversations = state.history.slice(-50).reduce<Array<{
+          date: Date;
+          topics: string[];
+          sentiment: 'positive' | 'neutral' | 'negative';
+          keyPhrases: string[];
+          agentId: string;
+        }>>((acc, h) => {
+          const dateKey = h.timestamp.toDateString();
+          const existing = acc.find(c => c.date.toDateString() === dateKey);
+          if (!existing) {
+            acc.push({
+              date: h.timestamp,
+              topics: [],
+              sentiment: 'neutral',
+              keyPhrases: [h.content.slice(0, 50)],
+              agentId: h.agentId || 'luna',
+            });
+          }
+          return acc;
+        }, []);
+
         return {
           userId,
-          conversations: state.history.slice(-50).map(h => ({
-            timestamp: h.timestamp,
-            role: h.role,
-            content: h.content,
-          })),
+          recentConversations,
           tasks: [], // TODO: integrate with Todoist
-          patterns: [],
+          activityTimes: state.history.slice(-20).map(h => h.timestamp),
+          messageFrequency: state.history.length / Math.max(1, state.sessionCount),
+          averageResponseTime: 5, // TODO: compute from history
+          moodIndicators: state.emotionalState ? [{
+            date: new Date(),
+            mood: state.emotionalState === 'overwhelmed' ? 'stressed' : state.emotionalState === 'spiraling' ? 'anxious' : 'calm',
+            confidence: 0.7,
+            source: 'conversation',
+          }] : [],
         };
       },
       isQuietHours: (userId) => {
@@ -1442,15 +1505,15 @@ function setupInsightEngine(): void {
         return hour >= CONFIG.quietHoursStart || hour < CONFIG.quietHoursEnd;
       },
       onTriggerFired: async (fired: FiredTrigger) => {
-        console.log(`[InsightEngine] Trigger fired: ${fired.trigger.name}`);
+        console.log(`[InsightEngine] Trigger fired: ${fired.triggerId}`);
 
         // Handle different trigger types
-        if (fired.trigger.action.type === 'check_in') {
-          const checkInType = fired.trigger.action.config?.checkInType as 'morning' | 'midday' | 'evening' | 'weekly';
+        if (fired.action === 'check_in') {
+          const checkInType = fired.actionConfig?.checkInType as 'morning' | 'midday' | 'evening' | 'weekly';
           if (checkInType) {
             await handleCheckIn(parseInt(fired.userId), checkInType);
           }
-        } else if (fired.trigger.action.type === 'message') {
+        } else if (fired.action === 'message') {
           // Generic proactive message
           const chatId = parseInt(fired.userId);
           const state = getState(chatId);
@@ -1581,10 +1644,11 @@ Your reply:`,
           );
 
           const reply = response.trim();
-          if (reply && whatsappAdapter) {
+          const wa = whatsappAdapter;
+          if (reply && wa) {
             // Extract phone number from JID (remove @s.whatsapp.net)
             const phone = msg.from.split('@')[0];
-            await whatsappAdapter.sendMessage(phone, reply);
+            await wa.sendMessage(phone, reply);
             console.log(`[WhatsApp] Replied to ${msg.fromFormatted}: ${reply}`);
           }
         } catch (error) {
@@ -1593,7 +1657,7 @@ Your reply:`,
       },
     });
 
-    const result = await whatsappAdapter.connect();
+    const result = await whatsappAdapter!.connect();
     if (result.success) {
       const allowMsg = allowlist ? `allowlist: ${allowlist.join(', ')}` : 'no allowlist (any number)';
       console.log(`[Chorus] WhatsApp (Baileys) initializing - ${allowMsg}, ${rateLimit}/hour limit`);
@@ -1615,7 +1679,7 @@ Your reply:`,
       rateLimit,
     });
 
-    const result = await whatsappAdapter.connect();
+    const result = await whatsappAdapter!.connect();
     if (result.success) {
       console.log('[Chorus] WhatsApp (Twilio) connected');
     } else {
@@ -1859,7 +1923,7 @@ async function main() {
         for (const chatId of existingChats) {
           try {
             const state = getState(chatId);
-            const lead = agents.luna; // Luna as the greeter
+            const lead = chorusAgents.luna; // Luna as the greeter
 
             // Different message based on FTUE status
             let message: string;

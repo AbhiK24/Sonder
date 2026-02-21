@@ -1182,7 +1182,7 @@ export const toolExecutors: Record<string, ToolExecutor> = {
       return { success: false, error: 'Google not connected. Please sign in with Google in settings.' };
     }
 
-    const { title, startTime, durationMinutes = 60, description, location, invitees } = args as {
+    const { title, startTime, durationMinutes: rawDuration = 60, description, location, invitees } = args as {
       title: string;
       startTime: string;
       durationMinutes?: number;
@@ -1190,6 +1190,12 @@ export const toolExecutors: Record<string, ToolExecutor> = {
       location?: string;
       invitees?: string;
     };
+
+    // Validate duration (1 minute to 24 hours)
+    const durationMinutes = Math.max(1, Math.min(1440, rawDuration));
+    if (rawDuration !== durationMinutes) {
+      console.warn(`[Calendar] Duration ${rawDuration}min clamped to ${durationMinutes}min`);
+    }
 
     // Parse start time
     const start = parseDateTime(startTime, context.timezone);
@@ -2121,6 +2127,7 @@ function parseDate(dateStr: string, timezone?: string): Date {
   const parsed = new Date(dateStr);
   if (!isNaN(parsed.getTime())) return parsed;
 
+  console.warn(`[parseDate] Could not parse "${dateStr}", defaulting to now`);
   return now;
 }
 
@@ -2160,6 +2167,7 @@ function parseDateTime(dateTimeStr: string, timezone?: string): Date {
   if (!isNaN(parsed.getTime())) return parsed;
 
   // Fallback: use current time + 1 hour
+  console.warn(`[parseDateTime] Could not parse "${dateTimeStr}", defaulting to +1 hour`);
   const fallback = new Date(now);
   fallback.setHours(fallback.getHours() + 1, 0, 0, 0);
   return fallback;

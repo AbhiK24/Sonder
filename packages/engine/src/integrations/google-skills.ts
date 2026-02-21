@@ -188,11 +188,14 @@ export async function createCalendarEvent(options: {
     title,
     startTime,
     endTime,
-    durationMinutes = 60,
+    durationMinutes: rawDuration = 60,
     description,
     location,
     invitees = [],
   } = options;
+
+  // Validate duration (1 minute to 24 hours = 1440 minutes)
+  const durationMinutes = Math.max(1, Math.min(1440, rawDuration));
 
   const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
   const now = new Date();
