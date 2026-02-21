@@ -577,7 +577,7 @@ IMPORTANT: You have real-time web search built in. When asked about current even
         userEmail: state.userEmail || state.profile.email,
         agentId: agent.id,
         agentName: agent.name,
-        timezone: process.env.TIMEZONE || 'UTC',
+        timezone: CONFIG.timezone,
         emailDomain: process.env.SONDER_EMAIL_DOMAIN,
         whatsappAllowlist: whatsappAllowlist,
         emailAdapter: emailAdapter || undefined,
@@ -1860,7 +1860,7 @@ async function main() {
   reminderEngine = new ReminderEngine({
     meetingReminderMinutes: 15,
     checkIntervalSeconds: 60,
-    timezone: process.env.TIMEZONE || 'UTC',
+    timezone: CONFIG.timezone,
     quietHoursStart: parseInt(process.env.QUIET_HOURS_START || '22', 10),
     quietHoursEnd: parseInt(process.env.QUIET_HOURS_END || '8', 10),
     getUpcomingEvents: (hours: number) => engineContext.getUpcomingEvents(hours),

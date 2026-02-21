@@ -2231,7 +2231,7 @@ function parseDate(dateStr: string, timezone?: string): Date {
 function parseDateTime(dateTimeStr: string, timezone?: string): Date {
   const lower = dateTimeStr.toLowerCase().trim();
   const now = new Date();
-  const tz = timezone || 'UTC';
+  const tz = timezone || process.env.TIMEZONE || 'Asia/Kolkata';
 
   // Handle "tomorrow 3pm", "today at 2:30pm", etc. — calendar date and time in user's timezone
   const tomorrowMatch = lower.match(/tomorrow\s+(?:at\s+)?(\d{1,2})(?::(\d{2}))?\s*(am|pm)?/i);
