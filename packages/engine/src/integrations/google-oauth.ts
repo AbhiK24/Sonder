@@ -252,7 +252,10 @@ export class GoogleOAuth {
    * Refresh the access token
    */
   private async refreshAccessToken(): Promise<boolean> {
-    if (!this.tokens?.refreshToken) return false;
+    if (!this.tokens?.refreshToken) {
+      console.error('[GoogleOAuth] No refresh token available');
+      return false;
+    }
 
     try {
       const response = await fetch(GOOGLE_TOKEN_URL, {
@@ -266,7 +269,20 @@ export class GoogleOAuth {
         }),
       });
 
-      if (!response.ok) return false;
+      if (!response.ok) {
+        const error = await response.json().catch(() => ({})) as any;
+        console.error('[GoogleOAuth] Token refresh failed:', error.error || response.status);
+
+        // If token is invalid/revoked, clear it
+        if (error.error === 'invalid_grant' || response.status === 400) {
+          console.error('[GoogleOAuth] Refresh token revoked or expired - clearing tokens');
+          this.tokens = null;
+          if (existsSync(this.tokenPath)) {
+            unlinkSync(this.tokenPath);
+          }
+        }
+        return false;
+      }
 
       const data = await response.json() as any;
 
@@ -277,10 +293,19 @@ export class GoogleOAuth {
       };
 
       this.saveTokens();
+      console.log('[GoogleOAuth] Token refreshed successfully');
       return true;
-    } catch {
+    } catch (error) {
+      console.error('[GoogleOAuth] Token refresh error:', error);
       return false;
     }
+  }
+
+  /**
+   * Check if re-authentication is needed
+   */
+  needsReauth(): boolean {
+    return this.tokens === null || !this.tokens.refreshToken;
   }
 
   /**
@@ -394,16 +419,37 @@ export class GoogleOAuth {
   async fetch(url: string, options: RequestInit = {}): Promise<Response> {
     const token = await this.getAccessToken();
     if (!token) {
-      throw new Error('Not authenticated');
+      throw new Error('Google authentication required. Please reconnect your Google account.');
     }
 
-    return fetch(url, {
+    const response = await fetch(url, {
       ...options,
       headers: {
         ...options.headers,
         Authorization: `Bearer ${token}`,
       },
     });
+
+    // Handle auth errors - token might have been revoked
+    if (response.status === 401 || response.status === 403) {
+      console.error('[GoogleOAuth] API returned auth error, attempting refresh...');
+
+      // Try to refresh and retry once
+      const refreshed = await this.refreshAccessToken();
+      if (refreshed && this.tokens?.accessToken) {
+        return fetch(url, {
+          ...options,
+          headers: {
+            ...options.headers,
+            Authorization: `Bearer ${this.tokens.accessToken}`,
+          },
+        });
+      }
+
+      throw new Error('Google authentication expired. Please reconnect your Google account.');
+    }
+
+    return response;
   }
 }
 

@@ -117,7 +117,7 @@ export async function getTodayEvents(): Promise<SkillResult<CalendarEvent[]>> {
 }
 
 /**
- * Create a calendar event
+ * Create a calendar event with validation and conflict detection
  */
 export async function createCalendarEvent(options: {
   title: string;
@@ -130,6 +130,10 @@ export async function createCalendarEvent(options: {
 }): Promise<SkillResult<CalendarEvent>> {
   const google = getGoogleOAuth();
   if (!google?.isAuthenticated()) {
+    // Check if re-auth is needed
+    if (google?.needsReauth()) {
+      return { success: false, error: 'Google authentication expired. Please reconnect your Google account.' };
+    }
     return { success: false, error: 'Google not connected' };
   }
 
@@ -143,9 +147,46 @@ export async function createCalendarEvent(options: {
     invitees = [],
   } = options;
 
+  const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
+  const now = new Date();
+
+  // Validate: reject past times (with 5 min buffer for processing)
+  const fiveMinAgo = new Date(now.getTime() - 5 * 60 * 1000);
+  if (startTime < fiveMinAgo) {
+    const requestedTime = startTime.toLocaleString('en-US', { timeZone: timezone });
+    const currentTime = now.toLocaleString('en-US', { timeZone: timezone });
+    return {
+      success: false,
+      error: `Cannot create event in the past. You requested ${requestedTime}, but it's currently ${currentTime}. Did you mean a different time?`
+    };
+  }
+
   const end = endTime || new Date(startTime.getTime() + durationMinutes * 60 * 1000);
 
+  // Validate: end must be after start
+  if (end <= startTime) {
+    return { success: false, error: 'Event end time must be after start time.' };
+  }
+
   try {
+    // Check for conflicts
+    const existingEvents = await google.calendar.listEvents({
+      timeMin: new Date(startTime.getTime() - 60000), // 1 min buffer
+      timeMax: new Date(end.getTime() + 60000),
+      maxResults: 10,
+    });
+
+    const conflicts = existingEvents.filter(e => {
+      // Check if events overlap
+      return e.start < end && e.end > startTime && e.status !== 'cancelled';
+    });
+
+    let conflictWarning = '';
+    if (conflicts.length > 0) {
+      const conflictNames = conflicts.map(c => `"${c.summary}"`).join(', ');
+      conflictWarning = `\n⚠️ Note: This overlaps with ${conflictNames}`;
+    }
+
     const event = await google.calendar.createEvent({
       summary: title,
       start: startTime,
@@ -160,7 +201,6 @@ export async function createCalendarEvent(options: {
       return { success: false, error: 'Failed to create event' };
     }
 
-    const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
     const timeStr = startTime.toLocaleTimeString('en-US', {
       hour: 'numeric',
       minute: '2-digit',
@@ -184,10 +224,15 @@ export async function createCalendarEvent(options: {
     return {
       success: true,
       data: event,
-      message: `Created "${title}" on ${dateStr} at ${timeStr}.${inviteMsg}${meetMsg}`,
+      message: `Created "${title}" on ${dateStr} at ${timeStr}.${inviteMsg}${meetMsg}${conflictWarning}`,
     };
   } catch (error) {
-    return { success: false, error: error instanceof Error ? error.message : 'Failed to create event' };
+    const errMsg = error instanceof Error ? error.message : 'Failed to create event';
+    // Check for auth-related errors
+    if (errMsg.includes('authentication') || errMsg.includes('reconnect')) {
+      return { success: false, error: errMsg };
+    }
+    return { success: false, error: errMsg };
   }
 }
 

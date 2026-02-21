@@ -2154,6 +2154,12 @@ function parseDateTime(dateTimeStr: string, timezone?: string): Date {
 // Tool Execution
 // =============================================================================
 
+// Tool execution timeout (30 seconds)
+const TOOL_TIMEOUT_MS = 30000;
+
+/**
+ * Execute a tool with timeout and error handling
+ */
 export async function executeTool(
   toolCall: ToolCall,
   context: ToolContext
@@ -2161,17 +2167,49 @@ export async function executeTool(
   const executor = toolExecutors[toolCall.name];
 
   if (!executor) {
-    return { success: false, error: `Unknown tool: ${toolCall.name}` };
+    // Unknown tool - provide helpful fallback message
+    console.warn(`[Tool] Unknown tool called: ${toolCall.name}`);
+    return {
+      success: false,
+      error: `I don't have a "${toolCall.name}" capability. Available tools: calendar, email, tasks, reminders, contacts, web search, and link summarization.`
+    };
+  }
+
+  // Validate arguments
+  if (toolCall.arguments === undefined || toolCall.arguments === null) {
+    toolCall.arguments = {};
+  }
+  if (typeof toolCall.arguments !== 'object') {
+    console.error(`[Tool] Invalid arguments type for ${toolCall.name}:`, typeof toolCall.arguments);
+    return {
+      success: false,
+      error: `Invalid arguments for ${toolCall.name}. Expected object, got ${typeof toolCall.arguments}.`
+    };
   }
 
   console.log(`[Tool] Executing: ${toolCall.name}`, toolCall.arguments);
 
   try {
-    const result = await executor(toolCall.arguments, context);
+    // Execute with timeout
+    const result = await Promise.race([
+      executor(toolCall.arguments, context),
+      new Promise<ToolResult>((_, reject) =>
+        setTimeout(() => reject(new Error('Tool execution timed out after 30 seconds')), TOOL_TIMEOUT_MS)
+      )
+    ]);
     return result;
   } catch (error) {
     const errorMsg = error instanceof Error ? error.message : 'Tool execution failed';
     console.error(`[Tool] Error:`, error);
+
+    // Provide user-friendly error messages
+    if (errorMsg.includes('timed out')) {
+      return { success: false, error: 'This operation is taking too long. Please try again later.' };
+    }
+    if (errorMsg.includes('network') || errorMsg.includes('ENOTFOUND') || errorMsg.includes('fetch')) {
+      return { success: false, error: 'Network error. Please check your connection and try again.' };
+    }
+
     return { success: false, error: errorMsg };
   }
 }
@@ -2260,6 +2298,7 @@ Agent: *uses summarize_link tool*
 
 /**
  * Parse tool calls from LLM response
+ * Handles various malformed JSON cases gracefully
  */
 export function parseToolCalls(response: string): ToolCall[] {
   const toolCalls: ToolCall[] = [];
@@ -2271,11 +2310,19 @@ export function parseToolCalls(response: string): ToolCall[] {
   while ((match = codeBlockRegex.exec(response)) !== null) {
     try {
       const parsed = JSON.parse(match[1].trim());
-      if (parsed.name && parsed.arguments) {
-        toolCalls.push(parsed as ToolCall);
+      if (parsed.name && typeof parsed.name === 'string') {
+        toolCalls.push({
+          name: parsed.name,
+          arguments: typeof parsed.arguments === 'object' ? parsed.arguments : {},
+        });
       }
-    } catch {
-      // Invalid JSON, skip
+    } catch (e) {
+      // Try to recover from malformed JSON
+      console.warn('[parseToolCalls] Failed to parse code block, attempting recovery:', match[1].slice(0, 100));
+      const recovered = tryRecoverToolCall(match[1]);
+      if (recovered) {
+        toolCalls.push(recovered);
+      }
     }
   }
 
@@ -2288,15 +2335,57 @@ export function parseToolCalls(response: string): ToolCall[] {
         const args = JSON.parse(match[2]);
         toolCalls.push({
           name: match[1],
-          arguments: args,
+          arguments: typeof args === 'object' ? args : {},
         });
       } catch {
-        // Invalid JSON, skip
+        // Try to at least get the tool name
+        toolCalls.push({
+          name: match[1],
+          arguments: {},
+        });
+        console.warn(`[parseToolCalls] Recovered tool name "${match[1]}" but args were malformed`);
       }
     }
   }
 
   return toolCalls;
+}
+
+/**
+ * Try to recover a tool call from malformed JSON
+ */
+function tryRecoverToolCall(raw: string): ToolCall | null {
+  // Try to extract tool name
+  const nameMatch = raw.match(/"name"\s*:\s*"([^"]+)"/);
+  if (!nameMatch) return null;
+
+  const toolName = nameMatch[1];
+
+  // Try to extract arguments
+  const argsMatch = raw.match(/"arguments"\s*:\s*(\{[\s\S]*?\})/);
+  let args: Record<string, unknown> = {};
+
+  if (argsMatch) {
+    try {
+      args = JSON.parse(argsMatch[1]);
+    } catch {
+      // Try to extract individual key-value pairs
+      const kvRegex = /"(\w+)"\s*:\s*(?:"([^"]+)"|(\d+)|(\btrue\b|\bfalse\b))/g;
+      let kv;
+      while ((kv = kvRegex.exec(argsMatch[1])) !== null) {
+        const key = kv[1];
+        const strVal = kv[2];
+        const numVal = kv[3];
+        const boolVal = kv[4];
+        if (strVal !== undefined) args[key] = strVal;
+        else if (numVal !== undefined) args[key] = parseInt(numVal);
+        else if (boolVal !== undefined) args[key] = boolVal === 'true';
+      }
+    }
+  }
+
+  console.log(`[parseToolCalls] Recovered tool: ${toolName}`, args);
+  return { name: toolName, arguments: args };
 }
 
 /**

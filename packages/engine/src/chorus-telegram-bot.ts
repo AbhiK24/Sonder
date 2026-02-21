@@ -469,6 +469,13 @@ IMPORTANT: You have real-time web search built in. When asked about current even
       : parseToolCalls(response);
     console.log(`[DEBUG] Tool calls: ${toolCalls.length}`, toolCalls.map(t => t.name));
 
+    // Tool loop prevention - max 5 tool calls per message to prevent runaway loops
+    const MAX_TOOL_CALLS_PER_MESSAGE = 5;
+    if (toolCalls.length > MAX_TOOL_CALLS_PER_MESSAGE) {
+      console.warn(`[Tool] Too many tool calls (${toolCalls.length}), limiting to ${MAX_TOOL_CALLS_PER_MESSAGE}`);
+      toolCalls.splice(MAX_TOOL_CALLS_PER_MESSAGE);
+    }
+
     // Tools that require confirmation before executing
     const CONFIRMATION_REQUIRED_TOOLS = ['send_email', 'send_whatsapp', 'google_create_event', 'google_update_event'];
 

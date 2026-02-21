@@ -248,14 +248,53 @@ class KimiProvider implements LLMProvider {
         }
 
         try {
-          const args = JSON.parse(tc.function.arguments || '{}');
+          // Handle malformed arguments gracefully
+          let args: Record<string, unknown> = {};
+          const rawArgs = tc.function.arguments || '{}';
+
+          if (rawArgs.trim()) {
+            try {
+              args = JSON.parse(rawArgs);
+            } catch (parseError) {
+              // Try to salvage - sometimes LLM sends incomplete JSON
+              console.warn(`[Kimi] Malformed tool args for ${tc.function.name}, attempting recovery:`, rawArgs);
+
+              // Try to extract key-value pairs from malformed JSON
+              const keyValueMatch = rawArgs.match(/"(\w+)":\s*"([^"]+)"/g);
+              if (keyValueMatch) {
+                for (const match of keyValueMatch) {
+                  const [, key, value] = match.match(/"(\w+)":\s*"([^"]+)"/) || [];
+                  if (key && value) args[key] = value;
+                }
+              }
+
+              // If still empty and there's content, try one more thing
+              if (Object.keys(args).length === 0 && rawArgs.includes(':')) {
+                console.error('[Kimi] Could not recover tool args:', rawArgs);
+                // Add the tool call anyway with empty args - let the executor handle it
+              }
+            }
+          }
+
+          // Validate required fields based on tool name
+          if (typeof args !== 'object' || Array.isArray(args)) {
+            console.error(`[Kimi] Invalid args type for ${tc.function.name}:`, typeof args);
+            args = {};
+          }
+
           toolCalls.push({
             id: tc.id,
             name: tc.function.name,
             arguments: args,
           });
         } catch (e) {
-          console.error('[Kimi] Failed to parse tool args:', tc.function.arguments, e);
+          console.error('[Kimi] Failed to process tool call:', tc.function.name, e);
+          // Still add the tool call with empty args so we can report the error
+          toolCalls.push({
+            id: tc.id,
+            name: tc.function.name,
+            arguments: {},
+          });
         }
       }
 
