@@ -51,6 +51,7 @@ export interface CalendarEvent {
   recurring: boolean;
   status: 'confirmed' | 'tentative' | 'cancelled';
   htmlLink?: string;
+  meetLink?: string;  // Google Meet link
 }
 
 export interface GmailMessage {
@@ -332,6 +333,7 @@ export class GoogleOAuth {
         const encrypted = readFileSync(this.tokenPath, 'utf-8');
         const decrypted = decrypt(encrypted, this.encryptionKey);
         this.tokens = JSON.parse(decrypted);
+        console.log('[GoogleOAuth] Loaded tokens from encrypted file');
         return;
       } catch {
         // Invalid or corrupted tokens
@@ -350,10 +352,24 @@ export class GoogleOAuth {
           expiresAt: data.expiresAt || Date.now() + 3600000,
           scope: data.scope || '',
         };
+        console.log('[GoogleOAuth] Loaded tokens from JSON file');
         return;
       } catch {
         // Invalid JSON
       }
+    }
+
+    // Fallback: load from environment variables (for cloud deployment)
+    const refreshToken = process.env.GOOGLE_REFRESH_TOKEN;
+    if (refreshToken) {
+      this.tokens = {
+        accessToken: '', // Will be refreshed
+        refreshToken,
+        expiresAt: 0, // Force refresh
+        scope: '',
+      };
+      console.log('[GoogleOAuth] Loaded refresh token from environment');
+      return;
     }
 
     this.tokens = null;
@@ -453,7 +469,7 @@ class GoogleCalendarAPI {
   }
 
   /**
-   * Create a calendar event (with optional invitees)
+   * Create a calendar event (with optional invitees and Google Meet)
    */
   async createEvent(options: {
     summary: string;
@@ -464,6 +480,7 @@ class GoogleCalendarAPI {
     attendees?: string[];  // email addresses
     calendarId?: string;
     sendNotifications?: boolean;
+    addMeet?: boolean;  // Add Google Meet link
   }): Promise<CalendarEvent | null> {
     const {
       summary,
@@ -474,12 +491,16 @@ class GoogleCalendarAPI {
       attendees = [],
       calendarId = 'primary',
       sendNotifications = true,
+      addMeet = true,  // Default to adding Meet
     } = options;
+
+    // Use user's timezone (IST), not server timezone (UTC)
+    const userTimezone = process.env.TIMEZONE || 'Asia/Kolkata';
 
     const event: any = {
       summary,
-      start: { dateTime: start.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
-      end: { dateTime: end.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone },
+      start: { dateTime: start.toISOString(), timeZone: userTimezone },
+      end: { dateTime: end.toISOString(), timeZone: userTimezone },
     };
 
     if (description) event.description = description;
@@ -488,8 +509,19 @@ class GoogleCalendarAPI {
       event.attendees = attendees.map(email => ({ email }));
     }
 
+    // Add Google Meet conferencing
+    if (addMeet) {
+      event.conferenceData = {
+        createRequest: {
+          requestId: `meet-${Date.now()}`,
+          conferenceSolutionKey: { type: 'hangoutsMeet' },
+        },
+      };
+    }
+
     const params = new URLSearchParams();
     if (sendNotifications) params.set('sendUpdates', 'all');
+    if (addMeet) params.set('conferenceDataVersion', '1');
 
     const response = await this.oauth.fetch(
       `${GOOGLE_CALENDAR_API}/calendars/${encodeURIComponent(calendarId)}/events?${params}`,
@@ -550,11 +582,12 @@ class GoogleCalendarAPI {
     if (description !== undefined) event.description = description;
     if (location !== undefined) event.location = location;
 
+    const userTimezone = process.env.TIMEZONE || 'Asia/Kolkata';
     if (start) {
-      event.start = { dateTime: start.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+      event.start = { dateTime: start.toISOString(), timeZone: userTimezone };
     }
     if (end) {
-      event.end = { dateTime: end.toISOString(), timeZone: Intl.DateTimeFormat().resolvedOptions().timeZone };
+      event.end = { dateTime: end.toISOString(), timeZone: userTimezone };
     }
     if (attendees !== undefined) {
       event.attendees = attendees.map(email => ({ email }));
@@ -652,6 +685,11 @@ class GoogleCalendarAPI {
       ? new Date(item.end.dateTime)
       : new Date(item.end?.date);
 
+    // Extract Google Meet link from conferenceData
+    const meetLink = item.conferenceData?.entryPoints?.find(
+      (ep: any) => ep.entryPointType === 'video'
+    )?.uri;
+
     return {
       id: item.id,
       summary: item.summary || '(No title)',
@@ -663,6 +701,7 @@ class GoogleCalendarAPI {
       recurring: !!item.recurringEventId,
       status: item.status || 'confirmed',
       htmlLink: item.htmlLink,
+      meetLink,
     };
   }
 }

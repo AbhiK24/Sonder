@@ -46,6 +46,7 @@ import {
 } from '../integrations/contacts.js';
 import { webSearch, formatSearchResults } from '../integrations/search.js';
 import { summarizeLink, fetchLinkContent } from '../integrations/link-summarizer.js';
+import type { ToolDefinitionForLLM } from '../types/index.js';
 
 // Tool definitions for LLM
 export interface ToolDefinition {
@@ -174,7 +175,7 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   // === Calendar ===
   {
     name: 'get_calendar_events',
-    description: 'Get calendar events for a date range. Use to check schedule, find free time, list meetings.',
+    description: "Get calendar events including today's schedule. Use when user asks about their calendar, meetings, or schedule for today or upcoming days.",
     parameters: {
       type: 'object',
       properties: {
@@ -2414,4 +2415,45 @@ export function hasLikelyDependencies(toolCalls: ToolCall[]): boolean {
   );
 
   return (hasCalendarQuery || hasTaskQuery) && hasEmailAction;
+}
+
+// =============================================================================
+// Native Tool Calling Support (Kimi K2, OpenAI)
+// =============================================================================
+
+/**
+ * Convert TOOL_DEFINITIONS to format for native tool calling
+ * Works with Kimi K2, OpenAI, and other OpenAI-compatible APIs
+ */
+export function getToolsForNativeToolCalling(): ToolDefinitionForLLM[] {
+  return TOOL_DEFINITIONS.map(tool => ({
+    name: tool.name,
+    description: tool.description,
+    parameters: {
+      type: 'object' as const,
+      properties: tool.parameters.properties,
+      required: tool.parameters.required,
+    },
+  }));
+}
+
+/**
+ * Get tool by name
+ */
+export function getToolDefinition(name: string): ToolDefinition | undefined {
+  return TOOL_DEFINITIONS.find(t => t.name === name);
+}
+
+/**
+ * Check if a tool requires confirmation before execution
+ */
+export function toolRequiresConfirmation(toolName: string): boolean {
+  const confirmationTools = new Set([
+    'send_email',
+    'send_whatsapp',
+    'google_create_event',
+    'google_update_event',
+    'build_tool',
+  ]);
+  return confirmationTools.has(toolName);
 }

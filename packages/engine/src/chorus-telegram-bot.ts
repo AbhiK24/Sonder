@@ -52,7 +52,10 @@ import {
   orderToolCalls,
   TOOL_DEFINITIONS,
   toolExecutors,
+  getToolsForNativeToolCalling,
+  toolRequiresConfirmation,
 } from './tools/index.js';
+import type { ToolCallFromLLM, GenerateWithToolsResult } from './types/index.js';
 
 // Tool Forge for self-extending capabilities
 import { createToolForge, ToolForge } from './tool-forge/index.js';
@@ -396,18 +399,48 @@ If the user asks you to take an action (send email, etc.), use the appropriate t
 IMPORTANT: You have real-time web search built in. When asked about current events, weather, news, or any current information, just answer directly - you already have web access. Never say you can't search the web or need permission.`;
 
   try {
-    const response = await provider.generate(prompt, {
-      temperature: 0.8,
-      maxTokens: 500,
-      useSearch: true,  // Enable Kimi's native web search for grounded responses
-    });
+    // Check if provider supports native tool calling
+    const supportsNativeTools = typeof provider.generateWithTools === 'function';
 
-    // DEBUG: Log raw response to see if tool calls are generated
+    let response: string;
+    let nativeToolCalls: ToolCallFromLLM[] = [];
+
+    if (supportsNativeTools) {
+      // Use native tool calling (Kimi K2, OpenAI)
+      const tools = getToolsForNativeToolCalling();
+      console.log(`[DEBUG] Using native tool calling with ${tools.length} tools`);
+
+      const result = await provider.generateWithTools!(prompt, {
+        temperature: 0.8,
+        maxTokens: 500,
+        useSearch: true,
+        tools,
+      });
+
+      response = result.content;
+      nativeToolCalls = result.toolCalls || [];
+
+      console.log(`[DEBUG] Native tool result: finishReason=${result.finishReason}, toolCalls=${nativeToolCalls.length}`);
+      if (nativeToolCalls.length > 0) {
+        console.log(`[DEBUG] Tool calls:`, nativeToolCalls.map(t => `${t.name}(${JSON.stringify(t.arguments)})`));
+      }
+    } else {
+      // Fallback to text-based tool parsing
+      response = await provider.generate(prompt, {
+        temperature: 0.8,
+        maxTokens: 500,
+        useSearch: true,
+      });
+    }
+
+    // DEBUG: Log raw response
     console.log(`[DEBUG] Raw LLM response:\n${response.slice(0, 500)}${response.length > 500 ? '...' : ''}`);
 
-    // Check for tool calls
-    const toolCalls = parseToolCalls(response);
-    console.log(`[DEBUG] Parsed tool calls: ${toolCalls.length}`, toolCalls.map(t => t.name));
+    // Get tool calls - either from native response or by parsing text
+    const toolCalls = nativeToolCalls.length > 0
+      ? nativeToolCalls.map(tc => ({ name: tc.name, arguments: tc.arguments }))
+      : parseToolCalls(response);
+    console.log(`[DEBUG] Tool calls: ${toolCalls.length}`, toolCalls.map(t => t.name));
 
     // Tools that require confirmation before executing
     const CONFIRMATION_REQUIRED_TOOLS = ['send_email', 'send_whatsapp', 'google_create_event', 'google_update_event'];
@@ -514,6 +547,7 @@ IMPORTANT: You have real-time web search built in. When asked about current even
           const actionResults = await Promise.all(
             remainingTools.map(async (toolCall) => {
               const result = await executeTool(toolCall, toolContext);
+              console.log(`[DEBUG] Tool ${toolCall.name} result:`, result);
               return {
                 name: toolCall.name,
                 success: result.success,
@@ -525,6 +559,7 @@ IMPORTANT: You have real-time web search built in. When asked about current even
             immediateResults.push(r.success ? `✓ ${r.name}: ${r.result}` : `✗ ${r.name} failed: ${r.result}`);
           });
         }
+        console.log(`[DEBUG] immediateResults:`, immediateResults);
       }
 
       // Handle confirmation-required tools
@@ -566,22 +601,34 @@ IMPORTANT: You have real-time web search built in. When asked about current even
 
       // No confirmation needed - just return results from immediate tools
       if (immediateResults.length > 0) {
-        // Generate follow-up response with tool results
-        const followUpPrompt = `${prompt}
+        // Check if any tool failed
+        const hasFailure = immediateResults.some(r => r.startsWith('✗'));
 
-## Tool Results
+        if (hasFailure) {
+          // If tools failed, report directly without LLM follow-up (prevents hallucination)
+          const failureMsg = immediateResults.filter(r => r.startsWith('✗')).join('\n');
+          return failureMsg.replace(/✗ \w+ failed: /g, '');
+        }
+
+        // All tools succeeded - generate follow-up with results
+        const followUpPrompt = `You are ${agent.name}. Give a brief, helpful response based ONLY on these tool results:
+
 ${immediateResults.join('\n')}
 
-## Your Follow-up Response
-Based on the tool results above, give a brief response confirming what happened. Be honest about failures.`;
+RULES:
+- Report ONLY what the tools returned - no guessing or adding information
+- If results show calendar/email data, summarize it naturally
+- Keep response to 1-2 sentences
+- Do NOT make up data that isn't in the results above`;
 
         const followUp = await provider.generate(followUpPrompt, {
-          temperature: 0.7,
+          temperature: 0.5,  // Lower temp to reduce hallucination
           maxTokens: 200,
-          useSearch: true,
         });
 
+        console.log(`[DEBUG] Follow-up raw:`, followUp.slice(0, 300));
         const cleaned = removeToolCallsFromResponse(followUp).trim();
+        console.log(`[DEBUG] Follow-up cleaned:`, cleaned.slice(0, 300));
         return stripAgentNamePrefix(cleaned, agent.name);
       }
     }

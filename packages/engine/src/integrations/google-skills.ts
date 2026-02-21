@@ -65,21 +65,44 @@ export async function getTodayEvents(): Promise<SkillResult<CalendarEvent[]>> {
   }
 
   try {
+    // Get start and end of today in IST (user's timezone)
+    const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
+
+    // Get current time in IST
     const now = new Date();
-    const endOfDay = new Date(now);
-    endOfDay.setHours(23, 59, 59, 999);
+    const istFormatter = new Intl.DateTimeFormat('en-CA', {
+      timeZone: timezone,
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+    });
+    const todayIST = istFormatter.format(now); // YYYY-MM-DD in IST
+
+    // Create start/end of day in IST, then convert to UTC for API
+    const startOfDay = new Date(`${todayIST}T00:00:00+05:30`);
+    const endOfDay = new Date(`${todayIST}T23:59:59+05:30`);
+
+    console.log(`[GoogleSkills] Today in IST: ${todayIST}, range: ${startOfDay.toISOString()} to ${endOfDay.toISOString()}`);
 
     const events = await google.calendar.listEvents({
-      timeMax: endOfDay,
+      timeMin: startOfDay,  // Start of today
+      timeMax: endOfDay,    // End of today
       maxResults: 50,
     });
+
+    console.log(`[GoogleSkills] Found ${events.length} events:`, events.map(e => `${e.start.toISOString()} - ${e.summary}`));
 
     if (events.length === 0) {
       return { success: true, data: [], message: "You have no events scheduled for today." };
     }
 
+    // Use IST timezone for display (timezone already defined above)
     const summary = events.map(e => {
-      const time = e.allDay ? 'All day' : e.start.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' });
+      const time = e.allDay ? 'All day' : e.start.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        timeZone: timezone,
+      });
       return `• ${time}: ${e.summary}`;
     }).join('\n');
 
@@ -137,14 +160,31 @@ export async function createCalendarEvent(options: {
       return { success: false, error: 'Failed to create event' };
     }
 
+    const timezone = process.env.TIMEZONE || 'Asia/Kolkata';
+    const timeStr = startTime.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      timeZone: timezone,
+    });
+    const dateStr = startTime.toLocaleDateString('en-US', {
+      weekday: 'short',
+      month: 'short',
+      day: 'numeric',
+      timeZone: timezone,
+    });
+
     const inviteMsg = invitees.length > 0
       ? ` Invitations sent to: ${invitees.join(', ')}.`
+      : '';
+
+    const meetMsg = event.meetLink
+      ? `\nGoogle Meet: ${event.meetLink}`
       : '';
 
     return {
       success: true,
       data: event,
-      message: `Created "${title}" on ${startTime.toLocaleDateString()} at ${startTime.toLocaleTimeString('en-US', { hour: 'numeric', minute: '2-digit' })}.${inviteMsg}`,
+      message: `Created "${title}" on ${dateStr} at ${timeStr}.${inviteMsg}${meetMsg}`,
     };
   } catch (error) {
     return { success: false, error: error instanceof Error ? error.message : 'Failed to create event' };

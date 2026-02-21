@@ -5,7 +5,7 @@
  * Supports: Ollama, OpenAI-compatible, Anthropic, MiniMax, Kimi (Moonshot)
  */
 
-import type { LLMProvider, ModelConfig, GenerateOptions } from '../types/index.js';
+import type { LLMProvider, ModelConfig, GenerateOptions, GenerateWithToolsResult, ToolCallFromLLM } from '../types/index.js';
 
 /**
  * Create an LLM provider based on config
@@ -132,10 +132,14 @@ class OpenAICompatibleProvider implements LLMProvider {
 
 /**
  * Kimi Provider (Moonshot AI)
- * OpenAI-compatible API
+ * OpenAI-compatible API with native tool calling support
+ *
  * International: https://api.moonshot.ai/v1
  * China: https://api.moonshot.cn/v1
- * Models: moonshot-v1-8k, moonshot-v1-32k, moonshot-v1-128k
+ * Models: kimi-k2-0711-preview (latest), moonshot-v1-8k/32k/128k
+ *
+ * Tool Call ID Format: functions.func_name:idx
+ * Tool Definition Format: { type: "function", function: { name, description, parameters } }
  */
 class KimiProvider implements LLMProvider {
   name = 'kimi';
@@ -145,12 +149,16 @@ class KimiProvider implements LLMProvider {
 
   constructor(config: ModelConfig) {
     this.endpoint = config.endpoint ?? 'https://api.moonshot.ai/v1';
-    this.model = config.modelName ?? 'moonshot-v1-32k';
+    this.model = config.modelName ?? 'kimi-k2-0711-preview';
     this.apiKey = config.apiKey!;
   }
 
-  async generate(prompt: string, options?: GenerateOptions): Promise<string> {
-    const messages: Array<{ role: string; content: string; tool_call_id?: string }> = [
+  /**
+   * Generate with optional native tool calling
+   * Returns structured result with tool calls if model requests them
+   */
+  async generateWithTools(prompt: string, options?: GenerateOptions): Promise<GenerateWithToolsResult> {
+    const messages: Array<{ role: string; content: string | null; tool_call_id?: string; tool_calls?: unknown[] }> = [
       { role: 'user', content: prompt }
     ];
 
@@ -161,20 +169,39 @@ class KimiProvider implements LLMProvider {
       max_tokens: options?.maxTokens ?? 500,
     };
 
-    // Kimi supports web search via builtin_function tool (K2 models) or use_search (v1 models)
-    if (options?.useSearch) {
-      // For K2 models, use builtin tool calling
-      if (this.model.includes('k2') || this.model.includes('kimi-k2')) {
-        body.tools = [{
-          type: 'builtin_function',
-          function: { name: '$web_search' }
-        }];
-        console.log('[Kimi] Using $web_search tool (K2 model)');
-      } else {
-        // For v1 models, use use_search parameter
-        body.use_search = true;
-        console.log('[Kimi] Using use_search parameter (v1 model)');
+    // Build tools array
+    const tools: Array<{ type: string; function?: unknown }> = [];
+
+    // Add custom tools if provided (convert to Kimi format)
+    if (options?.tools && options.tools.length > 0) {
+      for (const tool of options.tools) {
+        tools.push({
+          type: 'function',
+          function: {
+            name: tool.name,
+            description: tool.description,
+            parameters: tool.parameters,
+          }
+        });
       }
+    }
+
+    // Add web search for K2 models
+    if (options?.useSearch && (this.model.includes('k2') || this.model.includes('kimi-k2'))) {
+      tools.push({
+        type: 'builtin_function',
+        function: { name: '$web_search' }
+      });
+    }
+
+    if (tools.length > 0) {
+      body.tools = tools;
+      console.log('[Kimi] Tools enabled:', tools.map(t => t.function && typeof t.function === 'object' && 'name' in t.function ? (t.function as {name: string}).name : 'builtin'));
+    }
+
+    // Use use_search for v1 models
+    if (options?.useSearch && !this.model.includes('k2') && !this.model.includes('kimi-k2')) {
+      body.use_search = true;
     }
 
     const response = await fetch(`${this.endpoint}/chat/completions`, {
@@ -191,74 +218,152 @@ class KimiProvider implements LLMProvider {
       throw new Error(`Kimi API error: ${response.status} - ${error}`);
     }
 
+    interface KimiToolCall {
+      id: string;  // Format: functions.func_name:idx
+      type: string;
+      function: { name: string; arguments: string };
+    }
+
     interface KimiResponse {
       choices: Array<{
         message: {
           content: string | null;
-          tool_calls?: Array<{
-            id: string;
-            type: string;
-            function: { name: string; arguments: string };
-          }>;
+          tool_calls?: KimiToolCall[];
         };
-        finish_reason: string;
+        finish_reason: 'stop' | 'tool_calls' | 'length';
       }>;
     }
 
     const data = await response.json() as KimiResponse;
     const choice = data.choices[0];
 
-    // Handle tool calls (for K2 models with $web_search)
+    // Handle tool calls
     if (choice.finish_reason === 'tool_calls' && choice.message.tool_calls) {
-      console.log('[Kimi] Processing tool calls:', choice.message.tool_calls.map(t => t.function.name));
+      const toolCalls: ToolCallFromLLM[] = [];
 
-      // For $web_search, Kimi executes it internally and returns results
-      // We need to send the tool results back and get final response
-      const toolResults: Array<{ role: string; tool_call_id: string; content: string }> = [];
+      for (const tc of choice.message.tool_calls) {
+        // Skip internal tools like $web_search - handle them separately
+        if (tc.function.name.startsWith('$')) {
+          continue;
+        }
 
-      for (const toolCall of choice.message.tool_calls) {
-        console.log('[Kimi] Tool call:', toolCall.function.name, 'args:', toolCall.function.arguments);
-        if (toolCall.function.name === '$web_search') {
-          // Kimi handles $web_search internally - we just acknowledge it
-          toolResults.push({
-            role: 'tool',
-            tool_call_id: toolCall.id,
-            content: toolCall.function.arguments || '{}',
+        try {
+          const args = JSON.parse(tc.function.arguments || '{}');
+          toolCalls.push({
+            id: tc.id,
+            name: tc.function.name,
+            arguments: args,
           });
+        } catch (e) {
+          console.error('[Kimi] Failed to parse tool args:', tc.function.arguments, e);
         }
       }
 
-      // Make follow-up call to get final response with search results
-      const followUpBody = {
-        model: this.model,
-        messages: [
-          ...messages,
-          { role: 'assistant', content: null, tool_calls: choice.message.tool_calls },
-          ...toolResults,
-        ],
-        temperature: options?.temperature ?? 0.8,
-        max_tokens: options?.maxTokens ?? 500,
-      };
-
-      const followUpResponse = await fetch(`${this.endpoint}/chat/completions`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${this.apiKey}`,
-        },
-        body: JSON.stringify(followUpBody),
-      });
-
-      if (!followUpResponse.ok) {
-        const error = await followUpResponse.text();
-        throw new Error(`Kimi API error on follow-up: ${followUpResponse.status} - ${error}`);
+      // If we have custom tool calls, return them for external execution
+      if (toolCalls.length > 0) {
+        return {
+          content: choice.message.content || '',
+          toolCalls,
+          finishReason: 'tool_calls',
+        };
       }
 
-      const followUpData = await followUpResponse.json() as KimiResponse;
-      return followUpData.choices[0].message.content || '';
+      // Handle $web_search internally
+      const webSearchCalls = choice.message.tool_calls.filter(tc => tc.function.name === '$web_search');
+      if (webSearchCalls.length > 0) {
+        // Kimi handles web search internally - send acknowledgment and get final response
+        const toolResults = webSearchCalls.map(tc => ({
+          role: 'tool' as const,
+          tool_call_id: tc.id,
+          content: tc.function.arguments || '{}',
+        }));
+
+        const followUpBody = {
+          model: this.model,
+          messages: [
+            ...messages,
+            { role: 'assistant', content: null, tool_calls: choice.message.tool_calls },
+            ...toolResults,
+          ],
+          temperature: options?.temperature ?? 0.8,
+          max_tokens: options?.maxTokens ?? 500,
+        };
+
+        const followUpResponse = await fetch(`${this.endpoint}/chat/completions`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${this.apiKey}`,
+          },
+          body: JSON.stringify(followUpBody),
+        });
+
+        if (!followUpResponse.ok) {
+          const error = await followUpResponse.text();
+          throw new Error(`Kimi API error on follow-up: ${followUpResponse.status} - ${error}`);
+        }
+
+        const followUpData = await followUpResponse.json() as KimiResponse;
+        return {
+          content: followUpData.choices[0].message.content || '',
+          finishReason: followUpData.choices[0].finish_reason,
+        };
+      }
     }
 
-    return choice.message.content || '';
+    return {
+      content: choice.message.content || '',
+      finishReason: choice.finish_reason,
+    };
+  }
+
+  /**
+   * Send tool execution results back to Kimi and get final response
+   */
+  async continueWithToolResults(
+    originalPrompt: string,
+    assistantToolCalls: Array<{ id: string; function: { name: string; arguments: string } }>,
+    toolResults: Array<{ tool_call_id: string; content: string }>,
+    options?: GenerateOptions
+  ): Promise<string> {
+    const messages = [
+      { role: 'user', content: originalPrompt },
+      { role: 'assistant', content: null, tool_calls: assistantToolCalls },
+      ...toolResults.map(r => ({ role: 'tool', tool_call_id: r.tool_call_id, content: r.content })),
+    ];
+
+    const response = await fetch(`${this.endpoint}/chat/completions`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${this.apiKey}`,
+      },
+      body: JSON.stringify({
+        model: this.model,
+        messages,
+        temperature: options?.temperature ?? 0.8,
+        max_tokens: options?.maxTokens ?? 500,
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Kimi API error: ${response.status} - ${error}`);
+    }
+
+    const data = await response.json() as { choices: Array<{ message: { content: string | null } }> };
+    return data.choices[0].message.content || '';
+  }
+
+  /**
+   * Simple generate (backwards compatible - no tool calling)
+   * Explicitly removes tools to prevent tool_calls response
+   */
+  async generate(prompt: string, options?: GenerateOptions): Promise<string> {
+    // Don't pass tools - we want a direct text response
+    const optionsWithoutTools = options ? { ...options, tools: undefined } : options;
+    const result = await this.generateWithTools(prompt, optionsWithoutTools);
+    return result.content;
   }
 
   async generateJSON<T>(prompt: string, options?: GenerateOptions): Promise<T> {

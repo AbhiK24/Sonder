@@ -438,6 +438,24 @@ export interface LLMProvider {
   name: string;
   generate(prompt: string, options?: GenerateOptions): Promise<string>;
   generateJSON<T>(prompt: string, options?: GenerateOptions): Promise<T>;
+  // Native tool calling support (optional - returns tool calls if model supports it)
+  generateWithTools?(prompt: string, options?: GenerateOptions): Promise<GenerateWithToolsResult>;
+}
+
+export interface ToolDefinitionForLLM {
+  name: string;
+  description: string;
+  parameters: {
+    type: 'object';
+    properties: Record<string, { type: string; description: string; enum?: string[] }>;
+    required: string[];
+  };
+}
+
+export interface ToolCallFromLLM {
+  id: string;
+  name: string;
+  arguments: Record<string, unknown>;
 }
 
 export interface GenerateOptions {
@@ -445,6 +463,13 @@ export interface GenerateOptions {
   maxTokens?: number;
   stopSequences?: string[];
   useSearch?: boolean;  // Enable web search grounding (Kimi, Perplexity)
+  tools?: ToolDefinitionForLLM[];  // Custom tools for native tool calling
+}
+
+export interface GenerateWithToolsResult {
+  content: string;
+  toolCalls?: ToolCallFromLLM[];
+  finishReason: 'stop' | 'tool_calls' | 'length';
 }
 
 export interface ModelConfig {
