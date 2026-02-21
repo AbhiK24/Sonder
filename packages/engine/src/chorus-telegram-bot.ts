@@ -1304,19 +1304,32 @@ async function handleCheckIn(chatId: number, type: 'morning' | 'midday' | 'eveni
   await sendProactiveMessage(chatId, `${leadAgent.emoji} **${leadAgent.name}:** ${response}`);
 }
 
+const REUNION_GREETINGS = [
+  "We were all thinking about you!",
+  "We were wondering when you'd be back!",
+  "We missed you around here!",
+  "The Chorus was thinking of you while you were away...",
+  "Welcome back! We had some thoughts while you were gone...",
+  "Hey, you're back! We were just talking about you...",
+  "There you are! We've been waiting for you...",
+];
+
 async function handleReunion(chatId: number, awayMinutes: number, thoughts: string): Promise<void> {
   const state = getState(chatId);
   const leadAgent = chorusAgents.luna; // Luna leads reunions
 
+  // Pick a warm greeting
+  const greeting = REUNION_GREETINGS[Math.floor(Math.random() * REUNION_GREETINGS.length)];
+
   const response = await generateAgentResponse(
     leadAgent,
-    `(User just returned after ${awayMinutes} minutes away)`,
+    `(User just returned after ${awayMinutes} minutes away. Start with warmth, they were missed.)`,
     state,
     undefined,
     { reunionContext: thoughts }
   );
 
-  await sendProactiveMessage(chatId, `${leadAgent.emoji} **${leadAgent.name}:** ${response}`);
+  await sendProactiveMessage(chatId, `${leadAgent.emoji} **${leadAgent.name}:** ${greeting}\n\n${response}`);
 }
 
 // =============================================================================
