@@ -128,6 +128,9 @@ interface UserState {
 
 const userStates = new Map<number, UserState>();
 
+// Pending reunions - sent AFTER processing user's request
+const pendingReunions = new Map<number, { awayMinutes: number; thoughts: string }>();
+
 // Services
 let provider: LLMProvider;
 let idleEngine: IdleEngine;
@@ -1335,7 +1338,12 @@ function setupIdleEngine(): void {
       },
       onReunion: async (payload, message) => {
         const chatId = parseInt(payload.userId);
-        await handleReunion(chatId, payload.awayDuration, message.text);
+        // Store reunion - will be sent AFTER processing user's request
+        pendingReunions.set(chatId, {
+          awayMinutes: payload.awayDuration,
+          thoughts: message.text,
+        });
+        console.log(`[IdleEngine] Reunion queued for ${chatId} (away ${payload.awayDuration}m)`);
       },
       onThoughtGenerated: async (thought) => {
         console.log(`[IdleEngine] Generated thought for ${thought.userId}: ${thought.type}`);
@@ -1716,6 +1724,15 @@ async function main() {
       // Only reply if there's a response (FTUE sends messages directly)
       if (response) {
         await ctx.reply(response, { parse_mode: 'Markdown' });
+      }
+
+      // Send pending reunion AFTER processing user's request
+      const pendingReunion = pendingReunions.get(chatId);
+      if (pendingReunion) {
+        pendingReunions.delete(chatId);
+        // Small delay so reunion feels separate from the response
+        await new Promise(resolve => setTimeout(resolve, 1500));
+        await handleReunion(chatId, pendingReunion.awayMinutes, pendingReunion.thoughts);
       }
     } catch (error) {
       console.error(`[${chatId}] Error:`, error);
